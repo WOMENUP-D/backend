@@ -5,6 +5,7 @@ These enums encode the taxonomies fixed by the technical specification
 the string members — renaming one is a migration, not a refactor.
 """
 
+from datetime import date
 from enum import StrEnum
 
 
@@ -85,6 +86,51 @@ class Language(StrEnum):
     UZ = "uz"
     RU = "ru"
     EN = "en"
+
+
+# The portal has no content below this age; the account is not for them. The
+# upper bound only rejects a typo — a birth year of 1890 is a slipped digit, not
+# a centenarian signing up.
+#
+# They live here rather than in `services.age_gate` so a Pydantic schema can
+# import them without a schema depending on a service: nothing under
+# `app/schemas` imports `app/services` today, and `age_gate` itself imports
+# `app.models.profile`, so reaching for it from a schema would invert the
+# layering for two integers.
+MIN_SUPPORTED_AGE = 10
+MAX_SUPPORTED_AGE = 100
+
+
+def years_between(born: date, today: date) -> int:
+    """Whole years from `born` to `today`, never negative.
+
+    The one place this arithmetic is written. It looks trivial and is not: the
+    month/day comparison is what stops someone born in December being counted a
+    year older for the eleven months before her birthday, which on this portal
+    is the difference between a teenager and an adult at the health gate.
+    """
+    years = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    return max(0, years)
+
+
+def normalise_language(value: str | None) -> str | None:
+    """A locale tag from a client, reduced to a language the portal writes in.
+
+    The browser has four locales but only three written languages: `uz-Cyrl` is
+    Uzbek in another script, transliterated in the browser, so it folds to `uz`
+    rather than becoming a fourth prompt language.
+
+    Returns `None` for anything unrecognised so the caller falls through to the
+    stored language instead of silently writing Uzbek — "she asked for this" and
+    "we defaulted" are different facts, and only one of them is her choice.
+    """
+    if not value:
+        return None
+    # Only the primary subtag decides the language: `uz-Cyrl` and `uz-Latn` are
+    # both Uzbek, `ru-RU` is Russian. Matching on a prefix instead would fold
+    # any string merely beginning with "uz" into Uzbek.
+    head = value.strip().lower().split("-", 1)[0]
+    return head if head in {member.value for member in Language} else None
 
 
 class Region(StrEnum):

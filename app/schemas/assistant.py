@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import date
+from typing import Self
 
-from app.core.constants import AgeBand, AssistantSection
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.core.constants import MAX_SUPPORTED_AGE, MIN_SUPPORTED_AGE, AgeBand, AssistantSection
+from app.schemas.common import validate_birth_date
 
 
 class SourceRef(BaseModel):
@@ -110,9 +114,30 @@ class OnboardingIn(BaseModel):
 
     name: str = Field(min_length=1, max_length=120)
     surname: str = Field(default="", max_length=120)
-    age: int = Field(ge=10, le=100)
+    # A date of birth stays true on its own; an age is only true on the day it
+    # was typed. Asking for the date is what lets the safety band follow her
+    # instead of drifting a year out of date the moment she signs up.
+    birth_date: date | None = None
+    # Kept only for a client that was already open when this deployed, and for
+    # nothing else. New callers send `birth_date`. See the handler for why an
+    # age with no date is stored the way it is.
+    age: int | None = Field(default=None, ge=MIN_SUPPORTED_AGE, le=MAX_SUPPORTED_AGE)
     region: str | None = Field(default=None, max_length=40)
     interests: list[str] = Field(default_factory=list, max_length=12)
     goal: str = Field(default="", max_length=255)
     direction: str = Field(default="", max_length=60)
     consent_ai_personalisation: bool = True
+
+    _check_birth_date = field_validator("birth_date")(validate_birth_date)
+
+    @model_validator(mode="after")
+    def one_age_answer(self) -> Self:
+        """One of the two must be present, or we know nothing about her age.
+
+        Rejecting the empty case here rather than defaulting to an adult is the
+        whole point: an unknown age is treated as a minor everywhere else in the
+        portal, and silently inventing one would route a child past that.
+        """
+        if self.birth_date is None and self.age is None:
+            raise ValueError("provide birth_date")
+        return self

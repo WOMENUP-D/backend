@@ -134,6 +134,23 @@ class NewsDetail(NewsRead):
     age_relevance: dict[str, int]
 
 
+class NewsIngestReport(BaseModel):
+    """What one ingest run did.
+
+    Counts, not content — an editor reads the posts themselves. `reason` is how
+    a degraded run reports itself as a 200 with zero posts rather than as an
+    error: `disabled`, `ai_disabled`, `model_unavailable`, `refused`,
+    `no_results`, `locked` or `error`.
+    """
+
+    considered: int = 0
+    drafted: int = 0
+    published: int = 0
+    skipped_duplicate: int = 0
+    skipped_gate: int = 0
+    reason: str | None = None
+
+
 class PersonalisedNewsRead(NewsRead):
     """A card in the "For you" section.
 

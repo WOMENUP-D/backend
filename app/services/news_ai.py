@@ -230,7 +230,14 @@ def apply_analysis(post: NewsPost, analysis: Analysis) -> None:
     post.impact_score = analysis.impact
     if analysis.credibility is not None:
         post.credibility_score = analysis.credibility
+    # Merged, not assigned. `analysis.meta` and the three literal keys below
+    # are the only things this function is entitled to overwrite; anything else
+    # already in the column belongs to whoever wrote it. Ingestion keeps the
+    # article's provenance under `ai_meta["ingest"]`, and a wholesale
+    # assignment here would erase it the first time an editor pressed
+    # "Analyse" — the opposite of what the trace requirement is for.
     post.ai_meta = {
+        **(post.ai_meta or {}),
         **analysis.meta,
         "source": analysis.source,
         "audience": analysis.audience,

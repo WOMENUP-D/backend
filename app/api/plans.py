@@ -32,6 +32,7 @@ async def generate(
         user_id=uuid.UUID(user.id),
         horizon=payload.horizon,
         focus_dimensions=payload.focus_dimensions or None,
+        language=payload.language,
     )
 
 

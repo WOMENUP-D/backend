@@ -35,6 +35,7 @@ from app.core.constants import (
     Role,
     ScoreDimension,
     UserStatus,
+    years_between,
 )
 from app.core.logging import configure_logging
 from app.core.security import hash_password
@@ -53,6 +54,7 @@ from app.models.user import User, UserRole
 from app.seed_modules import MODULES as PROGRAM_MODULES
 from app.seed_news import load_news
 from app.services import rag
+from app.services.news_age import group_for_age
 from app.services.scoring import calculate_dimension_scores, persist_scores
 
 logger = logging.getLogger(__name__)
@@ -2617,6 +2619,11 @@ def _make_profile(user: User, now: datetime) -> Profile:
     employment, profession, skills = random.choice(OCCUPATIONS)
 
     age = random.randint(19, 54)
+    # Derive the date first and the bracket from it, so the two facts on the row
+    # cannot disagree. Drawing them independently let a profile carry a bracket
+    # a year away from the date the age gate actually reads.
+    born = (now - timedelta(days=age * 365 + random.randint(0, 364))).date()
+    bracket = group_for_age(years_between(born, now.date()))
     married = random.random() < 0.68
     children = random.choice([0, 1, 1, 2, 2, 3]) if married else random.choice([0, 0, 1])
 
@@ -2633,8 +2640,11 @@ def _make_profile(user: User, now: datetime) -> Profile:
     return Profile(
         user_id=user.id,
         full_name=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
-        birth_date=(now - timedelta(days=age * 365 + random.randint(0, 364))).date(),
-        age_group=f"{age // 10 * 10}-{age // 10 * 10 + 9}",
+        birth_date=born,
+        # The editorial vocabulary the news ranker keys its age map on. The
+        # ten-year bands this used to write ("20-29") match no `AgeGroup` value,
+        # so every seeded reader missed the lookup silently.
+        age_group=bracket.value if bracket else None,
         district=random.choice(DISTRICTS),
         education_level=education_level,
         education_field=education_field,
@@ -3570,7 +3580,8 @@ async def _ensure_account(
     # that band: no adult health content in her feed and an unpersonalised
     # assistant, on the one account every demonstration signs in with.
     profile.birth_date = profile.birth_date or date(now.year - 29, 6, 14)
-    profile.age_group = profile.age_group or "25-29"
+    demo_bracket = group_for_age(years_between(profile.birth_date, now.date()))
+    profile.age_group = profile.age_group or (demo_bracket.value if demo_bracket else None)
     profile.profession = profession
     profile.skills = skills or []
     profile.education_level = education

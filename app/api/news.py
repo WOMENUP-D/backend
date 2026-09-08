@@ -20,6 +20,7 @@ what a woman *may* read is decided by `age_gate` and by nothing else.
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -36,6 +37,7 @@ from app.schemas.news import (
     ForYouFeed,
     NewsCreate,
     NewsDetail,
+    NewsIngestReport,
     NewsPreferences,
     NewsPreferencesUpdate,
     NewsRead,
@@ -46,6 +48,7 @@ from app.services.age_gate import age_from_profile, band_for_profile, is_minor
 from app.services.audit_service import record_audit
 from app.services.news_age import AGE_GROUPS, group_for_age, group_for_profile
 from app.services.news_ai import analyse, apply_analysis
+from app.services.news_ingest import AUDIT_ACTION, ingest_news
 from app.services.news_ranking import rank
 
 router = APIRouter(prefix="/news", tags=["news"])
@@ -366,3 +369,42 @@ async def analyse_news(
     )
     await session.flush()
     return post
+
+
+@router.post("/ingest", response_model=NewsIngestReport)
+async def trigger_ingest(
+    user: ContentDep,
+    session: DbSession,
+    request: Request,
+    limit: int = Query(default=3, ge=1, le=10),
+) -> NewsIngestReport:
+    """Run the news search now, on this editor's authority.
+
+    Bounded deliberately: each item costs a search, a page fetch and two model
+    calls, so the request-path version is a spot check rather than a backfill.
+    Use `python -m app.ingest_news` for a full run.
+
+    Publishing is not this endpoint's decision either —
+    `news_ingest.publication_gate` decides, exactly as it does on the timer.
+    What an editor gets by pressing this is a run *now*, not a run with fewer
+    rules. It does bypass `NEWS_INGEST_ENABLED`, because that switch controls
+    the timer and a named editor pressing a button is not a timer; the audit
+    row below names her.
+
+    Placement note: `POST /ingest` cannot be shadowed by `GET /{slug}` — there
+    is no `POST /{param}` route on this router at all — so this sits with the
+    other editor actions rather than above the reader ones.
+    """
+    result = await ingest_news(session, limit=limit, force=True)
+    await record_audit(
+        session,
+        action=AUDIT_ACTION,
+        entity_type="news_post",
+        actor_id=uuid.UUID(user.id),
+        actor_role=user.role.value,
+        classification=DataClassification.INTERNAL,
+        changes={**asdict(result), "manual": True},
+        ip_address=client_ip(request),
+    )
+    await session.flush()
+    return NewsIngestReport(**asdict(result))

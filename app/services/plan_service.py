@@ -17,6 +17,7 @@ from app.core.constants import (
     PlanItemStatus,
     Priority,
     ScoreDimension,
+    normalise_language,
 )
 from app.models.assessment import DevelopmentScore
 from app.models.audit import AiInteraction
@@ -78,16 +79,22 @@ async def generate_plan(
     user_id: uuid.UUID,
     horizon: GoalHorizon = GoalHorizon.M6,
     focus_dimensions: list[ScoreDimension] | None = None,
+    language: str | None = None,
     gateway: LlmGateway | None = None,
 ) -> DevelopmentPlan:
     """Build a draft roadmap. Falls back to a rule-based plan if AI is down."""
     gateway = gateway or llm_gateway
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
-    # The roadmap prompt asks for the user's language; without telling it which
-    # one, every plan came back in Uzbek regardless of the locale she picked.
-    language = await session.scalar(select(User.language).where(User.id == user_id))
-    lang = language.value if language else "uz"
+    # Which language to write the roadmap in. The request wins: it carries the
+    # locale she is actually reading the site in, and that is a live fact.
+    # `User.language` is the fallback — it is only as fresh as the last time she
+    # changed it, and for accounts created before that was persisted it is the
+    # column default, which is why every plan used to come back in Uzbek.
+    stored = await session.scalar(select(User.language).where(User.id == user_id))
+    lang = (
+        normalise_language(language) or normalise_language(stored.value if stored else None) or "uz"
+    )
     scores = list(
         (
             await session.execute(
@@ -135,13 +142,17 @@ async def generate_plan(
     plan = DevelopmentPlan(
         user_id=user_id,
         horizon=horizon,
-        title=payload.get("title", "Individual rivojlanish rejasi"),
+        # A missing title fell back to a hardcoded Uzbek string, which put the
+        # one language bug back into a plan the model had written in Russian.
+        title=payload.get("title") or FALLBACK_TITLE.get(lang, FALLBACK_TITLE["uz"]),
         summary=payload.get("summary"),
         generated_by_ai=True,
         model_version=response.model,
         prompt_version=response.prompt_version,
         trace_id=response.trace_id,
-        rationale={"focus_dimensions": [d.value for d in focus]},
+        # Recorded so the reader can be told a plan was written in a language
+        # she is no longer browsing in, and offered a regenerate.
+        rationale={"focus_dimensions": [d.value for d in focus], "language": lang},
     )
     session.add(plan)
     await session.flush()
@@ -268,7 +279,11 @@ async def _fallback_plan(
         title=FALLBACK_TITLE.get(lang, FALLBACK_TITLE["uz"]),
         summary=FALLBACK_SUMMARY.get(lang, FALLBACK_SUMMARY["uz"]),
         generated_by_ai=False,
-        rationale={"strategy": "rule_based_fallback", "focus_dimensions": [d.value for d in focus]},
+        rationale={
+            "strategy": "rule_based_fallback",
+            "focus_dimensions": [d.value for d in focus],
+            "language": lang,
+        },
     )
     session.add(plan)
     await session.flush()

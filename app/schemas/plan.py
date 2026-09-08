@@ -50,6 +50,12 @@ class PlanGenerateRequest(BaseModel):
     focus_dimensions: list[ScoreDimension] = Field(
         default=[], max_length=3, description="Leave empty to let the AI choose."
     )
+    # The locale she is reading the site in. Without it the plan follows a
+    # stored column that nothing used to write, so every roadmap came back in
+    # Uzbek even for a user on the Russian pages. Unrecognised values fall
+    # through to the stored language rather than being rejected: a roadmap is
+    # worth more than a 422 over a locale tag.
+    language: str | None = Field(default=None, max_length=8, description="uz | uz-Cyrl | ru | en")
 
 
 class PlanAccept(BaseModel):

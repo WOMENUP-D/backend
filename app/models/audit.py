@@ -69,7 +69,9 @@ class AiInteraction(UUIDMixin, TimestampMixin, Base):
     feature: Mapped[str] = mapped_column(
         String(40),
         nullable=False,
-        comment="navigator | roadmap | recommendation | content_assistant | risk_flag",
+        comment=(
+            "navigator | roadmap | recommendation | content_assistant | risk_flag | news_ingest"
+        ),
     )
     model_version: Mapped[str] = mapped_column(String(80), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)

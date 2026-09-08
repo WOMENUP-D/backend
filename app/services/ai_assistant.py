@@ -30,7 +30,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import AgeBand, AssistantSection, ConsentScope, EnrollmentStatus
+from app.core.constants import (
+    AgeBand,
+    AssistantSection,
+    ConsentScope,
+    EnrollmentStatus,
+    normalise_language,
+)
 from app.models.assessment import DevelopmentScore
 from app.models.audit import AiInteraction
 from app.models.plan import DevelopmentPlan
@@ -167,13 +173,29 @@ class AssistantAnswer:
     guest_questions_left: int | None = None
 
 
-async def build_persona(session: AsyncSession, user_id: uuid.UUID | None) -> Persona:
-    """Assemble the persona, or an empty one when we may not personalise."""
+async def build_persona(
+    session: AsyncSession,
+    user_id: uuid.UUID | None,
+    *,
+    language: str | None = None,
+) -> Persona:
+    """Assemble the persona, or an empty one when we may not personalise.
+
+    `language` is the locale the request was made in and wins over the stored
+    column. Resolving it here rather than at each answer site is deliberate:
+    every canned reply in this module — unavailable, escalation, out-of-scope —
+    already keys off `persona.language`, so one override fixes all of them at
+    once and cannot be forgotten at a call site added later.
+    """
     if user_id is None:
-        return Persona()
+        return Persona(language=normalise_language(language) or "uz")
 
     user = await session.get(User, user_id)
-    language = user.language.value if user and user.language else "uz"
+    language = (
+        normalise_language(language)
+        or (user.language.value if user and user.language else None)
+        or "uz"
+    )
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     band = band_for_profile(profile)
@@ -284,7 +306,7 @@ async def ask_education(
     behind it.
     """
     gateway = gateway or llm_gateway
-    persona = persona or await build_persona(session, user_id)
+    persona = persona or await build_persona(session, user_id, language=language)
     lang = language or persona.language
 
     if rag.needs_human_escalation(question):
@@ -330,7 +352,7 @@ async def education_detail(
 ) -> AssistantAnswer:
     """The cards: professions or an ordered roadmap, tied to real programmes."""
     gateway = gateway or llm_gateway
-    persona = persona or await build_persona(session, user_id)
+    persona = persona or await build_persona(session, user_id, language=language)
     lang = language or persona.language
 
     catalogue, index = await _catalogue(session, lang)
@@ -388,7 +410,7 @@ async def ask_health(
 ) -> AssistantAnswer:
     """Age-appropriate health information. Never a diagnosis."""
     gateway = gateway or llm_gateway
-    persona = persona or await build_persona(session, user_id)
+    persona = persona or await build_persona(session, user_id, language=language)
     lang = language or persona.language
 
     if rag.needs_human_escalation(question):
@@ -463,7 +485,7 @@ async def daily_message(
     same message, and a fresh model call per page load would be waste.
     """
     gateway = gateway or llm_gateway
-    persona = persona or await build_persona(session, user_id)
+    persona = persona or await build_persona(session, user_id, language=language)
     lang = language or persona.language
     today = today or datetime.now(UTC).date()
 
@@ -554,7 +576,7 @@ async def ask(
     and far cheaper than making her ask twice.
     """
     gateway = gateway or llm_gateway
-    persona = await build_persona(session, user_id)
+    persona = await build_persona(session, user_id, language=language)
     lang = language or persona.language
 
     # Safety first, before routing and before any model call — a disclosure

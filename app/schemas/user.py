@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.constants import (
     GoalHorizon,
@@ -17,7 +17,7 @@ from app.core.constants import (
     ScoreDimension,
     UserStatus,
 )
-from app.schemas.common import ORMModel
+from app.schemas.common import ORMModel, validate_birth_date
 
 
 class UserRead(ORMModel):
@@ -74,6 +74,17 @@ class ProfileUpdate(ProfileBase, ProfileSensitive):
     # the field leaves the stored choice alone (`exclude_unset`), and sending
     # an explicit null — which would violate the column — is rejected.
     news_interests: list[NewsTopic] = []
+
+    # The same rule the onboarding applies, so this endpoint cannot be used to
+    # store a date of birth the sign-up form would have refused.
+    #
+    # It belongs on the *input* model only. `ProfileRead` and `ProfileReadFull`
+    # inherit from `ProfileBase` and are FastAPI response models, so a validator
+    # placed there would run on the way out as well — and because the rule is
+    # wall-clock dependent, a stored date that quietly aged past the ceiling
+    # would turn every read of that profile into a 500 rather than the write
+    # into a 422.
+    _check_birth_date = field_validator("birth_date")(validate_birth_date)
 
 
 class ProfileRead(ProfileBase, ORMModel):

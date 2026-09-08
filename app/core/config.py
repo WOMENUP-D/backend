@@ -90,6 +90,51 @@ class Settings(BaseSettings):
     ai_min_confidence: float = 0.35
     embedding_dimensions: int = 1024
 
+    # --- AI news ingestion ----------------------------------------------
+    # Off by default, and this one is not a taste question: a fresh checkout,
+    # CI and the test suite must never make a paid outbound call on a timer,
+    # let alone publish from one. Turning it on is a deployment decision.
+    news_ingest_enabled: bool = False
+    news_ingest_interval_hours: int = 8
+    # Per run. A cap, not a target: the job publishes what clears the gate.
+    news_ingest_max_posts: int = 6
+    # How recent an article has to be to be worth ingesting at all.
+    news_ingest_lookback_hours: int = 48
+    # How far back the near-duplicate title check looks.
+    news_ingest_dedup_days: int = 30
+    # The second half of the publishing decision, separate from the first:
+    # `enabled` turns the search on, this decides whether what it finds may
+    # reach a reader without a human. True because the feature was asked for
+    # as "search and publish"; the safety argument is answered by
+    # `news_ingest.publication_gate`, which is code, not by a queue nobody
+    # staffs. Set it false to run the same job as a drafting aid instead.
+    news_ingest_auto_publish: bool = True
+    # An allowlist, not a blocklist. National sources first — this is a portal
+    # for women in Uzbekistan — then the international health and science
+    # bodies `news_ranking.TRUSTED_SOURCES` already treats as authoritative.
+    news_ingest_allowed_domains: Annotated[list[str], NoDecode] = [
+        "uza.uz",
+        "gov.uz",
+        "ssv.uz",
+        "minzdrav.uz",
+        "stat.uz",
+        "lex.uz",
+        "who.int",
+        "un.org",
+        "unwomen.org",
+        "unicef.org",
+        "unesco.org",
+        "unfpa.org",
+        "nobelprize.org",
+        "thelancet.com",
+        "nature.com",
+        "science.org",
+        "bmj.com",
+        "nejm.org",
+        "cochrane.org",
+        "cdc.gov",
+    ]
+
     # --- Outbound channels ---------------------------------------------
     sms_provider_url: str | None = None
     sms_provider_token: str | None = None
@@ -126,7 +171,12 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     rate_limit_per_minute: int = 120
 
-    @field_validator("cors_origins", "supported_languages", mode="before")
+    @field_validator(
+        "cors_origins",
+        "supported_languages",
+        "news_ingest_allowed_domains",
+        mode="before",
+    )
     @classmethod
     def split_list(cls, value: object) -> object:
         """Accept both JSON (`["a","b"]`) and comma-separated (`a,b`) forms.

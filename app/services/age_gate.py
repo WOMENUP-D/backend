@@ -17,11 +17,21 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.core.constants import AgeBand
+from app.core.constants import MAX_SUPPORTED_AGE, MIN_SUPPORTED_AGE, AgeBand, years_between
 from app.models.profile import Profile
 
-# Below this the portal has no content at all; the account is not for them.
-MIN_SUPPORTED_AGE = 10
+__all__ = [
+    "ADULT_HEALTH_TOPICS",
+    "HEALTH_SCOPE",
+    "MAX_SUPPORTED_AGE",
+    "MIN_SUPPORTED_AGE",
+    "age_from_profile",
+    "band_for_age",
+    "band_for_profile",
+    "blocks_adult_health",
+    "fold",
+    "is_minor",
+]
 
 # Matching is done on a form with apostrophes stripped, so one spelling covers
 # the several glyphs Uzbek Latin is typed with. See `fold`.
@@ -97,10 +107,7 @@ def age_from_profile(profile: Profile | None, *, today: date | None = None) -> i
         return None
 
     if profile.birth_date is not None:
-        today = today or date.today()
-        born = profile.birth_date
-        years = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-        return max(0, years)
+        return years_between(profile.birth_date, today or date.today())
 
     if profile.age_group:
         digits = ""

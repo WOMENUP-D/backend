@@ -11,8 +11,14 @@ the rest of the catalogue does not.
   and from a reader whose age we do not know — the same protective default
   `age_gate` already applies to the assistant.
 * **No verdicts.** These posts inform and point to a doctor or an official
-  source; they never diagnose. That is an editorial rule, enforced by review
-  before `is_published` is set, not by the schema.
+  source; they never diagnose. Where a human drafts the post that stays an
+  editorial rule, enforced by review before `is_published` is set. Where the
+  AI news ingest drafts it, review is not available three times a day, so the
+  rule is enforced in code by `services.news_ingest.publication_gate` — a
+  check over attribution, the source domain, the escalation keyword filter and
+  the vocabulary of a verdict, run before `is_published` is ever set. Neither
+  the schema nor a prompt enforces it: a prompt is a request, and this feed
+  needs a boundary.
 
 Beside the gate sits a softer, separate mechanism: the editorial scores at the
 bottom of the model. `age_relevance` says which age brackets an article is
@@ -42,6 +48,10 @@ class NewsPost(UUIDMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_news_posts_published", "is_published", "published_at"),
         Index("ix_news_posts_category_published", "category", "is_published"),
+        # Deduplication expressed as a constraint rather than as a hope: even
+        # if two ingest runs raced past the SELECT, the second INSERT fails at
+        # the database instead of producing a duplicate feed card.
+        Index("ix_news_posts_source_url_hash", "source_url_hash", unique=True),
     )
 
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
@@ -75,6 +85,15 @@ class NewsPost(UUIDMixin, TimestampMixin, Base):
 
     source_name: Mapped[str | None] = mapped_column(String(160))
     source_url: Mapped[str | None] = mapped_column(String(500))
+
+    # The deduplication key, and the only one that holds forever. A job that
+    # runs three times a day for years cannot rely on a title: the same story
+    # is retitled between outlets and reprinted on anniversaries. This is the
+    # canonical form of `source_url` — scheme and host lowercased, `www.`
+    # dropped, query and fragment removed, trailing slash trimmed — hashed so
+    # the unique index is fixed-width. Null for hand-written posts, and
+    # Postgres allows many nulls in a unique index.
+    source_url_hash: Mapped[str | None] = mapped_column(String(64))
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
     region: Mapped[str | None] = mapped_column(String(60), index=True)
     reading_minutes: Mapped[int | None] = mapped_column(Integer)

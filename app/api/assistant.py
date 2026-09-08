@@ -34,7 +34,9 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.services import ai_assistant
+from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
+from app.services.news_age import group_for_age
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -287,11 +289,11 @@ async def assistant_profile(user: CurrentUserDep, session: DbSession) -> Assista
 async def onboarding(
     payload: OnboardingIn, user: CurrentUserDep, session: DbSession
 ) -> AssistantProfile:
-    """The five-field onboarding: name, age, interests, one goal, one direction.
+    """The five-field onboarding: name, date of birth, interests, goal, direction.
 
-    Age is stored as a birth date on 1 January of the implied year rather than
-    as a number, so the band stays correct as she gets older instead of ageing
-    out of accuracy the day after she signs up.
+    A date of birth is stored as given. It is asked for rather than an age
+    because an age is only true on the day it is typed, and the band it feeds
+    decides which health content she may be shown.
     """
     user_id = uuid.UUID(user.id)
     today = date.today()
@@ -302,9 +304,37 @@ async def onboarding(
         session.add(record)
 
     record.full_name = " ".join(part for part in (payload.name, payload.surname) if part.strip())
-    record.birth_date = date(today.year - payload.age, 1, 1)
-    record.age_group = f"{payload.age // 5 * 5}-{payload.age // 5 * 5 + 4}"
-    record.interests = [i.strip() for i in payload.interests if i.strip()][:12]
+
+    # A given date is stored as given; a bare age from a legacy client is
+    # anchored to *today*, not to 1 January.
+    #
+    # The 1 January form this replaces aged her up by up to eleven months: a
+    # girl who typed 17 in December became 18 to the gate on 1 January, and 18
+    # is exactly the boundary at which adult reproductive content stops being
+    # withheld. Anchoring to today's month and day instead makes her turn
+    # 18 on the latest date consistent with what she told us, which is the
+    # protective reading of an ambiguous answer.
+    #
+    # 29 February is stepped back a day rather than rejected — the anchor is
+    # derived, not hers, so it may be adjusted silently.
+    if payload.birth_date is not None:
+        record.birth_date = payload.birth_date
+    elif payload.age is not None:
+        day = 28 if (today.month, today.day) == (2, 29) else today.day
+        record.birth_date = date(today.year - payload.age, today.month, day)
+
+    age = age_from_profile(record, today=today)
+    group = group_for_age(age)
+    record.age_group = group.value if group else None
+
+    # Only overwrite what she actually sent. The second onboarding step is
+    # skippable and posts an empty list when skipped, and this endpoint is a
+    # re-entry point linked from the cabinet — so assigning unconditionally
+    # meant "come back and correct your date of birth" silently erased every
+    # interest she had chosen.
+    chosen = [i.strip() for i in payload.interests if i.strip()][:12]
+    if chosen:
+        record.interests = chosen
     record.completeness_percent = max(record.completeness_percent or 0, 60)
 
     # One goal, tied to a development dimension when the direction maps to one.
