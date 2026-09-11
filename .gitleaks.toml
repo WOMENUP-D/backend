@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known non-secret password used only by password-auth tests"
+regexTarget = "match"
+regexes = ['''olma-daraxti-2026''']
