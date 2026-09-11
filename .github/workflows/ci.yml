@@ -1,0 +1,167 @@
+name: backend CI and release
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: bash .ci/security.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: security-reports
+          path: reports/
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: womanup_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/womanup_test
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/womanup_test
+      JWT_SECRET_KEY: ci-only-not-a-production-secret-0000000000
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: '0.11.32'
+          python-version: '3.12'
+          enable-cache: true
+      - run: uv sync --frozen --extra dev
+      - run: python3 .ci/test_promote.py
+      - run: uv run --frozen pytest --junitxml=reports/pytest.xml
+      - name: Migrate a fresh database
+        run: |
+          PGPASSWORD=postgres createdb -h localhost -U postgres migration_test
+          DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/migration_test uv run --frozen alembic upgrade head
+          DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/migration_test uv run --frozen alembic upgrade head
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: test-reports
+          path: reports/
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [security, tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.release.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check immutable version
+        id: existing
+        env:
+          TAG: ghcr.io/womenup-d/backend:backend-${{ github.sha }}
+          VERSION: backend-${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if versions=$(gh api --paginate --slurp 'orgs/WOMENUP-D/packages/container/backend/versions?per_page=100' 2>error.log); then
+            digest=$(jq -r --arg tag "$VERSION" '.[][] | select(any(.metadata.container.tags[]?; . == $tag)) | .name' <<< "$versions")
+            if [[ -n "$digest" ]]; then
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+              actual=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest}}' | jq -r .digest)
+              test "$actual" = "$digest"
+              echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            fi
+          elif ! grep -q 'HTTP 404' error.log; then
+            cat error.log >&2
+            exit 1
+          fi
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        if: steps.existing.outputs.digest == ''
+        id: build
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/womenup-d/backend:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          build-args: REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+      - name: Scan exact release image
+        env:
+          DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p reports
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD -v "$PWD/reports:/reports" \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --severity HIGH,CRITICAL --exit-code 1 --format json \
+            --output /reports/image.json "ghcr.io/womenup-d/backend@$DIGEST"
+      - name: Publish immutable version
+        id: release
+        env:
+          DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
+          EXISTING: ${{ steps.existing.outputs.digest }}
+          TAG: ghcr.io/womenup-d/backend:backend-${{ github.sha }}
+        run: |
+          if [[ -z "$EXISTING" ]]; then
+            docker buildx imagetools create --prefer-index=false --tag "$TAG" "ghcr.io/womenup-d/backend@$DIGEST"
+          fi
+          actual=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest}}' | jq -r .digest)
+          test "$actual" = "$DIGEST"
+          echo "image=ghcr.io/womenup-d/backend@$DIGEST" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: image-security-report
+          path: reports/
+  deploy:
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: WOMENUP-D/infra
+          ref: main
+          path: .infra
+          token: ${{ secrets.INFRA_PUSH_TOKEN }}
+      - run: bash .ci/promote.sh
+        env:
+          APP: backend
+          SOURCE_SHA: ${{ github.sha }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

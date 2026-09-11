@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 
@@ -220,6 +222,9 @@ async def run() -> None:
                 delivered = await dispatch_pending(session)
                 sent, failed = await drain_outbox(session)
                 await session.commit()
+
+            if heartbeat := os.getenv("WORKER_HEARTBEAT_FILE"):
+                Path(heartbeat).touch()
 
             if delivered or sent or failed:
                 logger.info(

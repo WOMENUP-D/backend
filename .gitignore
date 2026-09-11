@@ -9,6 +9,10 @@
 __pycache__/
 *.py[cod]
 .venv/
+.uv-cache/
+.uv-python/
+reports/
+.infra/
 venv/
 .pytest_cache/
 .mypy_cache/
