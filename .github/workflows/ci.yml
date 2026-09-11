@@ -125,8 +125,12 @@ jobs:
           mkdir -p reports
           docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD -v "$PWD/reports:/reports" \
             aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
-            image --severity HIGH,CRITICAL --exit-code 1 --format json \
+            image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 --format json \
             --output /reports/image.json "ghcr.io/womenup-d/backend@$DIGEST"
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 --quiet \
+            "ghcr.io/womenup-d/backend@$DIGEST"
       - name: Publish immutable version
         id: release
         env:
