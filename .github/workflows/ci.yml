@@ -169,3 +169,46 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
           IMAGE: ${{ needs.publish.outputs.image }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  cleanup:
+    needs: [publish, deploy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Retain the deployed image and one rollback image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_IMAGE: ${{ needs.publish.outputs.image }}
+          OWNER: WOMENUP-D
+          PACKAGE: backend
+        run: |
+          set -euo pipefail
+          current_digest="${CURRENT_IMAGE##*@}"
+          [[ "$current_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+          versions=$(gh api --paginate --slurp "orgs/$OWNER/packages/container/$PACKAGE/versions?per_page=100")
+          retained_ids=$(jq -r --arg current_digest "$current_digest" '
+            [.[][]] | sort_by(.created_at) | reverse | . as $versions
+            | (map(select(.name == $current_digest)) | first) as $current
+            | if $current == null then
+                error("The deployed image is not present in GHCR; refusing to delete versions")
+              else
+                [$current.id, (map(select(.id != $current.id)) | first.id)]
+                | map(select(. != null))[]
+              end
+          ' <<< "$versions")
+
+          echo "Retaining package version IDs: $(tr '\n' ' ' <<< "$retained_ids")"
+          jq -r --argjson retained "$(jq -Rsc 'split("\n") | map(select(length > 0) | tonumber)' <<< "$retained_ids")" '
+            [.[][]] | .[] | select((.id | IN($retained[])) | not) | .id
+          ' <<< "$versions" | while read -r version_id; do
+            echo "Deleting old package version $version_id"
+            gh api --method DELETE "orgs/$OWNER/packages/container/$PACKAGE/versions/$version_id"
+          done
