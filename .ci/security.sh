@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-scanner="${1:?Usage: $0 {semgrep|gitleaks|trivy}}"
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 {semgrep|gitleaks|trivy}" >&2
+  exit 2
+fi
+
+scanner="$1"
 mkdir -p reports
 
 case "$scanner" in
