@@ -10,7 +10,7 @@ concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  security:
+  security-semgrep:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -18,13 +18,41 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - run: bash .ci/security.sh
+      - run: bash .ci/security.sh semgrep
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: security-reports
-          path: reports/
+          name: security-semgrep-report
+          path: reports/semgrep.json
+  security-gitleaks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: bash .ci/security.sh gitleaks
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: security-gitleaks-report
+          path: reports/gitleaks.json
+  security-trivy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: bash .ci/security.sh trivy
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: security-trivy-report
+          path: reports/dependencies.json
   tests:
+    needs: [security-semgrep, security-gitleaks, security-trivy]
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
@@ -45,10 +73,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
-          version: '0.11.32'
-          python-version: '3.12'
+          version: '0.12.13'
+          python-version: '3.14'
           enable-cache: true
       - run: uv sync --frozen --extra dev
       - run: python3 .ci/test_promote.py
@@ -64,9 +92,9 @@ jobs:
           name: test-reports
           path: reports/
 
-  publish:
+  build-publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [security, tests]
+    needs: tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -116,21 +144,6 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
-      - name: Scan exact release image
-        env:
-          DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p reports
-          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD -v "$PWD/reports:/reports" \
-            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
-            image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 --format json \
-            --output /reports/image.json "ghcr.io/womenup-d/backend@$DIGEST"
-          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
-            image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 --quiet \
-            "ghcr.io/womenup-d/backend@$DIGEST"
       - name: Publish immutable version
         id: release
         env:
@@ -144,13 +157,40 @@ jobs:
           actual=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest}}' | jq -r .digest)
           test "$actual" = "$DIGEST"
           echo "image=ghcr.io/womenup-d/backend@$DIGEST" >> "$GITHUB_OUTPUT"
+  image-scan:
+    needs: build-publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan the published image
+        env:
+          IMAGE: ${{ needs.build-publish.outputs.image }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p reports
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD -v "$PWD/reports:/reports" \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 --format json \
+            --output /reports/image.json "$IMAGE"
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: image-security-report
           path: reports/
   deploy:
-    needs: publish
+    needs: [build-publish, image-scan]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -167,10 +207,10 @@ jobs:
         env:
           APP: backend
           SOURCE_SHA: ${{ github.sha }}
-          IMAGE: ${{ needs.publish.outputs.image }}
+          IMAGE: ${{ needs.build-publish.outputs.image }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   cleanup:
-    needs: [publish, deploy]
+    needs: [build-publish, deploy]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -185,7 +225,7 @@ jobs:
       - name: Retain the deployed image and one rollback image
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURRENT_IMAGE: ${{ needs.publish.outputs.image }}
+          CURRENT_IMAGE: ${{ needs.build-publish.outputs.image }}
           OWNER: WOMENUP-D
           PACKAGE: backend
         run: |
