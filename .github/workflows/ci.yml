@@ -222,7 +222,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Retain the deployed image and one rollback image
+      - name: Retain the deployed image graph and one rollback graph
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURRENT_IMAGE: ${{ needs.build-publish.outputs.image }}
@@ -234,15 +234,62 @@ jobs:
           [[ "$current_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
 
           versions=$(gh api --paginate --slurp "orgs/$OWNER/packages/container/$PACKAGE/versions?per_page=100")
-          retained_ids=$(jq -r --arg current_digest "$current_digest" '
-            [.[][]] | sort_by(.created_at) | reverse | . as $versions
-            | (map(select(.name == $current_digest)) | first) as $current
-            | if $current == null then
+          current_version=$(jq -r --arg current_digest "$current_digest" '
+            [.[][]] | map(select(.name == $current_digest)) | first
+            | if . == null then
                 error("The deployed image is not present in GHCR; refusing to delete versions")
               else
-                [$current.id, (map(select(.id != $current.id)) | first.id)]
-                | map(select(. != null))[]
+                .name
               end
+          ' <<< "$versions")
+
+          # A published image is an OCI index that points to platform and
+          # attestation manifests. GHCR exposes each of those manifests as a
+          # package version, so retaining only the index leaves a broken image.
+          collect_image_graph() {
+            local root_digest="$1"
+            local manifest digest
+            local -a pending=("$root_digest")
+            local -A seen=()
+
+            while ((${#pending[@]})); do
+              digest="${pending[0]}"
+              pending=("${pending[@]:1}")
+              [[ -n "${seen[$digest]:-}" ]] && continue
+              seen["$digest"]=1
+
+              manifest=$(docker buildx imagetools inspect "ghcr.io/$OWNER/$PACKAGE@$digest" --raw) || return 1
+              while IFS= read -r child_digest; do
+                [[ -n "$child_digest" && -z "${seen[$child_digest]:-}" ]] && pending+=("$child_digest")
+              done < <(jq -r '.manifests[]?.digest // empty' <<< "$manifest")
+            done
+
+            printf '%s\n' "${!seen[@]}"
+          }
+
+          current_graph=$(collect_image_graph "$current_version") || {
+            echo "The deployed image graph is incomplete; refusing to delete versions" >&2
+            exit 1
+          }
+
+          rollback_graph=''
+          while IFS= read -r rollback_digest; do
+            [[ "$rollback_digest" == "$current_digest" ]] && continue
+            if rollback_graph=$(collect_image_graph "$rollback_digest"); then
+              echo "Retaining rollback image $rollback_digest"
+              break
+            fi
+            echo "Skipping incomplete rollback image $rollback_digest" >&2
+          done < <(jq -r --arg package "$PACKAGE" '
+            [.[][]]
+            | sort_by(.created_at) | reverse
+            | map(select(any(.metadata.container.tags[]?; test("^" + $package + "-[0-9a-f]{40}$"))))
+            | .[].name
+          ' <<< "$versions")
+
+          protected_digests=$(printf '%s\n%s\n' "$current_graph" "$rollback_graph" | sed '/^$/d' | sort -u)
+          retained_ids=$(jq -r --argjson protected "$(jq -Rsc 'split("\n") | map(select(length > 0))' <<< "$protected_digests")" '
+            [.[][]] | .[] | select(.name as $digest | $protected | index($digest)) | .id
           ' <<< "$versions")
 
           echo "Retaining package version IDs: $(tr '\n' ' ' <<< "$retained_ids")"
