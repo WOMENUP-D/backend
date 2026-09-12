@@ -139,7 +139,7 @@ class Settings(BaseSettings):
     sms_provider_url: str | None = None
     sms_provider_token: str | None = None
     smtp_host: str | None = None
-    smtp_port: int = 587
+    smtp_port: int | None = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
     # What a woman sees in the From line. Falls back to the SMTP user.
