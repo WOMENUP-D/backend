@@ -232,6 +232,7 @@ jobs:
           set -euo pipefail
           current_digest="${CURRENT_IMAGE##*@}"
           [[ "$current_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          registry_owner="${OWNER,,}"
 
           versions=$(gh api --paginate --slurp "orgs/$OWNER/packages/container/$PACKAGE/versions?per_page=100")
           current_version=$(jq -r --arg current_digest "$current_digest" '
@@ -258,7 +259,7 @@ jobs:
               [[ -n "${seen[$digest]:-}" ]] && continue
               seen["$digest"]=1
 
-              manifest=$(docker buildx imagetools inspect "ghcr.io/$OWNER/$PACKAGE@$digest" --raw) || return 1
+              manifest=$(docker buildx imagetools inspect "ghcr.io/$registry_owner/$PACKAGE@$digest" --raw) || return 1
               while IFS= read -r child_digest; do
                 [[ -n "$child_digest" && -z "${seen[$child_digest]:-}" ]] && pending+=("$child_digest")
               done < <(jq -r '.manifests[]?.digest // empty' <<< "$manifest")
