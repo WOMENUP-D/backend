@@ -29,6 +29,10 @@ class ConsentLog(UUIDMixin, TimestampMixin, Base):
     )
     scope: Mapped[ConsentScope] = mapped_column(str_enum(ConsentScope, 40), nullable=False)
     accepted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    #: For a scope given to one party — `share_with_employer` names the
+    #: organisation here. Null for platform-wide scopes. Current state is the
+    #: latest row for (user, scope, subject).
+    subject_ref: Mapped[str | None] = mapped_column(String(64))
     policy_version: Mapped[str] = mapped_column(String(20), nullable=False)
     accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(INET)

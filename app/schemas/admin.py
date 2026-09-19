@@ -28,7 +28,8 @@ class DashboardFilter(BaseModel):
 class KpiValue(BaseModel):
     key: str
     label: str
-    value: float
+    #: None when the denominator is 0 — "0 of 0" is not "0%".
+    value: float | None
     unit: str = "percent"
     numerator: int | None = None
     denominator: int | None = None
@@ -49,7 +50,8 @@ class RegionCoverage(BaseModel):
     region: Region
     registered: int
     active: int
-    avg_development_score: float
+    #: Not computed per region; None rather than an invented 0.0.
+    avg_development_score: float | None = None
 
 
 class TrafficDay(BaseModel):

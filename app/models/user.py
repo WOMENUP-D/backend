@@ -33,6 +33,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_users_region_status", "region", "status"),
         Index("ix_users_last_active_at", "last_active_at"),
+        Index("ix_users_created_at", "created_at"),
     )
 
     phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True)

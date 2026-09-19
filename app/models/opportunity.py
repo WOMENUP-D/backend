@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import (
     ApplicationStatus,
+    EventFormat,
     OpportunitySource,
     OpportunityType,
 )
@@ -26,7 +27,7 @@ from app.models.base import Base, TimestampMixin, UUIDMixin, str_enum
 
 
 class Opportunity(UUIDMixin, TimestampMixin, Base):
-    """A vacancy, grant, investment or marketplace slot.
+    """A vacancy, grant, investment or marketplace slot — or an event.
 
     `external_id` + `source` is the idempotency key for the sync job — a
     partner platform re-sending the same item updates rather than duplicates.
@@ -37,6 +38,7 @@ class Opportunity(UUIDMixin, TimestampMixin, Base):
         UniqueConstraint("source", "external_id", name="uq_opportunities_source"),
         Index("ix_opportunities_type_active", "type", "is_active"),
         Index("ix_opportunities_deadline", "deadline"),
+        Index("ix_opportunities_starts_at", "starts_at"),
     )
 
     source: Mapped[OpportunitySource] = mapped_column(
@@ -59,10 +61,30 @@ class Opportunity(UUIDMixin, TimestampMixin, Base):
         JSONB, default=dict, nullable=False, comment="Salary range, grant amount, etc."
     )
 
+    #: For an event, the last moment to register; otherwise the last moment to apply.
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Where to register or apply outside WomanUP, when the organiser takes it there.
     external_url: Mapped[str | None] = mapped_column(String(500))
+
+    # An event is a listing with a time. Everything else about it — organiser,
+    # topics (the skills column), age rule, registration — is the listing's own.
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    format: Mapped[EventFormat | None] = mapped_column(str_enum(EventFormat, 10))
+    #: The place, for an event she attends in person: a hall, an address.
+    venue: Mapped[str | None] = mapped_column(String(300))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: The WomanUP organisation that published it, for listings posted on the
+    #: platform. Partner-feed listings keep only the `organisation` name they
+    #: were sent with; nothing links them to an organisation record by guessing.
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), index=True
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
 
     applications: Mapped[list[Application]] = relationship(
         back_populates="opportunity", cascade="all, delete-orphan"
@@ -99,12 +121,32 @@ class Application(UUIDMixin, TimestampMixin, Base):
     opportunity: Mapped[Opportunity] = relationship(back_populates="applications")
 
 
+class SavedOpportunity(UUIDMixin, TimestampMixin, Base):
+    """A listing she kept to come back to. Saving is not applying: nothing
+    leaves the platform and no partner is told."""
+
+    __tablename__ = "saved_opportunities"
+    __table_args__ = (
+        UniqueConstraint("user_id", "opportunity_id", name="uq_saved_opportunities_user_id"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    opportunity_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("opportunities.id", ondelete="CASCADE"), index=True
+    )
+
+
 class OutcomeRecord(UUIDMixin, TimestampMixin, Base):
     """A confirmed result returned by a partner platform: hired, funded, first
     sale. This is what the North Star metric counts."""
 
     __tablename__ = "outcome_records"
-    __table_args__ = (Index("ix_outcome_records_user_type", "user_id", "outcome_type"),)
+    __table_args__ = (
+        Index("ix_outcome_records_user_type", "user_id", "outcome_type"),
+        Index("ix_outcome_records_created_at", "created_at"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True

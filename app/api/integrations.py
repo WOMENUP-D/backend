@@ -11,10 +11,13 @@ from sqlalchemy import select
 
 from app.api.deps import AdminDep, CurrentUserDep, DbSession, StaffDep
 from app.core.constants import (
+    EVENT_TYPES,
     ApplicationStatus,
     DataClassification,
+    EventFormat,
     IntegrationSystem,
     OpportunitySource,
+    OpportunityType,
 )
 from app.models.integration import IntegrationEvent
 from app.models.opportunity import Application, Opportunity, OutcomeRecord
@@ -26,6 +29,7 @@ from app.schemas.opportunity import (
     OutcomeCreate,
     OutcomeRead,
 )
+from app.services import events
 from app.services.audit_service import record_audit
 from app.services.integration_gateway import (
     ConsentMissingError,
@@ -42,6 +46,68 @@ SYSTEM_TO_SOURCE = {
     IntegrationSystem.INVEST_HUB: OpportunitySource.INVEST_HUB,
     IntegrationSystem.COMMERCE: OpportunitySource.COMMERCE,
 }
+
+
+_LANGUAGES = ("uz", "ru", "en")
+
+
+def _localized(item: dict, key: str, limit: int) -> dict:
+    """A partner sends `title_i18n` — or one `title` in its `language`, which
+    is stored under that language's key (uz when it names none)."""
+    given = item.get(f"{key}_i18n")
+    if isinstance(given, dict):
+        return {
+            language: str(text).strip()[:limit]
+            for language, text in given.items()
+            if language in _LANGUAGES and str(text or "").strip()
+        }
+    text = item.get(key)
+    language = item.get("language") if item.get("language") in _LANGUAGES else "uz"
+    return {language: text.strip()[:limit]} if isinstance(text, str) and text.strip() else {}
+
+
+def _moment(value: object) -> datetime | None:
+    """An ISO 8601 time with its offset. Anything else is not a time."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip())
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _listing_fields(item: dict) -> dict | None:
+    """One partner item as a listing — or None when it cannot be one: no
+    title, or a kind the platform does not know."""
+    try:
+        kind = OpportunityType(item.get("type") or "vacancy")
+    except ValueError:
+        return None
+    title = _localized(item, "title", 300)
+    if not title:
+        return None
+    starts = _moment(item.get("starts_at")) if kind in EVENT_TYPES else None
+    ends = _moment(item.get("ends_at")) if starts else None
+    fmt = item.get("format") if item.get("format") in {f.value for f in EventFormat} else None
+    return {
+        "type": kind,
+        "title_i18n": title,
+        "description_i18n": _localized(item, "description", 4000),
+        "organisation": (item.get("organisation") or None),
+        "region": item.get("region"),
+        "required_skills": [str(label) for label in item.get("required_skills") or []],
+        "eligibility": item.get("eligibility") or {},
+        "reward": item.get("reward") or {},
+        "deadline": _moment(item.get("deadline")),
+        "external_url": item.get("url"),
+        "is_active": bool(item.get("is_active", True)),
+        "synced_at": datetime.now(UTC),
+        "starts_at": starts,
+        "ends_at": ends if ends and starts and ends >= starts else None,
+        "format": EventFormat(fmt) if starts and fmt else None,
+        "venue": (str(item.get("venue") or "").strip()[:300] or None) if starts else None,
+    }
 
 
 def _verify_partner(system: IntegrationSystem, client_id: str | None) -> None:
@@ -157,10 +223,12 @@ async def sync_opportunities(
     _verify_partner(system, x_client_id)
     source = SYSTEM_TO_SOURCE[system]
 
-    created = updated = 0
+    created = updated = skipped = 0
     for item in items:
         external_id = str(item.get("external_id") or "").strip()
-        if not external_id:
+        fields = _listing_fields(item)
+        if not external_id or fields is None:
+            skipped += 1
             continue
 
         existing = await session.scalar(
@@ -168,29 +236,22 @@ async def sync_opportunities(
                 Opportunity.source == source, Opportunity.external_id == external_id
             )
         )
-        fields = {
-            "type": item.get("type", "vacancy"),
-            "title": item.get("title", "")[:300],
-            "description": item.get("description"),
-            "organisation": item.get("organisation"),
-            "region": item.get("region"),
-            "required_skills": item.get("required_skills", []),
-            "eligibility": item.get("eligibility", {}),
-            "reward": item.get("reward", {}),
-            "external_url": item.get("url"),
-            "is_active": item.get("is_active", True),
-            "synced_at": datetime.now(UTC),
-        }
-
         if existing is not None:
+            moved = existing.starts_at != fields["starts_at"]
             for key, value in fields.items():
                 setattr(existing, key, value)
             updated += 1
+            # Reminders follow an event the partner moved, and go with one it
+            # took down.
+            if not existing.is_active:
+                await events.drop_reminders(session, [existing.id])
+            elif moved and existing.starts_at is not None:
+                await events.reschedule(session, existing)
         else:
             session.add(Opportunity(source=source, external_id=external_id, **fields))
             created += 1
 
-    return Message(detail=f"{created} created, {updated} updated")
+    return Message(detail=f"{created} created, {updated} updated, {skipped} skipped")
 
 
 @router.post("/sync-profile", response_model=Message)
