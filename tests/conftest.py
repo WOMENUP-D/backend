@@ -60,6 +60,8 @@ async def engine():
             await connection.run_sync(Base.metadata.create_all)
     except Exception as exc:
         await engine.dispose()
+        if os.getenv("CI"):
+            raise RuntimeError("CI database/schema setup failed") from exc
         pytest.skip(f"PostgreSQL unavailable at {TEST_DB_URL}: {exc}")
 
     yield engine

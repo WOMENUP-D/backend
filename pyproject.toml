@@ -2,7 +2,7 @@
 name = "womanup-backend"
 version = "0.1.0"
 description = "WomanUP portal API — national digital development ecosystem for women and girls"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -47,7 +47,7 @@ addopts = "-q --strict-markers"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
@@ -57,7 +57,7 @@ ignore = ["B008"]  # FastAPI dependencies are function calls in defaults by desi
 "alembic/versions/*" = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 warn_unused_ignores = true
