@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, client_ip
-from app.core.constants import ConsentScope, DataClassification, Role
+from app.core.constants import SUBJECT_SCOPES, ConsentScope, DataClassification, Role
 from app.models.profile import Goal, Profile
 from app.models.user import User
 from app.schemas.admin import ConsentRead, ConsentUpdate
@@ -26,7 +26,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from app.services import activity
+from app.services import activity, skills
 from app.services.audit_service import current_consents, record_audit, record_consent
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -108,6 +108,13 @@ async def update_profile(
         ip_address=client_ip(request),
     )
     await session.flush()
+
+    if "skills" in changes:
+        # The skills she lists are her own word about herself, mirrored into
+        # the skill layer as exactly that. Removing one withdraws the claim and
+        # nothing else: a course she finished stays on the record.
+        await skills.sync_self_reported(session, uuid.UUID(user.id), profile.skills)
+
     # `updated_at` is filled by the database (`onupdate=func.now()`), so the
     # UPDATE leaves it expired on the instance. Serialising the response then
     # reaches for it outside the async context and the request dies with
@@ -191,6 +198,13 @@ async def update_consent(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown consent scope '{payload.scope}'",
         ) from None
+    if scope in SUBJECT_SCOPES:
+        # Sharing with an organisation is given to that organisation — on its
+        # listing or its invitation — and withdrawn there, never in general.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Consent scope '{scope.value}' is given per organisation",
+        )
 
     entry = await record_consent(
         session,

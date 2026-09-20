@@ -8,17 +8,24 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import ROLE_PERMISSIONS, Permission, Role
+from app.core.constants import ROLE_PERMISSIONS, Permission, Region, Role
 from app.core.logging import user_id_ctx
 from app.core.security import decode_token
 from app.db import get_session
+from app.models.user import User, UserRole
 from app.schemas.auth import CurrentUser
 
 bearer = HTTPBearer(auto_error=False)
 
-DbSession = Annotated[AsyncSession, Depends(get_session)]
+# `scope="function"`: the session commits when the endpoint has returned and
+# its response is serialised — before the response is sent. With the default
+# request scope the commit ran after the client already had its answer, so a
+# client that created something and asked for it straight away could be told
+# it did not exist.
+DbSession = Annotated[AsyncSession, Depends(get_session, scope="function")]
 
 
 async def get_current_user(
@@ -109,6 +116,30 @@ StaffDep = Annotated[
 ContentDep = Annotated[
     CurrentUser, Depends(require_roles(Role.ADMIN, Role.TRAINER, Role.MODERATOR))
 ]
+
+
+async def coordinator_region(session: AsyncSession, user: CurrentUser) -> Region | None:
+    """The region a regional coordinator is limited to, read from the database.
+
+    The access token carries roles, not regions, so `CurrentUser.region` is
+    never set from it; the scope lives on the role assignment
+    (`user_roles.scope_region`), with the region on her account as the
+    fallback. Administrators and moderators work nationally and get `None`, as
+    does a coordinator nobody has given a region — callers decide whether that
+    is allowed.
+    """
+    if user.has_role(Role.ADMIN, Role.MODERATOR) or not user.has_role(Role.REGIONAL_COORDINATOR):
+        return None
+    scoped = await session.scalar(
+        select(UserRole.scope_region).where(
+            UserRole.user_id == user.id,
+            UserRole.role == Role.REGIONAL_COORDINATOR,
+            UserRole.scope_region.is_not(None),
+        )
+    )
+    if scoped is not None:
+        return scoped
+    return await session.scalar(select(User.region).where(User.id == user.id))
 
 
 def client_ip(request: Request) -> str | None:

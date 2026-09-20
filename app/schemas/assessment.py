@@ -8,8 +8,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import ScoreDimension
+from app.core.constants import DimensionBand, ScoreDimension
 from app.schemas.common import ORMModel
+from app.schemas.recommendation import NextStep
+from app.schemas.skill import SkillRef
 
 
 class QuestionRead(ORMModel):
@@ -47,6 +49,37 @@ class DevelopmentScoreRead(BaseModel):
     assessment_id: uuid.UUID | None = None
     measured_at: datetime | None = None
     weakest_dimensions: list[ScoreDimension] = []
+
+
+class AnswerInsight(BaseModel):
+    """One of her own answers, quoted to explain how a dimension reads."""
+
+    question_id: uuid.UUID
+    text_i18n: dict
+    # The label of the option she chose, in every language the question has.
+    answer_i18n: dict = {}
+    value: float
+
+
+class DimensionInsight(ScoreRead):
+    """A dimension read in words: its band, what explains it, what to do."""
+
+    weight: float
+    band: DimensionBand
+    strengths: list[AnswerInsight] = []
+    weaknesses: list[AnswerInsight] = []
+    # Skills she does not hold that this platform's own courses and listings
+    # for the dimension teach or ask for — only gaps she can close here.
+    skill_gaps: list[SkillRef] = []
+    actions: list[NextStep] = []
+
+
+class ScoreInsightsRead(DevelopmentScoreRead):
+    """The Development Score with every dimension explained and made actionable."""
+
+    dimensions: list[DimensionInsight]  # type: ignore[assignment]
+    # The dimensions that need her most, strong ones left out.
+    focus_dimensions: list[ScoreDimension] = []
 
 
 class AssessmentRead(ORMModel):

@@ -22,8 +22,12 @@ from app.schemas.ai import (
     RiskFlagRead,
 )
 from app.schemas.common import Message
+from app.schemas.recommendation import RecommendationsRead
+from app.schemas.week import WeekRead
 from app.services import rag
 from app.services.ai_navigator import answer as navigator_answer
+from app.services.recommendation import recommendations_for
+from app.services.week import week_for
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -87,6 +91,25 @@ async def next_step(user: CurrentUserDep, session: DbSession) -> NextStepCard:
         description="Diagnostika natijasi asosida individual reja tuzamiz.",
         action_url="/plans/generate",
     )
+
+
+@router.get("/recommendations", response_model=RecommendationsRead)
+async def recommendations(user: CurrentUserDep, session: DbSession) -> RecommendationsRead:
+    """Her next steps, and the courses and listings behind them.
+
+    Supersedes `/ai/next-step` on the cabinet; that endpoint stays for older
+    clients. Up to three steps, each with its reason, and nothing named that the
+    database does not hold. Deterministic, with no model call.
+    """
+    return await recommendations_for(session, uuid.UUID(user.id))
+
+
+@router.get("/week", response_model=WeekRead)
+async def week(user: CurrentUserDep, session: DbSession) -> WeekRead:
+    """Her week in one row: the lesson she left off at, the next event, the
+    next practical task, the next listing. Each is a real record or absent —
+    the row is never filled in to look complete. Deterministic, no model call."""
+    return await week_for(session, uuid.UUID(user.id))
 
 
 @router.post(

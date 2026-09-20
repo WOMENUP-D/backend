@@ -51,8 +51,13 @@ from app.models.plan import DevelopmentPlan, PlanItem
 from app.models.profile import Profile
 from app.models.program import Enrollment, Program, ProgramModule
 from app.models.user import User, UserRole
+from app.seed_careers import load_careers
+from app.seed_lessons import carry_progress_over, load_lessons
 from app.seed_modules import MODULES as PROGRAM_MODULES
 from app.seed_news import load_news
+from app.seed_paths import load_paths
+from app.seed_skills import backfill, load_skills
+from app.seed_tasks import load_tasks
 from app.services import rag
 from app.services.news_age import group_for_age
 from app.services.scoring import calculate_dimension_scores, persist_scores
@@ -3009,6 +3014,30 @@ async def seed(*, force: bool = False) -> None:
         await session.flush()
         logger.info("seeded %s programmes", len(programs))
 
+        # Each module's own text becomes the lesson she opens, and every
+        # programme gets the level it teaches at. Written curricula already
+        # exist above; this turns them into something readable rather than
+        # inventing a second syllabus.
+        lesson_counts = await load_lessons(session)
+        logger.info("seeded lessons: %s", lesson_counts)
+
+        # Curated routes through the courses just seeded. They reference those
+        # programmes and copy nothing from them, so this adds no content — only
+        # an order worth taking them in.
+        path_counts = await load_paths(session)
+        logger.info("seeded learning paths: %s", path_counts)
+
+        # Briefs only — what to do and what it is judged against. No attempt,
+        # no submission and no evidence: those have to be earned.
+        task_counts = await load_tasks(session)
+        logger.info("seeded practical tasks: %s", task_counts)
+
+        # Directions toward work, over the skills the courses and tasks above
+        # teach. They name skills and a learning path and copy nothing, so this
+        # adds no course, task or listing — only a way of reading them.
+        career_counts = await load_careers(session)
+        logger.info("seeded career paths: %s", career_counts)
+
         # --- Opportunities --------------------------------------------------
         for source, otype, title, description, org, region, skills, reward, days in OPPORTUNITIES:
             session.add(
@@ -3513,6 +3542,24 @@ async def seed(*, force: bool = False) -> None:
             flags += 1
 
         logger.info("seeded %s open risk flags", flags)
+
+        # --- Skills ---------------------------------------------------
+        # The vocabulary, and the skills the population has already earned:
+        # what each woman listed, every course she finished, every
+        # certificate she holds. Idempotent, so re-seeding does not
+        # double-count, and `python -m app.seed_skills` does the same job on
+        # a database this script never touched.
+        loaded = await load_skills(session)
+        skill_counts = await backfill(session)
+        logger.info("seeded %s skills, backfilled %s", loaded, skill_counts)
+
+        # Enrollments exist by now, so what they record as finished becomes
+        # lesson ticks — through the one service that owns progress, which is
+        # also what issues the certificates those completions earned. It runs
+        # after the skill catalogue is loaded, so a course's skills resolve to
+        # curated entries rather than minting look-alikes.
+        carried = await carry_progress_over(session)
+        logger.info("carried progress onto lessons for %s enrollments", carried)
 
         await session.commit()
 

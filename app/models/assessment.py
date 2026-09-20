@@ -47,7 +47,10 @@ class Assessment(UUIDMixin, TimestampMixin, Base):
     """One completed (or in-progress) diagnostic run."""
 
     __tablename__ = "assessments"
-    __table_args__ = (Index("ix_assessments_user_completed", "user_id", "completed_at"),)
+    __table_args__ = (
+        Index("ix_assessments_user_completed", "user_id", "completed_at"),
+        Index("ix_assessments_completed_at", "completed_at"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True

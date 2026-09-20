@@ -25,12 +25,14 @@ from app.models.plan import DevelopmentPlan, PlanItem
 from app.models.profile import Goal, Profile
 from app.models.program import Program
 from app.models.user import User
+from app.services import skills as skill_service
 from app.services.llm_gateway import (
     LlmGateway,
     LlmUnavailableError,
     llm_gateway,
 )
 from app.services.prompts import ROADMAP_SCHEMA, ROADMAP_SYSTEM
+from app.services.score_insights import DIMENSION_PROGRAM_CATEGORIES
 from app.services.scoring import weakest_dimensions
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,11 @@ async def generate_plan(
         logger.info("AI disabled — generating rule-based plan for %s", user_id)
         return await _fallback_plan(session, user_id, horizon, focus, programs, lang)
 
-    prompt = _build_prompt(profile, score_map, goals, focus, horizon, programs, lang)
+    # Canonical skills, not the labels she once typed: the roadmap should
+    # build on what the platform can actually evidence, and should know the
+    # difference between a skill a course taught her and one someone verified.
+    notes = await skill_service.notes_for(session, user_id, language=lang)
+    prompt = _build_prompt(profile, score_map, goals, focus, horizon, programs, lang, notes)
 
     try:
         response = await gateway.complete(
@@ -222,6 +228,7 @@ def _build_prompt(
     horizon: GoalHorizon,
     programs: list[Program],
     lang: str = "uz",
+    skill_notes: list[skill_service.SkillNote] | None = None,
 ) -> str:
     """Assemble the user-turn payload. No direct identifiers are included."""
     lines = [
@@ -248,9 +255,15 @@ def _build_prompt(
             f"- education: {profile.education_level or 'unspecified'}",
             f"- employment: {profile.employment_status or 'unspecified'}",
             f"- profession: {profile.profession or 'unspecified'}",
-            f"- skills: {', '.join(profile.skills) or 'none recorded'}",
             f"- children: {children}",
         ]
+
+    # Skills as the platform records them, each with how well it is known.
+    # "learned" is a course; only a mentor, an employer or a placement makes a
+    # skill "verified", and a roadmap that confuses the two plans the wrong
+    # next step.
+    lines += ["", "RECORDED SKILLS (name — how well it is known — level):"]
+    lines += [f"- {note.as_line()}" for note in (skill_notes or [])] or ["- (none recorded yet)"]
 
     lines += ["", "AVAILABLE PROGRAMMES (id | category | title):"]
     lines += [f"- {p.id} | {p.category.value} | {_program_title(p, lang)}" for p in programs] or [
@@ -290,7 +303,16 @@ async def _fallback_plan(
 
     today = date.today()
     for index, dimension in enumerate(focus or list(ScoreDimension)[:3]):
-        match = next((p for p in programs if dimension.value in p.category.value), None)
+        # The first category that builds the dimension and has a programme.
+        match = next(
+            (
+                program
+                for category in DIMENSION_PROGRAM_CATEGORIES[dimension]
+                for program in programs
+                if program.category == category
+            ),
+            None,
+        )
         session.add(
             PlanItem(
                 plan_id=plan.id,
