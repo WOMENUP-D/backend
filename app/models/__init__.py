@@ -30,12 +30,14 @@ from app.models.program import (
     ProgramLesson,
     ProgramModule,
 )
+from app.models.rate_limit import AuthThrottle
 from app.models.skill import Skill, SkillEvidence, UserSkill
 from app.models.user import OtpChallenge, User, UserRole
 
 __all__ = [
     "AiInteraction",
     "Application",
+    "AuthThrottle",
     "Assessment",
     "AssessmentAnswer",
     "AssessmentQuestion",

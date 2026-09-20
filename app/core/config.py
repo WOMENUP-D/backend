@@ -73,6 +73,22 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 300
     otp_max_attempts: int = 5
     otp_resend_cooldown_seconds: int = 60
+    # Sign-in by phone stays off until an SMS provider is wired up: without one
+    # the code is never delivered, so the only way to "receive" it is to guess
+    # it — which would hand out accounts on numbers nobody owns.
+    phone_otp_enabled: bool = False
+
+    # --- OTP rate limits -------------------------------------------------
+    # Counted in the database (see `services.rate_limit`), so the limits hold
+    # across workers and restarts. A window is a fixed hour by default.
+    otp_request_ip_limit: int = 20
+    otp_request_ip_window_seconds: int = 3600
+    otp_request_identifier_limit: int = 5
+    otp_request_identifier_window_seconds: int = 3600
+    otp_verify_ip_limit: int = 30
+    otp_verify_ip_window_seconds: int = 3600
+    otp_verify_identifier_limit: int = 15
+    otp_verify_identifier_window_seconds: int = 3600
 
     # --- Localisation --------------------------------------------------
     default_language: Literal["uz", "ru", "en"] = "uz"

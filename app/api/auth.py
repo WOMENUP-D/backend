@@ -8,7 +8,7 @@ from collections import defaultdict
 import jwt
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.api.deps import CurrentUserDep, DbSession
+from app.api.deps import CurrentUserDep, DbSession, client_ip
 from app.core.config import settings
 from app.core.constants import ConsentScope
 from app.core.security import decode_token
@@ -24,9 +24,9 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.common import Message
-from app.services import auth_service, firebase_auth, mailer
+from app.services import auth_service, firebase_auth, mailer, rate_limit
 from app.services.audit_service import record_consent
-from app.services.auth_service import AuthError, EmailTaken, OtpThrottled
+from app.services.auth_service import AuthError, EmailTaken, OtpThrottled, StaffOtpBlocked
 from app.services.firebase_auth import (
     FirebaseAuthError,
     FirebaseNotConfigured,
@@ -36,8 +36,36 @@ from app.services.firebase_auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+PHONE_OTP_OFF = "phone sign-in is not available yet — sign in with your e-mail address"
+TOO_MANY_CODES = "too many code requests, please try again later"
+
+
+def _otp_ip(request: Request) -> str:
+    return client_ip(request) or "unknown"
+
+
+def _refuse_phone(payload: OtpRequest | OtpVerify) -> None:
+    """No code is sent by SMS, so no code may be verified by phone either.
+
+    Saying so plainly beats the previous behaviour, where the endpoint
+    answered "Verification code sent" for a message nothing had been asked to
+    deliver — and where the only way to obtain the unsent code was to guess it.
+    """
+    if payload.phone and not settings.phone_otp_enabled:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=PHONE_OTP_OFF)
+
+
+async def _within_limits(session: DbSession, limits, request: Request, identifier: str) -> None:
+    by_ip, by_identifier = limits
+    allowed = await rate_limit.take(session, by_ip, _otp_ip(request))
+    if allowed:
+        allowed = await rate_limit.take(session, by_identifier, identifier)
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=TOO_MANY_CODES)
+
+
 @router.post("/otp/request", response_model=Message)
-async def request_otp(payload: OtpRequest, session: DbSession) -> Message:
+async def request_otp(payload: OtpRequest, request: Request, session: DbSession) -> Message:
     """Send a one-time code to her e-mail address.
 
     The code leaves this function exactly once, in the message. It is returned
@@ -45,33 +73,39 @@ async def request_otp(payload: OtpRequest, session: DbSession) -> Message:
     and the demo would otherwise be unusable; on staging and production that
     branch is unreachable and a send failure is reported as a failure rather
     than as a code she will wait for and never receive.
+
+    A desk account gets the same answer as everyone else and no code at all:
+    the reply must not say which addresses belong to staff.
     """
+    _refuse_phone(payload)
+    await _within_limits(session, rate_limit.otp_request_limits(), request, payload.identifier)
+
+    sent = Message(detail="Verification code sent")
     try:
-        _, code = await auth_service.issue_otp(session, payload.identifier, payload.purpose)
+        _, code = await auth_service.issue_otp(
+            session, payload.identifier, payload.purpose, is_email=payload.email is not None
+        )
+    except StaffOtpBlocked:
+        return sent
     except OtpThrottled as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
-    if payload.email:
-        try:
-            await mailer.send_code(payload.identifier, code, payload.language)
-        except mailer.MailNotConfigured:
-            if settings.environment != "local":
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="e-mail sending is not configured",
-                ) from None
-        except mailer.MailFailed:
+    try:
+        await mailer.send_code(payload.identifier, code, payload.language)
+    except mailer.MailNotConfigured:
+        if settings.environment != "local":
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="could not send the code, please try again",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="e-mail sending is not configured",
             ) from None
-        else:
-            return Message(detail="Verification code sent")
-
-    # TODO(integrations): hand `code` to an SMS provider for phone sign-in.
-    if settings.environment == "local":
+        # Local development has no mailbox: the code is handed back instead.
         return Message(detail=f"Verification code (local only): {code}")
-    return Message(detail="Verification code sent")
+    except mailer.MailFailed:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="could not send the code, please try again",
+        ) from None
+    return sent
 
 
 class IpThrottle:
@@ -255,12 +289,24 @@ async def google_login(
 
 
 @router.post("/otp/verify", response_model=TokenPair)
-async def verify_otp(payload: OtpVerify, session: DbSession) -> TokenPair:
-    """Verify the code; creates the account on first successful verification."""
+async def verify_otp(payload: OtpVerify, request: Request, session: DbSession) -> TokenPair:
+    """Verify the code; creates the account on first successful verification.
+
+    Wrong guesses are counted against the code itself (which blocks after
+    `otp_max_attempts`) and against the caller's address and IP, so a code
+    cannot be searched for by asking for a new one every time.
+    """
+    _refuse_phone(payload)
+    await _within_limits(session, rate_limit.otp_verify_limits(), request, payload.identifier)
+
     try:
         return await auth_service.verify_and_login(
             session, payload.identifier, payload.code, is_email=payload.email is not None
         )
+    except StaffOtpBlocked as exc:
+        # She proved she holds the mailbox, so this says where to sign in
+        # instead. Asking for the code never reveals as much (see above).
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except AuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
