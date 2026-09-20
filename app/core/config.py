@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -155,7 +155,9 @@ class Settings(BaseSettings):
     sms_provider_url: str | None = None
     sms_provider_token: str | None = None
     smtp_host: str | None = None
-    smtp_port: int = 587
+    # Optional, because a deployment without mail is a supported state — but
+    # a value that is not a port is a mistake, not a preference.
+    smtp_port: int | None = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
     # What a woman sees in the From line. Falls back to the SMTP user.
@@ -182,6 +184,44 @@ class Settings(BaseSettings):
     s3_bucket: str = "womanup-media"
     s3_access_key: str | None = None
     s3_secret_key: str | None = None
+
+    @field_validator("smtp_port", mode="before")
+    @classmethod
+    def mail_port(cls, value: object) -> object:
+        """Accept a port, accept no mail at all, refuse anything else.
+
+        On 12 September 2026 a mail port that was not a number reached
+        production, where it failed inside the migration — after the deploy had
+        already stopped the running containers. The deploy now asks before it
+        stops anything (`scripts/preflight.py` in the infra repository), and
+        this is the check it asks: an unusable value is refused here, so a
+        release carrying one never starts serving.
+
+        Refusing is deliberate. Quietly turning mail off instead would leave a
+        portal that signs people in by e-mailing them a code unable to do so,
+        and nobody would be told why.
+
+        The value never appears in the message: it is somebody's configuration,
+        and `get_settings` keeps Pydantic's own rendering of it out of the log.
+        """
+        if isinstance(value, bool):
+            raise ValueError("SMTP_PORT must be a port number between 1 and 65535")
+        if value is None:
+            return None
+        if isinstance(value, int):
+            if 1 <= value <= 65535:
+                return value
+            raise ValueError("SMTP_PORT must be a port number between 1 and 65535")
+        # A secret store hands values back with the quotes and spaces it was
+        # given; that shape is not a reason to refuse a perfectly good port.
+        text = str(value).strip().strip("\"'").strip()
+        if not text:
+            # Mail is optional: unset stays unset, and the mailer reports
+            # itself as not configured.
+            return None
+        if text.isdigit() and 1 <= int(text) <= 65535:
+            return int(text)
+        raise ValueError("SMTP_PORT must be a port number between 1 and 65535")
 
     # --- Security -------------------------------------------------------
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
@@ -221,7 +261,19 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    """The settings, or a refusal that names the setting and nothing else.
+
+    Pydantic prints the offending input in its own error, which is how a
+    configuration value reaches a log — an Actions log, a container log, a
+    screenshot in a chat. The names are enough to fix it.
+    """
+    try:
+        return Settings()
+    except ValidationError as exc:
+        names = sorted({str(error["loc"][0]) for error in exc.errors()})
+        raise RuntimeError(
+            f"Invalid configuration: {', '.join(names)} (values are not shown)"
+        ) from None
 
 
 settings = get_settings()
