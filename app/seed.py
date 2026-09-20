@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import sys
 from datetime import UTC, date, datetime, timedelta
@@ -18,6 +19,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.constants import (
     ApplicationStatus,
     ConsentScope,
@@ -2870,8 +2872,38 @@ async def _real_accounts(session) -> list[str]:
     return real
 
 
+#: Set this to run the demonstration data against a production database. It
+#: exists so the refusal can be overridden deliberately and visibly — never by
+#: a flag somebody reaches for out of habit.
+PRODUCTION_OVERRIDE = "WOMANUP_SEED_PRODUCTION"
+
+
+def refuse_in_production() -> None:
+    """The demonstration dataset must never land on the real one.
+
+    This script ships inside the production image, deletes every account and
+    everything cascading off one, and creates an administrator whose password
+    is written in a public repository. On an empty production database it
+    would run without `--force` and hand that account to whoever reads it.
+    """
+    if not settings.is_production:
+        return
+    if os.getenv(PRODUCTION_OVERRIDE) == "yes-wipe-production":
+        logging.getLogger("app.seed").warning(
+            "seeding a production database because %s is set", PRODUCTION_OVERRIDE
+        )
+        return
+    raise SystemExit(
+        "\n  Refusing to seed: ENVIRONMENT is production.\n"
+        "  This script deletes every account and creates a demonstration "
+        "administrator whose password is public.\n"
+        f"  If that is genuinely what you want: {PRODUCTION_OVERRIDE}=yes-wipe-production\n"
+    )
+
+
 async def seed(*, force: bool = False) -> None:
     configure_logging()
+    refuse_in_production()
     now = datetime.now(UTC)
 
     async with SessionLocal() as session:
