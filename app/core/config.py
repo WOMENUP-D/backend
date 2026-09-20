@@ -73,9 +73,15 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 300
     otp_max_attempts: int = 5
     otp_resend_cooldown_seconds: int = 60
-    # Sign-in by phone stays off until an SMS provider is wired up: without one
-    # the code is never delivered, so the only way to "receive" it is to guess
-    # it — which would hand out accounts on numbers nobody owns.
+    # Signing in by one-time code is off: WomanUP opens an account with an
+    # e-mail address and a password, and nothing in the portal asks for a
+    # code. The flow stays in the codebase, and stays tested, for the day it
+    # is wanted again — but a door the product does not use is not left open.
+    otp_enabled: bool = False
+    # Even with codes switched on, phone stays off until an SMS provider is
+    # wired up: without one the code is never delivered, so the only way to
+    # "receive" it is to guess it — which would hand out accounts on numbers
+    # nobody owns.
     phone_otp_enabled: bool = False
 
     # --- OTP rate limits -------------------------------------------------

@@ -33,6 +33,17 @@ VERIFY = f"{API}/otp/verify"
 WRONG = "000000"
 
 
+@pytest.fixture(autouse=True)
+def code_sign_in_on(monkeypatch):
+    """These tests describe the code path, so they switch it on.
+
+    The portal signs people in with an address and a password, and codes are
+    off by default (`test_code_sign_in_is_off_by_default`). The protections
+    below still have to hold for the day the flow is wanted again.
+    """
+    monkeypatch.setattr(settings, "otp_enabled", True)
+
+
 @pytest.fixture
 def codes(monkeypatch) -> list[str]:
     """The codes the mailer was asked to send, instead of sending them.
@@ -375,3 +386,21 @@ async def test_requests_arriving_together_cannot_outrun_the_rate_limit(engine, s
 
     hits = await session.scalar(select(func.count(AuthThrottle.id)))
     assert hits == 1, "one window, one row"
+
+
+@pytest.mark.asyncio
+async def test_code_sign_in_is_off_by_default(client, session, monkeypatch, codes):
+    """The portal asks for an address and a password; nothing asks for a code."""
+    monkeypatch.setattr(settings, "otp_enabled", False)
+    email = address()
+
+    asked = await ask(client, email)
+    assert asked.status_code == 503
+    assert "password" in asked.json()["detail"]
+
+    tried = await try_code(client, email, WRONG)
+    assert tried.status_code == 503
+
+    # Nothing was created, and nothing was sent.
+    assert await _challenge(session, email) is None
+    assert codes == []

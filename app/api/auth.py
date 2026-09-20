@@ -36,6 +36,7 @@ from app.services.firebase_auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+OTP_OFF = "sign in with your e-mail address and password"
 PHONE_OTP_OFF = "phone sign-in is not available yet — sign in with your e-mail address"
 TOO_MANY_CODES = "too many code requests, please try again later"
 
@@ -44,13 +45,16 @@ def _otp_ip(request: Request) -> str:
     return client_ip(request) or "unknown"
 
 
-def _refuse_phone(payload: OtpRequest | OtpVerify) -> None:
-    """No code is sent by SMS, so no code may be verified by phone either.
+def _refuse_unavailable(payload: OtpRequest | OtpVerify) -> None:
+    """Refuse a way in that the portal does not offer.
 
-    Saying so plainly beats the previous behaviour, where the endpoint
-    answered "Verification code sent" for a message nothing had been asked to
-    deliver — and where the only way to obtain the unsent code was to guess it.
+    Codes are off by default: the portal signs people in with an address and a
+    password, so this endpoint has nobody to serve and every reason to be
+    closed. Phone has its own switch, because a code nothing sends can only be
+    obtained by guessing it.
     """
+    if not settings.otp_enabled:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=OTP_OFF)
     if payload.phone and not settings.phone_otp_enabled:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=PHONE_OTP_OFF)
 
@@ -77,7 +81,7 @@ async def request_otp(payload: OtpRequest, request: Request, session: DbSession)
     A desk account gets the same answer as everyone else and no code at all:
     the reply must not say which addresses belong to staff.
     """
-    _refuse_phone(payload)
+    _refuse_unavailable(payload)
     await _within_limits(session, rate_limit.otp_request_limits(), request, payload.identifier)
 
     sent = Message(detail="Verification code sent")
@@ -296,7 +300,7 @@ async def verify_otp(payload: OtpVerify, request: Request, session: DbSession) -
     `otp_max_attempts`) and against the caller's address and IP, so a code
     cannot be searched for by asking for a new one every time.
     """
-    _refuse_phone(payload)
+    _refuse_unavailable(payload)
     await _within_limits(session, rate_limit.otp_verify_limits(), request, payload.identifier)
 
     try:
