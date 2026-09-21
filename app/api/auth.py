@@ -8,7 +8,7 @@ from collections import defaultdict
 import jwt
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.api.deps import CurrentUserDep, DbSession
+from app.api.deps import CurrentUserDep, DbSession, client_ip
 from app.core.config import settings
 from app.core.constants import ConsentScope
 from app.core.security import decode_token
@@ -111,7 +111,18 @@ _google_throttle = IpThrottle(limit=15)
 
 
 def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+    """Who is actually knocking, not who forwarded the knock.
+
+    Behind the ingress every request arrives from the proxy's own address, so
+    keying the throttles on it gave everyone one shared bucket: eight wrong
+    passwords a minute from anybody refused a password sign-in to every woman
+    in the country, while the attacker's own allowance was the same one.
+
+    Caddy overwrites `X-Forwarded-For` with the connecting address, so the
+    left-most entry is the client and a header the client sets itself cannot
+    survive the hop. `client_ip` is the one place that reads it.
+    """
+    return client_ip(request) or "unknown"
 
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
