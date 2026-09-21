@@ -30,3 +30,26 @@ source builds are skipped. Candidate tags from failed scans are never deployed.
 Production mode, database credentials, JWT/Firebase/provider secrets, worker
 heartbeat and migration sequencing are supplied by infra. Do not run demo seeds
 in production. See infra's README for prod configuration, bootstrap and recovery.
+
+## The first administrator
+
+A fresh installation has a working `/admin` and nobody who can open it: the
+only thing that ever created an administrator was the demonstration seed, and
+the seed refuses to run against production. Open the first desk account on the
+server itself, once:
+
+```bash
+sudo bash -c 'cd /opt/womanup/current && source scripts/common.sh /opt/womanup &&
+  c run --rm --no-deps migrate python -m app.create_staff \
+    --email admin@example.uz --name "Ism Familiya"'
+```
+
+It asks for the password twice on a hidden prompt, so the password never
+reaches the shell history, `ps` or the deployment log. A non-interactive
+console can pass it in `WOMANUP_STAFF_PASSWORD` instead.
+
+`--role` grants `regional_coordinator`, `moderator` or `trainer` instead of
+`admin`, and a coordinator takes `--region`. The address may already belong to
+someone who registered as a learner — `--update` then promotes that account and
+sets a new password rather than opening a second WomanUP ID. Every grant is
+written to the audit log.
