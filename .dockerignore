@@ -6,5 +6,8 @@
 !alembic/
 !alembic/**
 !alembic.ini
+# The partner courses the load migration reads inside the image.
+!data/
+!data/**
 **/__pycache__/
 **/*.pyc
