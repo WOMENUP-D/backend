@@ -48,6 +48,10 @@ class ProgramBase(BaseModel):
     has_certificate: bool = False
     next_step: str | None = None
     provider: str | None = None
+    #: Set when the course is somebody else's and lives on their site. The
+    #: catalogue then links out instead of offering enrolment.
+    external_url: str | None = None
+    source: str | None = None
 
     @field_validator("learning_outcomes")
     @classmethod
