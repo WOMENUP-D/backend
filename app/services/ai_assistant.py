@@ -44,6 +44,7 @@ from app.models.profile import Goal, Profile
 from app.models.program import Enrollment, Program
 from app.models.user import User
 from app.services import ai_navigator, rag
+from app.services import skills as skill_service
 from app.services.age_gate import (
     HEALTH_SCOPE,
     age_from_profile,
@@ -91,7 +92,11 @@ class Persona:
     name: str | None = None
     language: str = "uz"
     interests: list[str] = field(default_factory=list)
-    skills: list[str] = field(default_factory=list)
+    #: What the platform records that she can do, from the canonical skill
+    #: layer — not the free text she once typed into her profile. Each note
+    #: carries how well the skill is known, because "learned" and "verified"
+    #: are different claims and the assistant must never merge them.
+    skills: list[skill_service.SkillNote] = field(default_factory=list)
     education_level: str | None = None
     profession: str | None = None
     employment_status: str | None = None
@@ -133,7 +138,16 @@ class Persona:
         if self.interests:
             lines.append(f"- interests: {', '.join(self.interests)}")
         if self.skills:
-            lines.append(f"- skills she already has: {', '.join(self.skills)}")
+            lines.append(
+                "- skills WomanUP records for her (name — how well it is known — level): "
+                + "; ".join(note.as_line() for note in self.skills)
+            )
+            lines.append(
+                "  a skill is *learned* when a course taught it, *assessed* when an "
+                "assessment scored it, and *verified* only when a mentor, an employer, "
+                "an internship or a job result confirmed it. Finishing a course never "
+                "makes a skill verified — never tell her it does."
+            )
         if self.goals:
             lines.append(f"- her stated goals: {'; '.join(self.goals)}")
         if self.directions:
@@ -249,7 +263,7 @@ async def build_persona(
         name=(profile.full_name.split()[0] if profile and profile.full_name else None),
         language=language,
         interests=list(profile.interests) if profile else [],
-        skills=list(profile.skills) if profile else [],
+        skills=await skill_service.notes_for(session, user_id, language=language),
         education_level=profile.education_level if profile else None,
         profession=profile.profession if profile else None,
         employment_status=profile.employment_status if profile else None,

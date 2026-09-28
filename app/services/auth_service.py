@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,15 +33,49 @@ class OtpThrottled(AuthError):
     pass
 
 
+class StaffOtpBlocked(AuthError):
+    """A staff account asked for, or tried, a one-time code.
+
+    Desks sign in with a login and a password on their own endpoint, which is
+    throttled harder and refuses anything but an active staff account. Leaving
+    the OTP door open for them would mean the strongest accounts on the
+    platform could be reached by guessing six digits.
+    """
+
+
+#: The roles a woman using the portal holds. Anything else is a desk.
+PARTICIPANT_ROLES = frozenset({Role.USER, Role.MOTHER})
+
+
+def is_staff(user: User) -> bool:
+    return bool(user.role_set - PARTICIPANT_ROLES)
+
+
+async def _load_by_identifier(
+    session: AsyncSession, identifier: str, is_email: bool
+) -> User | None:
+    field = User.email if is_email else User.phone
+    return await session.scalar(
+        select(User).options(selectinload(User.roles)).where(field == identifier)
+    )
+
+
 async def issue_otp(
-    session: AsyncSession, identifier: str, purpose: str = "login"
+    session: AsyncSession, identifier: str, purpose: str = "login", *, is_email: bool = True
 ) -> tuple[OtpChallenge, str]:
     """Create a challenge and return it with the clear-text code.
 
     The caller hands the code to the SMS/email sender and must never log it or
     return it over the API outside local development.
+
+    Raises `StaffOtpBlocked` when the address belongs to a desk account, so no
+    code is ever created for one.
     """
     now = datetime.now(UTC)
+
+    existing = await _load_by_identifier(session, identifier, is_email)
+    if existing is not None and is_staff(existing):
+        raise StaffOtpBlocked("staff accounts sign in with a password")
 
     recent = await session.scalar(
         select(OtpChallenge)
@@ -72,6 +106,36 @@ async def issue_otp(
     return challenge, code
 
 
+async def _count_failure(session: AsyncSession, challenge: OtpChallenge) -> None:
+    """Record a wrong guess against the code, and block the code at the limit.
+
+    Committed here, on purpose. The caller raises straight after, the router
+    turns that into a 401, and the request's transaction is rolled back — so a
+    counter left pending would be undone and the limit would never arrive.
+    One statement does the counting and the blocking, which is also what makes
+    it safe when several guesses land at once: each `UPDATE` reads the row's
+    committed value under a row lock, so nothing is lost in a race.
+    """
+    attempts = await session.scalar(
+        update(OtpChallenge)
+        .where(OtpChallenge.id == challenge.id, OtpChallenge.consumed_at.is_(None))
+        .values(
+            attempts=OtpChallenge.attempts + 1,
+            consumed_at=case(
+                (
+                    OtpChallenge.attempts + 1 >= settings.otp_max_attempts,
+                    datetime.now(UTC),
+                ),
+                else_=None,
+            ),
+        )
+        .returning(OtpChallenge.attempts)
+    )
+    await session.commit()
+    if attempts is not None and attempts >= settings.otp_max_attempts:
+        raise AuthError("too many attempts; request a new code")
+
+
 async def verify_and_login(
     session: AsyncSession, identifier: str, code: str, is_email: bool
 ) -> TokenPair:
@@ -91,18 +155,25 @@ async def verify_and_login(
         raise AuthError("no active verification code")
     if challenge.expires_at < now:
         raise AuthError("verification code expired")
-    if challenge.attempts >= settings.otp_max_attempts:
-        raise AuthError("too many attempts; request a new code")
 
     if not verify_otp(code, challenge.salt, challenge.code_hash):
-        challenge.attempts += 1
-        await session.flush()
+        await _count_failure(session, challenge)
         raise AuthError("invalid verification code")
 
-    challenge.consumed_at = now
+    # Consume the code in one statement, so two requests carrying the same
+    # correct code cannot both be served: the second updates no row.
+    consumed = await session.scalar(
+        update(OtpChallenge)
+        .where(OtpChallenge.id == challenge.id, OtpChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+        .returning(OtpChallenge.id)
+    )
+    if consumed is None:
+        raise AuthError("verification code already used")
 
-    field = User.email if is_email else User.phone
-    user = await session.scalar(select(User).where(field == identifier))
+    user = await _load_by_identifier(session, identifier, is_email)
+    if user is not None and is_staff(user):
+        raise StaffOtpBlocked("staff accounts sign in with a password")
 
     if user is None:
         user = User(

@@ -6,9 +6,10 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 
 from app.api.deps import CurrentUserDep, DbSession
+from app.core.constants import NotificationChannel
 from app.models.notification import Notification, NotificationPreference
 from app.schemas.admin import (
     NotificationPreferenceUpdate,
@@ -19,16 +20,24 @@ from app.schemas.common import Message
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
+def _hers_and_due(user_id: str):
+    """Her in-app notifications that are due. A reminder scheduled for
+    tomorrow is not shown today — it would say "tomorrow" a day early."""
+    return (
+        Notification.user_id == uuid.UUID(user_id),
+        Notification.channel == NotificationChannel.IN_APP,
+        or_(
+            Notification.scheduled_for.is_(None),
+            Notification.scheduled_for <= datetime.now(UTC),
+        ),
+    )
+
+
 @router.get("", response_model=list[NotificationRead])
 async def list_notifications(
     user: CurrentUserDep, session: DbSession, unread_only: bool = False, limit: int = 50
 ) -> list[Notification]:
-    from app.core.constants import NotificationChannel
-
-    stmt = select(Notification).where(
-        Notification.user_id == uuid.UUID(user.id),
-        Notification.channel == NotificationChannel.IN_APP,
-    )
+    stmt = select(Notification).where(*_hers_and_due(user.id))
     if unread_only:
         stmt = stmt.where(Notification.read_at.is_(None))
 
@@ -42,7 +51,7 @@ async def list_notifications(
 async def unread_count(user: CurrentUserDep, session: DbSession) -> dict[str, int]:
     count = await session.scalar(
         select(func.count(Notification.id)).where(
-            Notification.user_id == uuid.UUID(user.id),
+            *_hers_and_due(user.id),
             Notification.read_at.is_(None),
         )
     )
@@ -67,7 +76,7 @@ async def mark_all_read(user: CurrentUserDep, session: DbSession) -> Message:
     await session.execute(
         update(Notification)
         .where(
-            Notification.user_id == uuid.UUID(user.id),
+            *_hers_and_due(user.id),
             Notification.read_at.is_(None),
         )
         .values(read_at=datetime.now(UTC))

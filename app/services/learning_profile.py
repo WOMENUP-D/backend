@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.profile import LearningProfile, Profile
-from app.services import questionnaire
+from app.services import questionnaire, skills
 
 # Weekly hours, as a single number the planner can multiply.
 HOURS = {"under_3": 2, "3_5": 4, "5_10": 7, "10_20": 15, "over_20": 25}
@@ -206,5 +206,10 @@ async def save(
 
     await session.flush()
     # What she just told the questionnaire is what the profile was missing.
-    await fill_profile_from_answers(session, user_id, answers)
+    filled = await fill_profile_from_answers(session, user_id, answers)
+    if "skills" in filled:
+        # Skills she named in the questionnaire are her own word about herself,
+        # and are recorded as exactly that — the weakest evidence there is.
+        profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
+        await skills.sync_self_reported(session, user_id, profile.skills if profile else [])
     return record

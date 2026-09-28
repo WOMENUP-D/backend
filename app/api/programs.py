@@ -1,10 +1,8 @@
-"""Programme catalogue, enrollment and progress."""
+"""Programme catalogue, lessons, enrollment and progress."""
 
 from __future__ import annotations
 
-import secrets
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
@@ -17,18 +15,21 @@ from app.core.constants import (
     ProgramFormat,
     Role,
 )
-from app.models.program import Certificate, Enrollment, Program, ProgramModule
+from app.models.program import Certificate, Enrollment, Program, ProgramLesson, ProgramModule
 from app.schemas.common import Page, PaginationParams
 from app.schemas.program import (
     CertificateRead,
+    EnrollmentDetail,
     EnrollmentRead,
+    LessonProgressUpdate,
     ProgramCreate,
     ProgramDetail,
+    ProgramLessonDetail,
     ProgramRead,
     ProgramUpdate,
     ProgressUpdate,
 )
-from app.services.plan_service import close_plan_items_for_program
+from app.services import learning, skills
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -101,14 +102,133 @@ async def list_programs(
     )
 
 
+@router.get("/me/enrollments", response_model=list[EnrollmentDetail])
+async def my_enrollments(
+    user: CurrentUserDep, session: DbSession, status_filter: EnrollmentStatus | None = None
+) -> list[EnrollmentDetail]:
+    """What she is studying, each with the course it belongs to.
+
+    The programme travels with the enrollment because every screen that lists
+    them needs to name the course, and fetching them one by one is a request
+    per row.
+    """
+    stmt = (
+        select(Enrollment, Program)
+        .join(Program, Program.id == Enrollment.program_id)
+        .where(Enrollment.user_id == uuid.UUID(user.id))
+        .order_by(Enrollment.last_activity_at.desc().nullslast())
+    )
+    if status_filter:
+        stmt = stmt.where(Enrollment.status == status_filter)
+
+    return [
+        EnrollmentDetail(
+            **EnrollmentRead.model_validate(enrollment).model_dump(),
+            program=ProgramRead.model_validate(program),
+        )
+        for enrollment, program in (await session.execute(stmt)).all()
+    ]
+
+
+@router.get("/me/certificates", response_model=list[CertificateRead])
+async def my_certificates(user: CurrentUserDep, session: DbSession) -> list[CertificateRead]:
+    rows = await session.execute(
+        select(Certificate, Program)
+        .join(Enrollment, Enrollment.id == Certificate.enrollment_id)
+        .join(Program, Program.id == Enrollment.program_id)
+        .where(
+            Certificate.user_id == uuid.UUID(user.id),
+            Certificate.revoked_at.is_(None),
+        )
+        .order_by(Certificate.issued_at.desc())
+    )
+    return [_certificate_read(certificate, program) for certificate, program in rows.all()]
+
+
+@router.get("/certificates/verify/{code}", response_model=CertificateRead)
+async def verify_certificate(code: str, session: DbSession) -> CertificateRead:
+    """Public verification — an employer checks a certificate without an account."""
+    row = (
+        await session.execute(
+            select(Certificate, Program)
+            .join(Enrollment, Enrollment.id == Certificate.enrollment_id)
+            .join(Program, Program.id == Enrollment.program_id)
+            .where(Certificate.verification_code == code, Certificate.revoked_at.is_(None))
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
+    return _certificate_read(*row)
+
+
+def _certificate_read(certificate: Certificate, program: Program) -> CertificateRead:
+    return CertificateRead(
+        **{
+            field: getattr(certificate, field)
+            for field in ("id", "serial_number", "issued_at", "file_url", "verification_code")
+        },
+        program_id=program.id,
+        program_title_i18n=program.title_i18n,
+    )
+
+
+@router.get("/slug/{slug}", response_model=ProgramDetail)
+async def read_program_by_slug(
+    slug: str, session: DbSession, user: OptionalUserDep
+) -> ProgramDetail:
+    """The same card, addressed the way the learning section links to it.
+
+    Course URLs are readable — `/talim/kurslar/buxgalteriya-asoslari` — and a
+    slug is the one thing about a course that a person can type.
+    """
+    program = await session.scalar(select(Program).where(Program.slug == slug))
+    return await _program_detail(session, program, user)
+
+
 @router.get("/{program_id}", response_model=ProgramDetail)
-async def read_program(program_id: uuid.UUID, session: DbSession, user: OptionalUserDep) -> Program:
+async def read_program(
+    program_id: uuid.UUID, session: DbSession, user: OptionalUserDep
+) -> ProgramDetail:
     """One programme card, open to visitors like the catalogue itself.
 
     Unpublished programmes are 404 for everyone except the people who edit
     them. Without that check this endpoint handed a draft to anyone holding its
     id — which was already true for every signed-in user before the catalogue
     became public, and would have widened to the whole internet with it.
+    """
+    program = await session.get(Program, program_id)
+    return await _program_detail(session, program, user)
+
+
+async def _program_detail(session, program: Program | None, user) -> ProgramDetail:
+    """The card with its contents and its skills, or a 404 she may not see past."""
+    if program is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+
+    may_see_drafts = user is not None and user.has_role(Role.ADMIN, Role.TRAINER, Role.MODERATOR)
+    if not program.is_published and not may_see_drafts:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+
+    # Modules carry their lessons with them, so the contents list is one query
+    # rather than one per module.
+    await session.refresh(program, ["modules"])
+    detail = ProgramDetail.model_validate(program)
+    # The card names what it teaches in the reader's language; the column keeps
+    # the author's own words.
+    index = await skills.SkillIndex.load(session, program.skills_taught)
+    detail.skills = index.refs(program.skills_taught)
+    return detail
+
+
+@router.get("/{program_id}/lessons/{lesson_slug}", response_model=ProgramLessonDetail)
+async def read_lesson(
+    program_id: uuid.UUID, lesson_slug: str, session: DbSession, user: OptionalUserDep
+) -> ProgramLesson:
+    """One lesson, with its body.
+
+    Readable wherever the course card is: the syllabus and the module texts are
+    already public, and a woman deciding whether a course is for her is owed a
+    look at it. Completing one is what needs an enrollment.
     """
     program = await session.get(Program, program_id)
     if program is None:
@@ -118,8 +238,14 @@ async def read_program(program_id: uuid.UUID, session: DbSession, user: Optional
     if not program.is_published and not may_see_drafts:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
 
-    await session.refresh(program, ["modules"])
-    return program
+    lesson = await session.scalar(
+        select(ProgramLesson)
+        .join(ProgramModule, ProgramModule.id == ProgramLesson.module_id)
+        .where(ProgramModule.program_id == program_id, ProgramLesson.slug == lesson_slug)
+    )
+    if lesson is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+    return lesson
 
 
 @router.post("", response_model=ProgramRead, status_code=status.HTTP_201_CREATED)
@@ -144,6 +270,8 @@ async def update_program(
     user: ContentDep,
     session: DbSession,
 ) -> Program:
+    from datetime import UTC, datetime
+
     program = await session.get(Program, program_id)
     if program is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
@@ -163,36 +291,16 @@ async def update_program(
     status_code=status.HTTP_201_CREATED,
 )
 async def enroll(program_id: uuid.UUID, user: CurrentUserDep, session: DbSession) -> Enrollment:
-    program = await session.get(Program, program_id)
-    if program is None or not program.is_published:
+    """Put her on a course. Enrolling twice returns the enrollment she has.
+
+    The catalogue stays open: a course that happens to sit inside a learning
+    path is still enrollable from here, because a path advises an order rather
+    than owning the course.
+    """
+    enrollment = await learning.enroll(session, user_id=uuid.UUID(user.id), program_id=program_id)
+    if enrollment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
-
-    user_id = uuid.UUID(user.id)
-    existing = await session.scalar(
-        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.program_id == program_id)
-    )
-    if existing is not None:
-        return existing
-
-    enrollment = Enrollment(
-        user_id=user_id,
-        program_id=program_id,
-        status=EnrollmentStatus.ENROLLED,
-        started_at=datetime.now(UTC),
-    )
-    session.add(enrollment)
-    await session.flush()
     return enrollment
-
-
-@router.get("/me/enrollments", response_model=list[EnrollmentRead])
-async def my_enrollments(
-    user: CurrentUserDep, session: DbSession, status_filter: EnrollmentStatus | None = None
-) -> list[Enrollment]:
-    stmt = select(Enrollment).where(Enrollment.user_id == uuid.UUID(user.id))
-    if status_filter:
-        stmt = stmt.where(Enrollment.status == status_filter)
-    return list((await session.execute(stmt)).scalars())
 
 
 @router.post("/enrollments/{enrollment_id}/progress", response_model=EnrollmentRead)
@@ -202,83 +310,61 @@ async def update_progress(
     user: CurrentUserDep,
     session: DbSession,
 ) -> Enrollment:
-    """Mark a module done and recompute progress; issues the certificate on
-    completion when the programme awards one."""
-    enrollment = await session.get(Enrollment, enrollment_id)
-    if enrollment is None or enrollment.user_id != uuid.UUID(user.id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+    """Mark a module done and recompute progress.
 
-    module_ids = list(
-        (
-            await session.execute(
-                select(ProgramModule.id).where(ProgramModule.program_id == enrollment.program_id)
-            )
-        ).scalars()
-    )
-    if payload.module_id not in module_ids:
+    For programmes whose modules carry no lessons. Progress, completion, the
+    certificate and the skill evidence all run through `services.learning`, so
+    a module tick and a lesson tick end in exactly the same place.
+    """
+    enrollment = await _own_enrollment(session, enrollment_id, user)
+    module_ids, _ = await learning.course_units(session, enrollment.program_id)
+    if str(payload.module_id) not in module_ids:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Module does not belong to this programme",
         )
 
-    completed = set(enrollment.completed_modules or [])
-    if payload.completed:
-        completed.add(str(payload.module_id))
-    else:
-        completed.discard(str(payload.module_id))
-
-    now = datetime.now(UTC)
-    enrollment.completed_modules = sorted(completed)
-    enrollment.progress_percent = round(len(completed) * 100 / len(module_ids)) if module_ids else 0
-    enrollment.last_activity_at = now
-    enrollment.status = (
-        EnrollmentStatus.COMPLETED
-        if enrollment.progress_percent >= 100
-        else EnrollmentStatus.IN_PROGRESS
+    return await learning.mark_module(
+        session,
+        enrollment=enrollment,
+        module_id=payload.module_id,
+        completed=payload.completed,
     )
 
-    if enrollment.status == EnrollmentStatus.COMPLETED and enrollment.completed_at is None:
-        enrollment.completed_at = now
-        # The roadmap step that *is* this course closes itself. The platform
-        # already knows the course is finished — it just recorded the last
-        # module — so making her confirm it again on another screen is asking
-        # her to restate what the system holds.
-        await close_plan_items_for_program(session, enrollment.user_id, enrollment.program_id)
-        program = await session.get(Program, enrollment.program_id)
-        if program is not None and program.has_certificate:
-            session.add(
-                Certificate(
-                    enrollment_id=enrollment.id,
-                    user_id=enrollment.user_id,
-                    serial_number=f"WU-{now:%Y}-{secrets.token_hex(4).upper()}",
-                    issued_at=now,
-                    verification_code=secrets.token_urlsafe(24),
-                )
-            )
 
-    await session.flush()
+@router.post("/enrollments/{enrollment_id}/lessons", response_model=EnrollmentRead)
+async def complete_lesson(
+    enrollment_id: uuid.UUID,
+    payload: LessonProgressUpdate,
+    user: CurrentUserDep,
+    session: DbSession,
+) -> Enrollment:
+    """Mark a lesson done, and recompute what that means for the course.
+
+    The lesson has to belong to the programme she is enrolled in: an id from
+    somebody else's course is a 422, not a tick.
+    """
+    enrollment = await _own_enrollment(session, enrollment_id, user)
+    lesson = await learning.lesson_in_program(
+        session, lesson_id=payload.lesson_id, program_id=enrollment.program_id
+    )
+    if lesson is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Lesson does not belong to this programme",
+        )
+
+    return await learning.mark_lesson(
+        session,
+        enrollment=enrollment,
+        lesson_id=lesson.id,
+        completed=payload.completed,
+    )
+
+
+async def _own_enrollment(session, enrollment_id: uuid.UUID, user) -> Enrollment:
+    """Her enrollment, or a 404. Never the id the browser happens to send."""
+    enrollment = await session.get(Enrollment, enrollment_id)
+    if enrollment is None or enrollment.user_id != uuid.UUID(user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
     return enrollment
-
-
-@router.get("/me/certificates", response_model=list[CertificateRead])
-async def my_certificates(user: CurrentUserDep, session: DbSession) -> list[Certificate]:
-    rows = await session.execute(
-        select(Certificate).where(
-            Certificate.user_id == uuid.UUID(user.id),
-            Certificate.revoked_at.is_(None),
-        )
-    )
-    return list(rows.scalars())
-
-
-@router.get("/certificates/verify/{code}", response_model=CertificateRead)
-async def verify_certificate(code: str, session: DbSession) -> Certificate:
-    """Public verification — an employer checks a certificate without an account."""
-    certificate = await session.scalar(
-        select(Certificate).where(
-            Certificate.verification_code == code, Certificate.revoked_at.is_(None)
-        )
-    )
-    if certificate is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
-    return certificate

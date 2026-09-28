@@ -23,9 +23,11 @@ from app.schemas.assessment import (
     LearningAnswers,
     LearningProfileRead,
     QuestionRead,
+    ScoreInsightsRead,
     ScoreRead,
 )
 from app.services import learning_profile, questionnaire
+from app.services.recommendation import dimension_insights
 from app.services.scoring import (
     calculate_dimension_scores,
     composite_score,
@@ -144,6 +146,22 @@ async def read_score(user: CurrentUserDep, session: DbSession) -> DevelopmentSco
         measured_at=max((s.measured_at for s in scores if s.measured_at), default=None),
         weakest_dimensions=weakest_dimensions(dimension_map),
     )
+
+
+@router.get("/score/insights", response_model=ScoreInsightsRead)
+async def read_score_insights(user: CurrentUserDep, session: DbSession) -> ScoreInsightsRead:
+    """The score, dimension by dimension: how each reads, why, and what would move it.
+
+    Built from her own answers, the published catalogue and open listings, with
+    no model call — so it is as fast and as repeatable as the score itself.
+    """
+    insights = await dimension_insights(session, uuid.UUID(user.id))
+    if insights is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No assessment completed yet",
+        )
+    return insights
 
 
 @router.get("/history", response_model=list[AssessmentRead])

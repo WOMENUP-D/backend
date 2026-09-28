@@ -10,7 +10,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 
-from app.api.deps import AdminDep, DbSession, StaffDep
+from app.api.deps import AdminDep, DbSession, StaffDep, coordinator_region
 from app.core.constants import Region, Role
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
@@ -29,45 +29,45 @@ from app.services.audit_service import record_audit
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _scoped_filters(user, filters: DashboardFilter) -> DashboardFilter:
+async def _scoped_filters(session, user, filters: DashboardFilter) -> DashboardFilter:
     """A regional coordinator only ever sees their own region.
 
-    Enforced server-side: overriding the query parameter cannot widen scope.
+    Enforced server-side from her role assignment: overriding the query
+    parameter cannot widen scope.
     """
-    if user.has_role(Role.ADMIN):
-        return filters
-    if user.region is not None:
-        filters.region = user.region
+    region = await coordinator_region(session, user)
+    if region is not None:
+        filters.region = region
     return filters
 
 
-@router.get("/dashboard", response_model=DashboardOverview)
+@router.get("/dashboard", response_model=DashboardOverview, deprecated=True)
 async def overview(
     user: StaffDep,
     session: DbSession,
     filters: DashboardFilter = Depends(),
 ) -> DashboardOverview:
-    return await dashboard_overview(session, _scoped_filters(user, filters))
+    return await dashboard_overview(session, await _scoped_filters(session, user, filters))
 
 
-@router.get("/kpi", response_model=KpiSnapshot)
+@router.get("/kpi", response_model=KpiSnapshot, deprecated=True)
 async def kpi(
     user: StaffDep,
     session: DbSession,
     filters: DashboardFilter = Depends(),
 ) -> KpiSnapshot:
     """The MVP KPI set from section 09."""
-    return await kpi_snapshot(session, _scoped_filters(user, filters))
+    return await kpi_snapshot(session, await _scoped_filters(session, user, filters))
 
 
-@router.get("/kpi/export")
+@router.get("/kpi/export", deprecated=True)
 async def export_kpi(
     user: StaffDep,
     session: DbSession,
     filters: DashboardFilter = Depends(),
 ) -> Response:
     """CSV export for reporting to the Assembly."""
-    snapshot = await kpi_snapshot(session, _scoped_filters(user, filters))
+    snapshot = await kpi_snapshot(session, await _scoped_filters(session, user, filters))
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -112,8 +112,9 @@ async def list_users(
     """Operational user list. Deliberately returns no direct identifiers —
     coordinators work with regions and activity, not phone numbers."""
     stmt = select(User)
-    if not user.has_role(Role.ADMIN) and user.region is not None:
-        stmt = stmt.where(User.region == user.region)
+    scoped = await coordinator_region(session, user)
+    if scoped is not None:
+        stmt = stmt.where(User.region == scoped)
     elif region:
         stmt = stmt.where(User.region == region)
 

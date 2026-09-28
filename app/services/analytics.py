@@ -1,4 +1,10 @@
-"""KPI computation for the management dashboard (section 09)."""
+"""KPI computation for the management dashboard (section 09).
+
+Superseded by `services.results`, which the admin Results dashboard reads:
+there every figure counts participants only (not staff), every filter applies
+to every figure, and every figure has a written definition. These endpoints
+stay for older clients.
+"""
 
 from __future__ import annotations
 
@@ -29,8 +35,8 @@ from app.schemas.admin import (
 )
 
 
-def _ratio(numerator: int, denominator: int) -> float:
-    return round(numerator * 100 / denominator, 2) if denominator else 0.0
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return round(numerator * 100 / denominator, 2) if denominator else None
 
 
 def _apply_user_filters(stmt: Select, filters: DashboardFilter) -> Select:
@@ -293,7 +299,6 @@ async def dashboard_overview(
             region=Region(region),
             registered=total,
             active=active_count,
-            avg_development_score=0.0,
         )
         for region, total, active_count in coverage_rows
     ]

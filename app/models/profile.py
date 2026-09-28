@@ -70,6 +70,21 @@ class Profile(UUIDMixin, TimestampMixin, Base):
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_url: Mapped[str | None] = mapped_column(String(500))
 
+    # --- portfolio visibility -------------------------------------------
+    # Kept on the profile rather than in a table of their own: they are one
+    # row per woman, and they describe how her own record is shown. Private
+    # until she says otherwise, and never public for a minor or a woman whose
+    # age is unknown — see `services.portfolio.may_publish`.
+    portfolio_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: An opaque token, never derived from her id — a public link must not be
+    #: a way of enumerating accounts. Minted on first publish, kept after.
+    portfolio_slug: Mapped[str | None] = mapped_column(String(40), unique=True)
+    portfolio_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Which sections a public reader sees: {"skills": true, ...}. A section
+    #: missing from the map counts as shown, so adding one later does not
+    #: silently hide it from everyone who published before it existed.
+    portfolio_sections: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+
     completeness_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="profile")

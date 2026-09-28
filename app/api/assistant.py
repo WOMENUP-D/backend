@@ -33,7 +33,8 @@ from app.schemas.assistant import (
     DetailAsk,
     OnboardingIn,
 )
-from app.services import ai_assistant
+from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
+from app.services import ai_assistant, ai_coach
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
@@ -155,6 +156,50 @@ async def ask(
     )
     await session.commit()
     return _reply(answer, guest_left)
+
+
+# --- the coach -------------------------------------------------------------
+#
+# Two endpoints and a shared context. The GET is deterministic — her score, her
+# skills, her courses, her routes and the engine's own ranking, with no model
+# call — so "where you are" and "what to do next" are always true and render
+# instantly. The POST is the conversation, and it is grounded in exactly the
+# same records.
+#
+# Both answer for the caller in the token and for nobody else: the user id is
+# never read from the path, the query or the body.
+
+
+@router.get("/coach", response_model=CoachContextRead)
+async def coach_context(
+    user: CurrentUserDep, session: DbSession, language: str | None = None
+) -> CoachContextRead:
+    """Where she stands, what to do next, and the questions worth asking.
+
+    No model call: every figure is read from her own records and the
+    deterministic engine, so this card cannot be wrong and cannot be slow.
+    """
+    context = await ai_coach.build(session, uuid.UUID(user.id), language=language)
+    return context.read
+
+
+@router.post("/coach", response_model=CoachReply)
+async def coach_ask(payload: CoachAsk, user: CurrentUserDep, session: DbSession) -> CoachReply:
+    """Ask the Coach. Signed in only — there is nothing to coach without a record.
+
+    Every programme, path and listing the answer may name is enumerated before
+    the model is called and resolved again afterwards, so a reference that
+    reaches the browser is one the database holds.
+    """
+    reply = await ai_coach.answer(
+        session,
+        user_id=uuid.UUID(user.id),
+        question=payload.message,
+        language=payload.language,
+        opportunity_id=payload.opportunity_id,
+    )
+    await session.commit()
+    return reply
 
 
 @router.post("/education", response_model=AssistantReply)
