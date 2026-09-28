@@ -41,9 +41,18 @@ SLUG_SAFE = re.compile(r"[^a-z0-9]+")
 HTTPS = re.compile(r"^https://[^\s\"']+$")
 
 CATEGORIES = {
-    "vocational_skills", "ethics_culture", "health", "international", "parenting",
-    "financial_literacy", "entrepreneurship", "leadership", "legal_literacy",
-    "digital_safety", "mentorship_networking", "volunteering",
+    "vocational_skills",
+    "ethics_culture",
+    "health",
+    "international",
+    "parenting",
+    "financial_literacy",
+    "entrepreneurship",
+    "leadership",
+    "legal_literacy",
+    "digital_safety",
+    "mentorship_networking",
+    "volunteering",
 }
 LANGUAGES = {"uz", "ru", "en"}
 
@@ -62,34 +71,40 @@ def _rows() -> list[dict]:
         language = record.get("language") or "ru"
         if not title or not HTTPS.fullmatch(url) or category not in CATEGORIES:
             continue
-        slug = SLUG_SAFE.sub("-", f"{record.get('source', SOURCE)}-{record.get('external_id')}".lower()).strip("-")[:160]
+        slug = SLUG_SAFE.sub(
+            "-", f"{record.get('source', SOURCE)}-{record.get('external_id')}".lower()
+        ).strip("-")[:160]
         if not slug or slug in seen:
             continue
         seen.add(slug)
         summary = (record.get("summary") or "").strip()[:600]
-        rows.append({
-            "id": uuid.uuid4(),
-            "slug": slug,
-            "title_i18n": {"uz": title, "ru": title, "en": title},
-            "goal_i18n": {},
-            "description_i18n": ({"uz": summary, "ru": summary, "en": summary} if summary else {}),
-            "category": category,
-            "format": "video",
-            "language": language if language in LANGUAGES else "ru",
-            "target_regions": [],
-            "target_segments": [],
-            "prerequisites": [],
-            "learning_outcomes": [],
-            "skills_taught": [],
-            "has_certificate": False,
-            "provider": (record.get("provider") or SOURCE)[:200],
-            "external_url": url,
-            "source": (record.get("source") or SOURCE)[:40],
-            "is_published": True,
-            "published_at": now,
-            "created_at": now,
-            "updated_at": now,
-        })
+        rows.append(
+            {
+                "id": uuid.uuid4(),
+                "slug": slug,
+                "title_i18n": {"uz": title, "ru": title, "en": title},
+                "goal_i18n": {},
+                "description_i18n": (
+                    {"uz": summary, "ru": summary, "en": summary} if summary else {}
+                ),
+                "category": category,
+                "format": "video",
+                "language": language if language in LANGUAGES else "ru",
+                "target_regions": [],
+                "target_segments": [],
+                "prerequisites": [],
+                "learning_outcomes": [],
+                "skills_taught": [],
+                "has_certificate": False,
+                "provider": (record.get("provider") or SOURCE)[:200],
+                "external_url": url,
+                "source": (record.get("source") or SOURCE)[:40],
+                "is_published": True,
+                "published_at": now,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
     return rows
 
 
@@ -101,7 +116,8 @@ def upgrade() -> None:
 
     connection = op.get_bind()
     existing = {
-        slug for (slug,) in connection.execute(
+        slug
+        for (slug,) in connection.execute(
             sa.text("SELECT slug FROM programs WHERE slug = ANY(:slugs)"),
             {"slugs": [row["slug"] for row in rows]},
         )
