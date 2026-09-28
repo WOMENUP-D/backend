@@ -18,7 +18,7 @@ evidence a completion writes falls back to its own floor when the level is not
 set.
 
 Revision ID: 0014
-Revises: 0013
+Revises: 0013a
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision = "0014"
-down_revision = "0013"
+down_revision = "0013a"
 branch_labels = None
 depends_on = None
 
