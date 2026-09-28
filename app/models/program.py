@@ -72,6 +72,14 @@ class Program(UUIDMixin, TimestampMixin, Base):
     next_step: Mapped[str | None] = mapped_column(String(120))
 
     provider: Mapped[str | None] = mapped_column(String(200))
+    # Where the course actually lives, when it is not ours. A programme with an
+    # external_url belongs to somebody else: the portal lists it and links to
+    # it, and promises nothing about it — no enrolment here, no plan, no
+    # certificate of ours.
+    external_url: Mapped[str | None] = mapped_column(String(500))
+    # Which catalogue it came from — "stepik", "coursera", "ochiqkurs" — so an
+    # import can be undone without touching the portal's own programmes.
+    source: Mapped[str | None] = mapped_column(String(40), index=True)
     author_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
