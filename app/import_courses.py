@@ -69,6 +69,13 @@ def clean(record: dict, index: int) -> dict:
     title = record["title"].strip()[:300]
     summary = (record.get("summary") or "").strip()[:600]
 
+    # Only skills the course names outright. The recommender ranks on "how much
+    # of this she does not know yet", so an invented skill sends her somewhere
+    # she did not ask to go — an empty list is the honest answer.
+    skills = [
+        str(skill).strip()[:80] for skill in (record.get("skills") or []) if str(skill).strip()
+    ]
+
     return {
         "slug": slug_for(record["source"], str(record["external_id"])),
         # The title stays in the language it is taught in — translating a course
@@ -79,6 +86,7 @@ def clean(record: dict, index: int) -> dict:
         "language": language,
         "format": ProgramFormat.VIDEO,
         "provider": (record.get("provider") or record["source"]).strip()[:200],
+        "skills_taught": skills[:8],
         "external_url": url,
         "source": record["source"].strip()[:40],
         "is_published": True,

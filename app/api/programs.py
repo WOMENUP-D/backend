@@ -83,6 +83,13 @@ async def list_programs(
                 func.lower(Program.goal_i18n.op("->>")("uz")).like(pattern),
                 func.lower(Program.goal_i18n.op("->>")("ru")).like(pattern),
                 func.lower(Program.goal_i18n.op("->>")("en")).like(pattern),
+                # The description too. A course brought in from another
+                # platform has a title and a description and nothing else, so
+                # without this "здоровье" found two of the forty-seven health
+                # courses and "ребёнок" found none of the ten about children.
+                func.lower(Program.description_i18n.op("->>")("uz")).like(pattern),
+                func.lower(Program.description_i18n.op("->>")("ru")).like(pattern),
+                func.lower(Program.description_i18n.op("->>")("en")).like(pattern),
                 func.lower(func.array_to_string(Program.skills_taught, " ")).like(pattern),
                 func.lower(Program.slug).like(pattern),
             )

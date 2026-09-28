@@ -32,6 +32,7 @@ from app.core.constants import (
     SCORE_WEIGHTS,
     DimensionBand,
     EnrollmentStatus,
+    Language,
     NextStepKind,
     PlanItemStatus,
     RecommendationReason,
@@ -268,6 +269,11 @@ class LearnerContext:
     # `opportunities`: an event is recommended for what it covers and when it
     # is, not for how well her skills cover what it asks (`services.events`).
     events: list[Opportunity] = field(default_factory=list)
+    #: The language she reads the portal in, when it is known. A course she
+    #: cannot read is not a recommendation, and three quarters of this
+    #: catalogue arrived in Russian. Unknown means "do not narrow": a visitor
+    #: browsing the directions has no account and no language yet.
+    language: Language | None = None
 
     @property
     def current(self) -> dict[ScoreDimension, float]:
@@ -302,6 +308,7 @@ async def load_context(
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     region = await session.scalar(select(User.region).where(User.id == user_id))
+    language = await session.scalar(select(User.language).where(User.id == user_id))
     scores = {
         row.dimension: row
         for row in (
@@ -412,6 +419,7 @@ async def load_context(
         user_id=user_id,
         age=age,
         region=region_value,
+        language=language,
         skills=profile_skills,
         index=index,
         held=await _held_keys(session, user_id, index, profile_skills),
@@ -796,21 +804,41 @@ def focus_dimensions(ctx: LearnerContext, limit: int = 3) -> list[ScoreDimension
     return [d for d in focus_order(current) if band_for(current[d]) != DimensionBand.STRONG][:limit]
 
 
+def language_distance(program: Program, reader: Language | None) -> int:
+    """How far a course is from the language she reads. Lower is closer.
+
+    Her own language first. Russian second for an Uzbek reader, because most
+    of this catalogue is in Russian and she will very likely follow it —
+    ranked below her own, never hidden. Anything else last.
+    """
+    if reader is None or program.language == reader:
+        return 0
+    if reader in (Language.UZ, Language.RU) and program.language in (Language.UZ, Language.RU):
+        return 1
+    return 2
+
+
 def programs_for_dimension(ctx: LearnerContext, dimension: ScoreDimension) -> list[Program]:
     """Programmes that build a dimension, best first. Finished ones are left out.
 
-    A course she has started comes first, furthest along first; then the
-    category most directly tied to the dimension; then whichever would teach
-    her the most she does not hold yet.
+    A course she has started comes first, furthest along first; then one she
+    can read; then the category most directly tied to the dimension; then
+    whichever would teach her the most she does not hold yet.
     """
     categories = DIMENSION_PROGRAM_CATEGORIES[dimension]
 
-    def rank(program: Program) -> tuple[int, int, int, int]:
+    def rank(program: Program) -> tuple[int, int, int, int, int]:
         enrollment = ctx.enrollments.get(program.id)
         started = enrollment is not None and enrollment.status in _OPEN_ENROLLMENT
         progress = enrollment.progress_percent if enrollment is not None and started else 0
         new = sum(1 for label in program.skills_taught if not ctx.holds(label))
-        return (0 if started else 1, -progress, categories.index(program.category), -new)
+        return (
+            0 if started else 1,
+            -progress,
+            language_distance(program, ctx.language),
+            categories.index(program.category),
+            -new,
+        )
 
     candidates = [
         program

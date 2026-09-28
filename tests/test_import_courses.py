@@ -151,4 +151,8 @@ def test_the_shipped_file_is_one_the_importer_accepts():
     rows = [clean(record, index) for index, record in enumerate(records)]
     assert len({row["slug"] for row in rows}) == len(rows), "two courses share a slug"
     assert all(row["external_url"].startswith("https://") for row in rows)
-    assert {row["source"] for row in rows} == {"stepik"}
+    # Stepik is the bulk of it; the Uzbek platforms are the reason the file
+    # exists at all for a reader who does not read Russian.
+    sources = {row["source"] for row in rows}
+    assert "stepik" in sources
+    assert sources <= {"stepik", "ochiqkurs", "direktor", "spbu"}
