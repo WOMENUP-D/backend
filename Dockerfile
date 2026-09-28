@@ -23,6 +23,9 @@ RUN apk upgrade --no-cache && apk add --no-cache libstdc++ \
 COPY --from=builder /app/.venv ./.venv
 COPY alembic ./alembic
 COPY alembic.ini ./
+# The partner courses the load migration reads, and the file the import
+# command uses on the server afterwards.
+COPY data ./data
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/WOMENUP-D/backend" org.opencontainers.image.revision=$REVISION
 USER 10001:10001

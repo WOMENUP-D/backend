@@ -14,8 +14,13 @@ No data is moved here. `python -m app.seed_skills` loads the catalogue and
 turns existing profiles, completed courses and certificates into evidence; it
 is idempotent and safe to run repeatedly.
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0013a
+Revises: 0013
+
+Renumbered after the fact: two branches added a migration numbered 0013 at
+the same time — this one and the external-course columns — and Alembic refuses
+to run with a duplicate. Production had already applied the other, so this one
+follows it rather than the other way round.
 """
 
 from __future__ import annotations
@@ -25,8 +30,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision = "0013"
-down_revision = "0012"
+revision = "0013a"
+down_revision = "0013"
 branch_labels = None
 depends_on = None
 
