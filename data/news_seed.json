@@ -1,0 +1,702 @@
+[
+ {
+  "slug": "womanup-yangiliklar-lentasi-ochildi",
+  "category": "announcement",
+  "tone": "plum",
+  "emblem": "📣",
+  "tags": [
+   "womanup",
+   "platforma"
+  ],
+  "source_name": "WomanUP",
+  "source_url": null,
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": true,
+  "days_ago": 0,
+  "title": {
+   "uz": "WomanUP yangiliklar lentasi ochildi",
+   "ru": "Открылась лента новостей WomanUP",
+   "en": "The WomanUP news feed is open"
+  },
+  "summary": {
+   "uz": "Tibbiyot, salomatlik, ayollarning ilmiy kashfiyotlari va eʼlonlar — hammasi bitta joyda.",
+   "ru": "Медицина, здоровье, научные открытия женщин и объявления — всё в одном месте.",
+   "en": "Medicine, health, women's discoveries in science and announcements — all in one place."
+  },
+  "body": {
+   "uz": "Bugundan boshlab portal kabinet bilan emas, lenta bilan ochiladi. Bu yerda siz uchun tanlangan yangiliklar chiqadi: tibbiyot nimani bilib oldi, ayollar fanda nimani kashf qildi, qaysi grant va dastur ochildi.\n\nHar bir tibbiy post manbasi bilan chiqadi — Jahon sogʻliqni saqlash tashkiloti, Nobel qoʻmitasi, UNESCO. Bu tasodif emas: manbasiz sogʻliq haqidagi daʼvo — bu shunchaki mish-mish.\n\nLenta hech qachon tashxis qoʻymaydi va dori tavsiya qilmaydi. U nima maʼlum ekanini tushuntiradi va shifokorga yoʻnaltiradi.",
+   "ru": "С сегодняшнего дня портал открывается не кабинетом, а лентой. Здесь выходят новости, отобранные для вас: что узнала медицина, что открыли женщины в науке, какой грант или программа открылись.\n\nКаждый медицинский пост выходит с источником — Всемирная организация здравоохранения, Нобелевский комитет, ЮНЕСКО. Это не формальность: утверждение о здоровье без источника — это просто слух.\n\nЛента никогда не ставит диагноз и не назначает лечение. Она объясняет, что известно, и направляет к врачу.",
+   "en": "From today the portal opens on the feed rather than on your cabinet. Here you will find news chosen for you: what medicine has learned, what women have discovered in science, which grant or programme has opened.\n\nEvery medical post carries its source — the World Health Organization, the Nobel Committee, UNESCO. That is not a formality: a health claim with no source behind it is a rumour.\n\nThe feed never diagnoses and never prescribes. It explains what is known and points you to a doctor."
+  }
+ },
+ {
+  "slug": "rivojlanish-balini-oting",
+  "category": "announcement",
+  "tone": "sand",
+  "emblem": "🧭",
+  "tags": [
+   "diagnostika",
+   "womanup"
+  ],
+  "source_name": "WomanUP",
+  "source_url": null,
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": true,
+  "days_ago": 1,
+  "title": {
+   "uz": "Rivojlanish balini oʻtkazing — 8 yoʻnalish, 15 daqiqa",
+   "ru": "Пройдите Развитие-балл — 8 направлений, 15 минут",
+   "en": "Take the Development Score — 8 dimensions, 15 minutes"
+  },
+  "summary": {
+   "uz": "Diagnostika taʼlim, ish, tadbirkorlik, moliya, sogʻliq, oila, ijtimoiy faollik va xalqaro integratsiyani oʻlchaydi.",
+   "ru": "Диагностика измеряет образование, работу, предпринимательство, финансы, здоровье, семью, социальную активность и международную интеграцию.",
+   "en": "The assessment measures education, work, entrepreneurship, finance, health, family, social activity and international integration."
+  },
+  "body": {
+   "uz": "Rivojlanish bali — bu imtihon emas. Bu sizning bugungi holatingizning surati: sakkizta yoʻnalish boʻyicha qayerda kuchlisiz va qayerda qoʻllab-quvvatlash kerak.\n\nNatija asosida platforma individual rejani taklif qiladi. Reja avtomatik ishga tushmaydi — uni siz koʻrib chiqasiz va oʻzingiz qabul qilasiz. Rozi boʻlmasangiz, u shunchaki taklif boʻlib qoladi.\n\nBir necha oydan keyin diagnostikani takrorlash mumkin — shunda oʻzgarishni raqamda koʻrasiz.",
+   "ru": "Развитие-балл — это не экзамен. Это снимок вашего сегодняшнего состояния: по восьми направлениям видно, где вы сильны, а где нужна поддержка.\n\nПо результату платформа предложит индивидуальный план. План не запускается автоматически — вы его смотрите и принимаете сами. Если не согласны, он останется просто предложением.\n\nЧерез несколько месяцев диагностику можно пройти снова — и увидеть изменение в цифрах.",
+   "en": "The Development Score is not an exam. It is a picture of where you are today: across eight dimensions, where you are strong and where support would help.\n\nFrom the result the platform proposes an individual plan. The plan does not start by itself — you read it and accept it yourself. If you disagree, it stays a proposal and nothing more.\n\nIn a few months you can take the assessment again and see the change as a number."
+  }
+ },
+ {
+  "slug": "grant-va-dastur-arizalari-ochiq",
+  "category": "announcement",
+  "tone": "sky",
+  "emblem": "🗂",
+  "tags": [
+   "grant",
+   "imkoniyat",
+   "tadbirkorlik"
+  ],
+  "source_name": "WomanUP · Invest HUB",
+  "source_url": null,
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 3,
+  "title": {
+   "uz": "Tadbirkor ayollar uchun grant arizalari ochiq",
+   "ru": "Открыт приём заявок на гранты для женщин-предпринимателей",
+   "en": "Grant applications for women entrepreneurs are open"
+  },
+  "summary": {
+   "uz": "Invest HUB bilan integratsiya orqali arizani portalning oʻzidan yuborish mumkin.",
+   "ru": "Через интеграцию с Invest HUB заявку можно отправить прямо с портала.",
+   "en": "Through the Invest HUB integration you can apply straight from the portal."
+  },
+  "body": {
+   "uz": "«Imkoniyatlar» boʻlimida grantlar, vakansiyalar va investitsiya takliflari toʻplangan. Ular hamkor platformalardan keladi va profilingizga mos ravishda saralanadi.\n\nAriza yuborishdan oldin portal sizdan aniq roziligingizni soʻraydi va nima uzatilishini koʻrsatadi: taxallus identifikatori va kasbiy maʼlumotlar. Telefon raqamingiz, pochtangiz va toʻliq ismingiz hamkorga yuborilmaydi.\n\nRoziligingizni istalgan vaqtda qaytarib olishingiz mumkin.",
+   "ru": "В разделе «Возможности» собраны гранты, вакансии и инвестиционные предложения. Они приходят с партнёрских платформ и подбираются под ваш профиль.\n\nПеред отправкой заявки портал запрашивает ваше явное согласие и показывает, что именно будет передано: псевдонимный идентификатор и профессиональные данные. Телефон, почта и полное имя партнёру не уходят.\n\nСогласие можно отозвать в любой момент.",
+   "en": "The Opportunities section gathers grants, vacancies and investment offers. They arrive from partner platforms and are matched to your profile.\n\nBefore an application is sent the portal asks for your explicit consent and shows exactly what will be shared: a pseudonymous id and professional details. Your phone number, e-mail and full name never reach the partner.\n\nYou can withdraw that consent at any time."
+  }
+ },
+ {
+  "slug": "katalin-kariko-mrna-nobel",
+  "category": "science",
+  "tone": "ink",
+  "emblem": "🔬",
+  "tags": [
+   "nobel",
+   "mrna",
+   "immunologiya"
+  ],
+  "source_name": "Nobel Assembly, Karolinska Institutet (2023)",
+  "source_url": "https://www.nobelprize.org/prizes/medicine/2023/summary/",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 2,
+  "title": {
+   "uz": "Katalin Karikó: oʻn yillik rad javoblardan Nobel mukofotigacha",
+   "ru": "Каталин Карико: от десятилетий отказов до Нобелевской премии",
+   "en": "Katalin Karikó: from decades of rejection to a Nobel Prize"
+  },
+  "summary": {
+   "uz": "2023-yilgi fiziologiya va tibbiyot boʻyicha Nobel mukofoti mRNK vaksinalarini mumkin qilgan kashfiyot uchun berildi.",
+   "ru": "Нобелевская премия 2023 года по физиологии и медицине — за открытие, которое сделало возможными мРНК-вакцины.",
+   "en": "The 2023 Nobel Prize in Physiology or Medicine went to the discovery that made mRNA vaccines possible."
+  },
+  "body": {
+   "uz": "Katalin Karikó Vengriyada tugʻilgan biokimyogar. Uning gʻoyasi — hujayraga kerakli oqsilni oʻzi ishlab chiqarishni «aytib» beruvchi mRNK molekulasidan dori sifatida foydalanish — koʻp yillar davomida grant komissiyalari tomonidan rad etilgan. 1995-yilda universitetda uning lavozimi pasaytirilgan.\n\nDrew Weissman bilan birgalikda u asosiy toʻsiqni yechdi: sunʼiy mRNK organizmda kuchli yalligʻlanish reaksiyasini keltirib chiqarardi. Ular nukleozidlarni modifikatsiya qilish — molekulaning bir «harfini» almashtirish — bu reaksiyani susaytirishini koʻrsatishdi.\n\nOʻsha modifikatsiya keyinchalik COVID-19ga qarshi mRNK vaksinalarining asosi boʻldi. 2023-yilda Karolinska instituti Nobel assambleyasi ikkalasiga fiziologiya va tibbiyot boʻyicha Nobel mukofotini berdi.\n\nBu tarixning eng qiziq tomoni — kashfiyot toʻxtab qolmagani emas, balki uni davom ettirgan odam butun karerasi davomida «bu istiqbolsiz» degan javobni eshitgani.",
+   "ru": "Каталин Карико — биохимик, родившаяся в Венгрии. Её идея использовать молекулу мРНК как лекарство — «сказать» клетке, какой белок произвести, — годами отклонялась грантовыми комиссиями. В 1995 году её понизили в должности в университете.\n\nВместе с Дрю Вайсманом она сняла главное препятствие: искусственная мРНК вызывала в организме сильную воспалительную реакцию. Они показали, что модификация нуклеозидов — замена одной «буквы» молекулы — эту реакцию гасит.\n\nИменно эта модификация легла в основу мРНК-вакцин против COVID-19. В 2023 году Нобелевская ассамблея Каролинского института присудила обоим премию по физиологии и медицине.\n\nСамое примечательное в этой истории не то, что открытие состоялось, а то, что человек, доведший его до конца, всю карьеру слышал: «это бесперспективно».",
+   "en": "Katalin Karikó is a Hungarian-born biochemist. Her idea — using an mRNA molecule as a medicine, telling a cell which protein to make — was turned down by grant committees for years. In 1995 she was demoted at her university.\n\nWith Drew Weissman she removed the central obstacle: synthetic mRNA provoked a strong inflammatory response in the body. They showed that modifying its nucleosides — swapping a single 'letter' of the molecule — quiets that response.\n\nThat modification became the foundation of the mRNA vaccines against COVID-19. In 2023 the Nobel Assembly at Karolinska Institutet awarded them both the prize in Physiology or Medicine.\n\nThe striking part of the story is not that the discovery happened, but that the person who saw it through spent a career being told it was going nowhere."
+  }
+ },
+ {
+  "slug": "crispr-genom-tahriri-nobel",
+  "category": "science",
+  "tone": "ink",
+  "emblem": "🧬",
+  "tags": [
+   "nobel",
+   "genetika",
+   "crispr"
+  ],
+  "source_name": "The Royal Swedish Academy of Sciences (2020)",
+  "source_url": "https://www.nobelprize.org/prizes/chemistry/2020/summary/",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 5,
+  "title": {
+   "uz": "Genom «qaychisi»: kimyo boʻyicha Nobel mukofotini ikki ayol oldi",
+   "ru": "«Ножницы» для генома: Нобелевскую премию по химии получили две женщины",
+   "en": "Genetic scissors: two women won the Nobel Prize in Chemistry"
+  },
+  "summary": {
+   "uz": "Emmanuelle Charpentier va Jennifer Doudna CRISPR-Cas9 usulini ishlab chiqdi — DNKni aniq nuqtada tahrirlash imkonini beradi.",
+   "ru": "Эмманюэль Шарпантье и Дженнифер Даудна разработали метод CRISPR-Cas9 — он позволяет редактировать ДНК в точной позиции.",
+   "en": "Emmanuelle Charpentier and Jennifer Doudna developed CRISPR-Cas9, which edits DNA at a precise position."
+  },
+  "body": {
+   "uz": "2020-yilda Shvetsiya Qirollik fanlar akademiyasi kimyo boʻyicha Nobel mukofotini Emmanuelle Charpentier va Jennifer Doudnaga berdi. Bu — mukofot tarixida birinchi marta kimyo boʻyicha ikki ayolga birgalikda berilgani.\n\nCRISPR-Cas9 dastlab bakteriyalarning viruslardan himoyalanish tizimi sifatida topilgan. Tadqiqotchilar uni universal vositaga aylantirishdi: endi DNK zanjirini oldindan belgilangan joyda kesish mumkin.\n\nUsul oʻroqsimon hujayrali anemiya va beta-talassemiya kabi irsiy kasalliklarni davolash usullarini ishlab chiqishda qoʻllanilmoqda, shuningdek qishloq xoʻjaligi va fundamental biologiyada.\n\nCharpentier mukofotdan keyin aytgan gap koʻp iqtibos keltiriladi: u yosh qizlarga fan «ayollar uchun ham» ekanini emas, balki fan ularniki ekanini koʻrsatishga umid qiladi.",
+   "ru": "В 2020 году Шведская королевская академия наук присудила Нобелевскую премию по химии Эмманюэль Шарпантье и Дженнифер Даудне. Это первый случай в истории премии, когда химическую награду разделили две женщины.\n\nCRISPR-Cas9 изначально нашли как систему защиты бактерий от вирусов. Исследовательницы превратили её в универсальный инструмент: теперь цепочку ДНК можно разрезать в заранее заданном месте.\n\nМетод применяется при разработке методов лечения наследственных болезней — серповидноклеточной анемии и бета-талассемии, — а также в сельском хозяйстве и фундаментальной биологии.\n\nФразу Шарпантье после награждения часто цитируют: она надеется показать девочкам не то, что наука «в том числе для женщин», а то, что наука — их.",
+   "en": "In 2020 the Royal Swedish Academy of Sciences awarded the Nobel Prize in Chemistry to Emmanuelle Charpentier and Jennifer Doudna — the first time in the prize's history that two women shared the chemistry award.\n\nCRISPR-Cas9 was first found as a bacterial defence system against viruses. The two researchers turned it into a general-purpose tool: a DNA strand can now be cut at a position chosen in advance.\n\nThe method is being used to develop treatments for inherited diseases such as sickle-cell anaemia and beta-thalassaemia, as well as in agriculture and basic biology.\n\nCharpentier's line after the award is often quoted: she hopes to show girls not that science is 'also for women', but that science is theirs."
+  }
+ },
+ {
+  "slug": "andrea-ghez-qora-tuynuk",
+  "category": "science",
+  "tone": "sky",
+  "emblem": "🔭",
+  "tags": [
+   "nobel",
+   "astronomiya",
+   "fizika"
+  ],
+  "source_name": "The Royal Swedish Academy of Sciences (2020)",
+  "source_url": "https://www.nobelprize.org/prizes/physics/2020/summary/",
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 8,
+  "title": {
+   "uz": "Andrea Ghez: galaktikamiz markazida nima borligini oʻlchagan ayol",
+   "ru": "Андреа Гез: женщина, которая измерила, что находится в центре нашей галактики",
+   "en": "Andrea Ghez: the woman who measured what sits at our galaxy's centre"
+  },
+  "summary": {
+   "uz": "2020-yilgi fizika boʻyicha Nobel mukofoti Somon yoʻli markazidagi ulkan massali obyekt uchun berildi.",
+   "ru": "Нобелевская премия по физике 2020 года — за сверхмассивный объект в центре Млечного Пути.",
+   "en": "The 2020 Nobel Prize in Physics recognised the supermassive object at the centre of the Milky Way."
+  },
+  "body": {
+   "uz": "Andrea Ghez — fizika boʻyicha Nobel mukofotini olgan toʻrtinchi ayol. U oʻttiz yil davomida Somon yoʻli markazi atrofidagi yulduzlarning harakatini kuzatgan.\n\nYulduzlar juda tez va juda kichik orbitada aylanardi. Buni faqat bitta narsa tushuntira olardi: markazda Quyoshdan millionlab marta ogʻirroq, lekin juda kichik hajmdagi obyekt bor.\n\nKuzatish uchun u atmosfera buzilishini kompensatsiya qiluvchi adaptiv optikadan foydalandi — bu texnikaning oʻzi ham astronomiyani oʻzgartirdi.\n\n2020-yilda u Reinhard Genzel bilan mukofotni boʻlishdi — Yerdan koʻrinmaydigan narsani, uning atrofidagi harakat orqali oʻlchash mumkinligini isbotlagani uchun.",
+   "ru": "Андреа Гез — четвёртая женщина, получившая Нобелевскую премию по физике. Тридцать лет она наблюдала за движением звёзд вокруг центра Млечного Пути.\n\nЗвёзды двигались слишком быстро и по слишком тесным орбитам. Объяснение было только одно: в центре находится объект в миллионы раз тяжелее Солнца, но занимающий крошечный объём.\n\nДля наблюдений она применила адаптивную оптику, компенсирующую искажения атмосферы, — эта техника сама по себе изменила астрономию.\n\nВ 2020 году она разделила премию с Райнхардом Генцелем — за доказательство того, что невидимое с Земли можно измерить по движению вокруг него.",
+   "en": "Andrea Ghez is the fourth woman to receive the Nobel Prize in Physics. For thirty years she tracked the motion of stars around the centre of the Milky Way.\n\nThe stars moved too fast, on orbits too tight. Only one thing could explain it: an object at the centre millions of times heavier than the Sun, packed into a tiny volume.\n\nTo see them she used adaptive optics, which cancels the blurring of the atmosphere — a technique that reshaped astronomy in its own right.\n\nIn 2020 she shared the prize with Reinhard Genzel, for proving that something invisible from Earth can be measured by what moves around it."
+  }
+ },
+ {
+  "slug": "ayollar-ilm-fanda-har-uchinchi-tadqiqotchi",
+  "category": "science",
+  "tone": "sand",
+  "emblem": "📊",
+  "tags": [
+   "unesco",
+   "ilm-fan",
+   "statistika"
+  ],
+  "source_name": "UNESCO Institute for Statistics",
+  "source_url": "https://www.unesco.org/en/articles/women-science",
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 11,
+  "title": {
+   "uz": "Dunyoda har uch tadqiqotchidan bittasi — ayol",
+   "ru": "В мире женщина — каждый третий исследователь",
+   "en": "Worldwide, roughly one researcher in three is a woman"
+  },
+  "summary": {
+   "uz": "UNESCO maʼlumotlariga koʻra ayollar dunyo tadqiqotchilarining taxminan uchdan birini tashkil qiladi — muhandislik va IT sohalarida esa bundan ham kam.",
+   "ru": "По данным ЮНЕСКО женщины составляют около трети исследователей мира — а в инженерии и IT их ещё меньше.",
+   "en": "UNESCO data puts women at about a third of the world's researchers — and fewer still in engineering and IT."
+  },
+  "body": {
+   "uz": "UNESCO statistika instituti maʼlumotlariga koʻra, dunyodagi tadqiqotchilarning taxminan 33 foizi ayollar. Bu raqam oʻn yil ichida deyarli oʻzgarmadi.\n\nFarq soha boʻyicha keskin: hayot haqidagi fanlarda ayollar koʻp, muhandislik, informatika va sunʼiy intellektda esa ancha kam. Yuqori lavozimlarda va tadqiqot rahbarligida nomutanosiblik yanada kuchayadi.\n\nSabab qobiliyatda emas. Tadqiqotlar koʻrsatishicha, asosiy yoʻqotish maktabdan universitetgacha va universitetdan ilmiy karerangacha boʻlgan oʻtishlarda sodir boʻladi — yaʼni tanlov qilinadigan nuqtalarda.\n\nShuning uchun mentorlik va aniq namunalar muhim: qiz oʻz yoʻnalishida ayolni koʻrsa, bu yoʻl unga ham ochiq ekani koʻrinadi.",
+   "ru": "По данным Института статистики ЮНЕСКО, женщины составляют около 33% исследователей в мире. За десятилетие эта доля почти не изменилась.\n\nРазрыв резко различается по областям: в науках о жизни женщин много, в инженерии, информатике и искусственном интеллекте — заметно меньше. На руководящих позициях и в управлении исследованиями диспропорция усиливается.\n\nПричина не в способностях. Исследования показывают, что основные потери происходят на переходах: школа — университет и университет — научная карьера, то есть в точках выбора.\n\nПоэтому важны наставничество и конкретные примеры: если девушка видит женщину в своей области, этот путь становится для неё видимым.",
+   "en": "According to the UNESCO Institute for Statistics, women make up about 33% of the world's researchers. That share has barely moved in a decade.\n\nThe gap varies sharply by field: women are well represented in the life sciences and much less so in engineering, computing and artificial intelligence. In senior posts and research leadership the imbalance widens further.\n\nThe cause is not ability. Studies point to the transitions — school to university, university to a research career — as where the losses happen: the points where a choice is made.\n\nThat is why mentorship and concrete examples matter: when a girl sees a woman working in her field, the path becomes visible to her too."
+  }
+ },
+ {
+  "slug": "bachadon-buyni-saratonini-oldini-olish",
+  "category": "medicine",
+  "tone": "rose",
+  "emblem": "🩺",
+  "tags": [
+   "profilaktika",
+   "skrining",
+   "hpv"
+  ],
+  "source_name": "World Health Organization",
+  "source_url": "https://www.who.int/initiatives/cervical-cancer-elimination-initiative",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 4,
+  "title": {
+   "uz": "Bachadon boʻyni saratoni — oldini olish mumkin boʻlgan kam sonli saratonlardan biri",
+   "ru": "Рак шейки матки — один из немногих видов рака, который можно предотвратить",
+   "en": "Cervical cancer is one of the few cancers that can be prevented"
+  },
+  "summary": {
+   "uz": "JSST strategiyasi uchta raqamga asoslanadi: emlash, skrining va davolash qamrovi.",
+   "ru": "Стратегия ВОЗ строится на трёх цифрах: охват вакцинацией, скринингом и лечением.",
+   "en": "The WHO strategy rests on three numbers: vaccination, screening and treatment coverage."
+  },
+  "body": {
+   "uz": "Jahon sogʻliqni saqlash tashkiloti bachadon boʻyni saratonini yoʻq qilish boʻyicha global strategiyani qabul qilgan. U «90–70–90» deb ataladigan uchta maqsadga asoslanadi: 15 yoshgacha qizlarning 90 foizini HPVga qarshi emlash, ayollarning 70 foizini yuqori aniqlikdagi test bilan skriningdan oʻtkazish va aniqlangan holatlarning 90 foizini davolash bilan taʼminlash.\n\nKasallikning asosiy sababi — inson papillomavirusining yuqori onkogen turlari bilan uzoq davom etuvchi infeksiya. Aynan shuning uchun emlash profilaktika sifatida ishlaydi.\n\nSkrining muhim, chunki oʻzgarishlar saratonga aylanguncha yillar kerak boʻladi va bu bosqichda ular deyarli har doim davolanadi. Erta bosqichda kasallik odatda hech qanday belgi bermaydi — «hech narsa ogʻrimayapti» degani sogʻlom degani emas.\n\nQaysi yoshda va qanday davriylikda tekshiruvdan oʻtish kerakligini shifokoringiz aytadi — bu yoshga va mahalliy protokolga bogʻliq.",
+   "ru": "Всемирная организация здравоохранения приняла глобальную стратегию элиминации рака шейки матки. Она строится на трёх целях, известных как «90–70–90»: привить против ВПЧ 90% девочек до 15 лет, охватить скринингом высокоточным тестом 70% женщин и обеспечить лечением 90% выявленных случаев.\n\nОсновная причина болезни — длительная инфекция онкогенными типами вируса папилломы человека. Именно поэтому вакцинация работает как профилактика.\n\nСкрининг важен потому, что изменениям нужны годы, чтобы стать раком, и на этой стадии они почти всегда излечимы. На ранней стадии болезнь обычно не даёт никаких симптомов — «ничего не болит» не означает «здорова».\n\nВ каком возрасте и с какой периодичностью проходить обследование, скажет ваш врач — это зависит от возраста и местного протокола.",
+   "en": "The World Health Organization has adopted a global strategy to eliminate cervical cancer. It rests on three targets known as '90–70–90': vaccinate 90% of girls against HPV by age 15, screen 70% of women with a high-performance test, and treat 90% of identified cases.\n\nThe disease is caused by persistent infection with high-risk types of human papillomavirus. That is precisely why vaccination works as prevention.\n\nScreening matters because those changes take years to become cancer, and at that stage they are almost always treatable. Early on the disease usually causes no symptoms at all — 'nothing hurts' does not mean 'healthy'.\n\nYour doctor will tell you at what age and how often to be screened: it depends on your age and the local protocol."
+  }
+ },
+ {
+  "slug": "kokrak-saratonini-erta-aniqlash",
+  "category": "medicine",
+  "tone": "rose",
+  "emblem": "🎗",
+  "tags": [
+   "profilaktika",
+   "skrining",
+   "onkologiya"
+  ],
+  "source_name": "World Health Organization · Global Breast Cancer Initiative",
+  "source_url": "https://www.who.int/news-room/fact-sheets/detail/breast-cancer",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 6,
+  "title": {
+   "uz": "Koʻkrak saratoni: erta aniqlash omon qolish ehtimolini keskin oshiradi",
+   "ru": "Рак груди: раннее выявление резко повышает шансы",
+   "en": "Breast cancer: early detection changes the odds dramatically"
+  },
+  "summary": {
+   "uz": "JSST maʼlumotlariga koʻra koʻkrak saratoni dunyoda ayollar orasida eng koʻp uchraydigan saraton turi.",
+   "ru": "По данным ВОЗ, рак груди — самый распространённый вид рака среди женщин в мире.",
+   "en": "WHO data makes breast cancer the most common cancer among women worldwide."
+  },
+  "body": {
+   "uz": "Koʻkrak saratoni — dunyoda ayollar orasida eng koʻp tashxis qoʻyiladigan saraton. JSSTning global tashabbusi oʻlim darajasini har yili 2,5 foizga kamaytirishni maqsad qilgan.\n\nBu maqsadning asosi — murakkab texnologiya emas, balki uchta oddiy narsa: kasallik haqida bilim, tashxisning kechikmasligi va davolashning uzilishsiz boʻlishi.\n\nAmalda bu shuni anglatadi: koʻkrakdagi oʻzgarishni — tugun, shakl yoki teri oʻzgarishi, soʻrgʻichdan ajralma — sezgan ayol haftalar emas, kunlar ichida shifokorga murojaat qilishi kerak.\n\nMammografiya skriningi qaysi yoshdan boshlanishi mamlakat protokoliga bogʻliq. Oilangizda koʻkrak yoki tuxumdon saratoni boʻlgan boʻlsa, buni albatta shifokorga ayting — bu tekshiruv jadvalini oʻzgartirishi mumkin.\n\nBu post tashxis qoʻymaydi. Har qanday xavotirni koʻrikdan oʻtkazadigan yagona odam — shifokor.",
+   "ru": "Рак груди — самый часто диагностируемый рак у женщин в мире. Глобальная инициатива ВОЗ ставит целью снижать смертность на 2,5% в год.\n\nВ основе этой цели не сложная технология, а три простые вещи: знание о болезни, отсутствие задержки с диагнозом и непрерывность лечения.\n\nНа практике это значит: женщина, заметившая изменение в груди — уплотнение, изменение формы или кожи, выделения из соска, — должна обратиться к врачу в течение дней, а не недель.\n\nС какого возраста начинается маммографический скрининг, зависит от протокола страны. Если в вашей семье был рак груди или яичников, обязательно скажите об этом врачу — это может изменить график обследований.\n\nЭтот пост не ставит диагноз. Единственный, кто может оценить любую тревогу, — врач.",
+   "en": "Breast cancer is the most frequently diagnosed cancer in women worldwide. WHO's global initiative aims to reduce mortality by 2.5% per year.\n\nWhat underpins that target is not advanced technology but three simple things: knowing about the disease, not delaying diagnosis, and treatment that is not interrupted.\n\nIn practice this means a woman who notices a change in her breast — a lump, a change in shape or skin, discharge from the nipple — should see a doctor within days, not weeks.\n\nThe age at which mammography screening begins depends on the national protocol. If breast or ovarian cancer runs in your family, tell your doctor — it may change your screening schedule.\n\nThis post does not diagnose. The only person who can assess a worry is a doctor."
+  }
+ },
+ {
+  "slug": "homiladorlikda-folat-kislotasi",
+  "category": "medicine",
+  "tone": "rose",
+  "emblem": "🤍",
+  "tags": [
+   "homiladorlik",
+   "profilaktika"
+  ],
+  "source_name": "World Health Organization",
+  "source_url": "https://www.who.int/tools/elena/interventions/folate-periconceptional",
+  "reading_minutes": 2,
+  "adult": true,
+  "pinned": false,
+  "days_ago": 9,
+  "title": {
+   "uz": "Folat kislotasi homiladorlikni rejalashtirishdan oldin boshlanadi",
+   "ru": "Фолиевая кислота начинается до планирования беременности",
+   "en": "Folic acid starts before you plan a pregnancy"
+  },
+  "summary": {
+   "uz": "JSST homiladorlikdan oldin va uning birinchi haftalarida folat kislotasini qabul qilishni tavsiya qiladi.",
+   "ru": "ВОЗ рекомендует приём фолиевой кислоты до беременности и в её первые недели.",
+   "en": "WHO recommends folic acid before conception and through the first weeks of pregnancy."
+  },
+  "body": {
+   "uz": "Asab naychasi nuqsonlari homiladorlikning birinchi haftalarida — koʻpincha ayol hali homiladorligini bilmagan paytda — shakllanadi. Aynan shuning uchun JSST folat kislotasini homiladorlikdan oldin boshlashni tavsiya qiladi.\n\nBu qoida oddiy koʻrinadi, lekin uning maʼnosi vaqtda: homiladorlikni tasdiqlagandan keyin boshlangan qabul koʻpincha kech boʻladi.\n\nDozani shifokor belgilaydi — u sizning anamnezingizga va boshqa qabul qilayotgan preparatlaringizga bogʻliq. Bu post dozani tavsiya qilmaydi.",
+   "ru": "Дефекты нервной трубки формируются в первые недели беременности — часто когда женщина ещё не знает, что беременна. Именно поэтому ВОЗ рекомендует начинать приём фолиевой кислоты до беременности.\n\nПравило выглядит простым, но его смысл — во времени: приём, начатый после подтверждения беременности, часто уже поздний.\n\nДозу определяет врач — она зависит от вашего анамнеза и других принимаемых препаратов. Этот пост дозу не назначает.",
+   "en": "Neural tube defects form in the first weeks of pregnancy — often before a woman knows she is pregnant. That is exactly why WHO recommends starting folic acid before conception.\n\nThe rule looks simple, but its meaning is about timing: supplements started after a pregnancy is confirmed are often already late.\n\nThe dose is set by your doctor and depends on your history and any other medication you take. This post does not prescribe one."
+  }
+ },
+ {
+  "slug": "temir-tanqisligi-kamqonlik",
+  "category": "health",
+  "tone": "sage",
+  "emblem": "🌿",
+  "tags": [
+   "kamqonlik",
+   "ovqatlanish",
+   "charchoq"
+  ],
+  "source_name": "World Health Organization",
+  "source_url": "https://www.who.int/news-room/fact-sheets/detail/anaemia",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 7,
+  "title": {
+   "uz": "Doimiy charchoq har doim ham «shunchaki charchoq» emas",
+   "ru": "Постоянная усталость не всегда «просто усталость»",
+   "en": "Constant tiredness is not always 'just tiredness'"
+  },
+  "summary": {
+   "uz": "JSST maʼlumotlariga koʻra reproduktiv yoshdagi ayollarning taxminan uchdan biri kamqonlikdan aziyat chekadi.",
+   "ru": "По данным ВОЗ, примерно треть женщин репродуктивного возраста страдает анемией.",
+   "en": "WHO data suggests roughly a third of women of reproductive age have anaemia."
+  },
+  "body": {
+   "uz": "Kamqonlik — dunyodagi eng keng tarqalgan ovqatlanish bilan bogʻliq muammolardan biri, va u ayollarga erkaklarga qaraganda ancha koʻp taʼsir qiladi. JSST baholariga koʻra, 15–49 yoshdagi ayollarning taxminan uchdan biri kamqonlikka ega.\n\nBelgilari koʻpincha kundalik hayotga «yozib qoʻyiladi»: charchoq, bosh aylanishi, teri oqarishi, diqqatni jamlashning qiyinlashuvi, sochning toʻkilishi. Ayol buni ish, uy yumushi yoki uyqusizlik bilan izohlaydi va yillar davomida shifokorga murojaat qilmaydi.\n\nKamqonlikning oʻzi tashxis emas — bu belgi. Sababi temir tanqisligi ham, boshqa holat ham boʻlishi mumkin. Shuning uchun temir preparatlarini oʻz-oʻzidan boshlash notoʻgʻri: ortiqcha temir zararli, va asosiy sabab yashirinib qoladi.\n\nToʻgʻri qadam oddiy — umumiy qon tahlili. Bu arzon, tez va koʻpincha savolga javob beradi.",
+   "ru": "Анемия — одна из самых распространённых в мире проблем, связанных с питанием, и женщин она затрагивает заметно чаще мужчин. По оценкам ВОЗ, около трети женщин 15–49 лет живут с анемией.\n\nСимптомы обычно «списывают» на повседневность: усталость, головокружение, бледность, трудности с концентрацией, выпадение волос. Женщина объясняет это работой, домом или недосыпом и годами не доходит до врача.\n\nСама анемия — не диагноз, а признак. Причиной может быть дефицит железа, а может — другое состояние. Поэтому начинать приём железа самостоятельно неправильно: избыток железа вреден, а настоящая причина остаётся скрытой.\n\nПравильный шаг простой — общий анализ крови. Он недорогой, быстрый и часто отвечает на вопрос.",
+   "en": "Anaemia is one of the most widespread nutrition-related problems in the world, and it affects women considerably more than men. WHO estimates that around a third of women aged 15–49 live with it.\n\nThe symptoms are usually written off as ordinary life: tiredness, dizziness, pallor, trouble concentrating, hair loss. A woman puts it down to work, the house or poor sleep, and goes years without seeing a doctor.\n\nAnaemia itself is not a diagnosis — it is a sign. The cause may be iron deficiency, or something else entirely. Starting iron on your own is therefore the wrong move: excess iron is harmful, and the real cause stays hidden.\n\nThe right step is a simple one — a full blood count. It is cheap, quick, and often answers the question."
+  }
+ },
+ {
+  "slug": "haftasiga-150-daqiqa-harakat",
+  "category": "health",
+  "tone": "sage",
+  "emblem": "🚶‍♀️",
+  "tags": [
+   "harakat",
+   "odat",
+   "profilaktika"
+  ],
+  "source_name": "World Health Organization",
+  "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 10,
+  "title": {
+   "uz": "Haftasiga 150 daqiqa — sport zali shart emas",
+   "ru": "150 минут в неделю — спортзал не обязателен",
+   "en": "150 minutes a week — no gym required"
+  },
+  "summary": {
+   "uz": "JSST kattalar uchun haftasiga 150–300 daqiqa oʻrtacha jadallikdagi harakatni tavsiya qiladi.",
+   "ru": "ВОЗ рекомендует взрослым 150–300 минут умеренной активности в неделю.",
+   "en": "WHO recommends 150–300 minutes of moderate activity a week for adults."
+  },
+  "body": {
+   "uz": "JSSTning jismoniy faollik boʻyicha tavsiyasi kattalar uchun bitta raqamga sigʻadi: haftasiga 150 dan 300 daqiqagacha oʻrtacha jadallikdagi harakat. Bu kuniga taxminan 20–40 daqiqa.\n\n«Oʻrtacha jadallik» — bu yugurish shart emas degani. Tez yurish, zinapoya, velosiped, uy yumushlari va raqs ham hisobga oladi. Meʼyor — gapira olasiz, lekin qoʻshiq ayta olmaysiz.\n\nBu tavsiyaning eng foydali qismi — uni boʻlaklarga boʻlish mumkin. Kuniga uch marta oʻn daqiqa — bu bir marta oʻttiz daqiqa bilan bir xil hisoblanadi.\n\nHar qanday harakat harakatsizlikdan yaxshiroq. Agar hozir nolga yaqin boʻlsangiz, birinchi maqsad 150 daqiqa emas — birinchi maqsad bugungi yurish.",
+   "ru": "Рекомендация ВОЗ по физической активности умещается для взрослых в одну цифру: от 150 до 300 минут умеренной активности в неделю. Это примерно 20–40 минут в день.\n\n«Умеренная активность» означает, что бегать не обязательно. Быстрая ходьба, лестница, велосипед, домашние дела и танцы тоже считаются. Ориентир — вы можете говорить, но не можете петь.\n\nСамая полезная часть этой рекомендации в том, что её можно дробить. Три раза по десять минут в день считаются так же, как один тридцатиминутный подход.\n\nЛюбое движение лучше его отсутствия. Если сейчас у вас почти ноль, первая цель — не 150 минут, а сегодняшняя прогулка.",
+   "en": "WHO's physical activity guidance fits into a single number for adults: 150 to 300 minutes of moderate activity per week. That is roughly 20–40 minutes a day.\n\n'Moderate' means running is not required. Brisk walking, stairs, cycling, housework and dancing all count. The rule of thumb: you can talk, but you cannot sing.\n\nThe most useful part of the guidance is that it can be broken up. Three ten-minute bouts in a day count the same as one block of thirty.\n\nAny movement beats none. If you are near zero right now, the first target is not 150 minutes — it is today's walk."
+  }
+ },
+ {
+  "slug": "ruhiy-salomatlik-va-charchoq",
+  "category": "health",
+  "tone": "sky",
+  "emblem": "🫧",
+  "tags": [
+   "ruhiy salomatlik",
+   "charchoq",
+   "uyqu"
+  ],
+  "source_name": "World Health Organization",
+  "source_url": "https://www.who.int/news-room/fact-sheets/detail/mental-health-strengthening-our-response",
+  "reading_minutes": 3,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 13,
+  "title": {
+   "uz": "Charchoq — dangasalik emas, signal",
+   "ru": "Выгорание — не лень, а сигнал",
+   "en": "Burnout is not laziness — it is a signal"
+  },
+  "summary": {
+   "uz": "JSST charchoqni kasallik emas, ish bilan bogʻliq va bartaraf etilmagan surunkali stress hodisasi sifatida taʼriflaydi.",
+   "ru": "ВОЗ описывает выгорание не как болезнь, а как явление хронического рабочего стресса, с которым не справились.",
+   "en": "WHO describes burnout not as a disease but as a phenomenon of chronic workplace stress that was not managed."
+  },
+  "body": {
+   "uz": "Xalqaro kasalliklar tasnifida charchoq (burnout) kasallik emas, balki «kasbiy hodisa» sifatida taʼriflangan: bartaraf etilmagan surunkali ish stressi natijasi. Uning uchta belgisi bor — quvvatning tugashi, ishdan ruhiy uzoqlashish va samaradorlikning pasayishi.\n\nAyollar uchun bu koʻpincha ikki qavatli boʻladi: ish va uydagi koʻrinmas mehnat. Ikkinchisi jadvalga yozilmaydi, shuning uchun «men shunchaki dam olmayapman» degan tuygʻu tushunarsiz koʻrinadi.\n\nNima yordam beradi: uyqu rejimini tiklash, kunda ish bilan bogʻliq boʻlmagan aniq vaqt, yordam soʻrash koʻnikmasi va yuklamani baham koʻrish. Bular kichik qadamlar, lekin ular tekshirilgan.\n\nAgar holat ikki haftadan koʻproq davom etsa, kundalik ishlarga xalaqit bersa yoki oʻzingizga zarar yetkazish fikrlari paydo boʻlsa — bu mutaxassisga murojaat qilish sababi, kuchsizlik belgisi emas.",
+   "ru": "В международной классификации болезней выгорание описано не как болезнь, а как «профессиональное явление»: результат хронического рабочего стресса, с которым не справились. У него три признака — истощение, психологическое отдаление от работы и снижение результативности.\n\nУ женщин это часто двухслойно: работа плюс невидимый труд дома. Второй в расписание не записывается, поэтому ощущение «я просто не отдыхаю» выглядит необъяснимым.\n\nЧто помогает: восстановление режима сна, чёткое время в дне, не связанное с работой, навык просить помощь и разделение нагрузки. Это небольшие шаги, но проверенные.\n\nЕсли состояние длится дольше двух недель, мешает обычным делам или появляются мысли о причинении себе вреда — это повод обратиться к специалисту, а не признак слабости.",
+   "en": "In the international classification of diseases, burnout is described not as a disease but as an 'occupational phenomenon': the result of chronic workplace stress that was not successfully managed. It has three markers — exhaustion, mental distance from the job, and reduced effectiveness.\n\nFor women it is often two-layered: paid work plus invisible work at home. The second never goes on a schedule, which is why the feeling of 'I just never rest' seems inexplicable.\n\nWhat helps: restoring a sleep pattern, a defined part of the day with no work in it, the skill of asking for help, and sharing the load. These are small steps, but they are tested ones.\n\nIf it lasts more than two weeks, interferes with ordinary tasks, or thoughts of harming yourself appear — that is a reason to see a professional, not a sign of weakness."
+  }
+ },
+ {
+  "slug": "raqamli-koniklar-va-ish-bozori",
+  "category": "career",
+  "tone": "sand",
+  "emblem": "💼",
+  "tags": [
+   "kasb",
+   "raqamli koʻnikma",
+   "ish"
+  ],
+  "source_name": "WomanUP · Edu-Job",
+  "source_url": null,
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 12,
+  "title": {
+   "uz": "Ish bozorida eng koʻp soʻralayotgan koʻnikmalar",
+   "ru": "Какие навыки чаще всего спрашивают на рынке труда",
+   "en": "The skills employers ask for most"
+  },
+  "summary": {
+   "uz": "Portaldagi vakansiyalar tahlili: raqamli savodxonlik, hisobot va mijoz bilan muloqot.",
+   "ru": "Анализ вакансий на портале: цифровая грамотность, отчётность и работа с клиентом.",
+   "en": "An analysis of vacancies on the portal: digital literacy, reporting and client work."
+  },
+  "body": {
+   "uz": "«Imkoniyatlar» boʻlimidagi vakansiyalarni koʻrsangiz, bir naqsh koʻrinadi: talab qilinadigan koʻnikmalarning katta qismi — bu diplom emas, balki aniq amaliy mahoratlar.\n\nEng koʻp uchraydiganlari: elektron jadvallar bilan ishlash, oddiy hisobot tayyorlash, mijoz bilan yozma muloqot, ijtimoiy tarmoqda kontent va buxgalteriya dasturlarining boshlangʻich darajasi.\n\nBu yaxshi xabar, chunki bunday koʻnikmalar bir necha oyda oʻzlashtiriladi. Portaldagi dasturlar katalogi aynan shu koʻnikmalar boʻyicha qidiruvni qoʻllab-quvvatlaydi — kurs nomi bilan emas, siz qila olishni istagan ish bilan.\n\nAgar diagnostikadan oʻtgan boʻlsangiz, reja shu boʻshliqlarni hisobga oladi.",
+   "ru": "Если просмотреть вакансии в разделе «Возможности», виден один рисунок: большая часть требуемых навыков — это не диплом, а конкретные прикладные умения.\n\nЧаще всего встречаются: работа с электронными таблицами, подготовка простого отчёта, письменная коммуникация с клиентом, контент в соцсетях и начальный уровень бухгалтерских программ.\n\nЭто хорошая новость, потому что такие навыки осваиваются за несколько месяцев. Каталог программ на портале поддерживает поиск именно по навыкам — не по названию курса, а по тому, что вы хотите уметь делать.\n\nЕсли вы прошли диагностику, план учитывает эти пробелы.",
+   "en": "Look through the vacancies in the Opportunities section and one pattern stands out: most of the skills asked for are not a degree but specific, practical abilities.\n\nThe most frequent are spreadsheets, putting together a simple report, written communication with a client, social media content, and a basic level of accounting software.\n\nThat is good news, because skills like these take months, not years. The programme catalogue on the portal supports searching by skill — not by course title, but by what you want to be able to do.\n\nIf you have taken the assessment, your plan already accounts for those gaps."
+  }
+ },
+ {
+  "slug": "mentorlik-sessiyalari-ochiq",
+  "category": "success_story",
+  "tone": "plum",
+  "emblem": "✨",
+  "tags": [
+   "mentorlik",
+   "hikoya"
+  ],
+  "source_name": "WomanUP",
+  "source_url": null,
+  "reading_minutes": 2,
+  "adult": false,
+  "pinned": false,
+  "days_ago": 14,
+  "title": {
+   "uz": "Mentorlik: birinchi suhbat odatda eng qiyini",
+   "ru": "Наставничество: первый разговор обычно самый трудный",
+   "en": "Mentorship: the first conversation is usually the hardest"
+  },
+  "summary": {
+   "uz": "Mentorlar katalogi ochiq — sessiyani portaldan bron qilish mumkin.",
+   "ru": "Каталог наставниц открыт — сессию можно забронировать на портале.",
+   "en": "The mentor directory is open — you can book a session from the portal."
+  },
+  "body": {
+   "uz": "Mentorlik — bu bepul maslahat emas. Bu sizning oʻrningizda boʻlgan odam bilan suhbat: u qanday tanlov qilganini va nimadan afsuslanganini bilasiz.\n\nAmaliyot koʻrsatadiki, eng qiyin qadam — birinchi xabar. Shuning uchun portal sessiyani soʻrashni qisqa shaklga aylantirdi: mavzuni tanlaysiz, savolingizni yozasiz va vaqt taklif qilasiz.\n\nBirinchi suhbatga tayyorgarlik uchun uchta savol yetarli: hozir nima toʻsib turibdi, oʻn ikki oydan keyin qayerda boʻlishni istaysiz va qaysi qadamni yolgʻiz qila olmayapsiz.",
+   "ru": "Наставничество — это не бесплатная консультация. Это разговор с человеком, который был на вашем месте: вы узнаёте, какой выбор он сделал и о чём жалеет.\n\nПрактика показывает, что самый трудный шаг — первое сообщение. Поэтому портал свёл запрос сессии к короткой форме: выбираете тему, пишете свой вопрос и предлагаете время.\n\nДля подготовки к первому разговору достаточно трёх вопросов: что мешает сейчас, где вы хотите быть через двенадцать месяцев и какой шаг вы не можете сделать в одиночку.",
+   "en": "Mentorship is not free consulting. It is a conversation with someone who has stood where you are: you learn what choice they made and what they regret.\n\nIn practice the hardest step is the first message. So the portal reduced requesting a session to a short form: pick a topic, write your question, propose a time.\n\nThree questions are enough to prepare for a first conversation: what is blocking you now, where you want to be in twelve months, and which step you cannot take alone."
+  }
+ },
+ {
+  "slug": "raqamli-kasblar-xotin-qizlarga",
+  "category": "career",
+  "tone": "sky",
+  "emblem": "🌐",
+  "tags": [
+   "raqamli kasb",
+   "ish",
+   "taʼlim"
+  ],
+  "source_name": "UzA",
+  "source_url": "https://uza.uz/oz/posts/raqamli-kasblar-xotin-qizlarga-qanday-imkoniyatlar-ochmoqda_911098",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-09-20",
+  "title": {
+   "uz": "Raqamli kasblar xotin-qizlarga qanday imkoniyatlar ochmoqda",
+   "ru": "Какие возможности открывают женщинам цифровые профессии",
+   "en": "What digital professions open up for women"
+  },
+  "summary": {
+   "uz": "Toshkentda Osiyo taraqqiyot banki tashkil qilgan davra suhbatida shu savol muhokama qilindi.",
+   "ru": "Этот вопрос обсуждали в Ташкенте на круглом столе Азиатского банка развития.",
+   "en": "The question was discussed in Tashkent at a roundtable held by the Asian Development Bank."
+  },
+  "body": {
+   "uz": "Osiyo taraqqiyot banki tashkil qilgan davra suhbatida gender tenglik va xotin-qizlarning iqtisodiyotdagi ishtiroki muhokama qilindi. Unda bankning Oʻzbekistondagi vakili Kanokpan Lao-Araya, Sogʻliqni saqlash vaziri oʻrinbosari Elmira Bositxonova va Raqamli texnologiyalar vazirligi maslahatchisi Kamola Sobirova qatnashdi.\n\nMuhokamada aytilgan asosiy fikr: texnologik kasblarda insonning jinsi emas, bilimi, salohiyati va kasbiy mahorati hal qiladi. Portalning «Dasturlar» boʻlimida raqamli koʻnikmalar boʻyicha bepul kurslar yigʻilgan — oʻzingizga mos yoʻnalishni shu yerdan tanlashingiz mumkin.",
+   "ru": "На круглом столе, организованном Азиатским банком развития, обсуждали гендерное равенство и участие женщин в экономике. В разговоре участвовали представитель банка в Узбекистане Канокпан Лао-Арая, заместитель министра здравоохранения Эльмира Боситхонова и советник Министерства цифровых технологий Камола Собирова.\n\nГлавная мысль разговора: в технологических профессиях решают не пол, а знания, способности и профессиональное мастерство. В разделе «Программы» на портале собраны бесплатные курсы по цифровым навыкам — направление можно выбрать там.",
+   "en": "A roundtable held by the Asian Development Bank discussed gender equality and women's participation in the economy. Among the speakers were the Bank's representative in Uzbekistan Kanokpan Lao-Araya, Deputy Minister of Health Elmira Bositkhonova and Kamola Sobirova, adviser at the Ministry of Digital Technologies.\n\nThe central point: in technology work it is knowledge, ability and craft that decide, not gender. The portal's Programmes section collects free courses in digital skills, and a direction can be chosen there."
+  }
+ },
+ {
+  "slug": "uy-mehnati-royxatdan-otish",
+  "category": "career",
+  "tone": "sand",
+  "emblem": "📋",
+  "tags": [
+   "mehnat",
+   "huquq",
+   "shartnoma"
+  ],
+  "source_name": "UN Women",
+  "source_url": "https://eca.unwomen.org/en/stories/news/2026/08/legal-recognition-is-not-protection-what-registration-changes-for-domestic-workers-in-uzbekistan",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-08-28",
+  "title": {
+   "uz": "Uy xizmatida roʻyxatdan oʻtganlarning 91 foizi — ayollar",
+   "ru": "91% зарегистрированных в домашнем труде — женщины",
+   "en": "Women are 91 per cent of registered domestic workers"
+  },
+  "summary": {
+   "uz": "Roʻyxat pensiya badalini beradi, ammo kasallik varaqasi va tugʻruq nafaqasini bermaydi.",
+   "ru": "Регистрация даёт пенсионные отчисления, но не даёт больничного и декретных.",
+   "en": "Registration brings pension contributions, but no sick pay and no maternity benefit."
+  },
+  "body": {
+   "uz": "Oʻzbekistonda uy xizmatlari boʻyicha 260 265 kishi oʻzini oʻzi band deb roʻyxatdan oʻtgan, ularning taxminan 91 foizi — ayollar. Roʻyxatdan oʻtish ixtiyoriy.\n\n2022-yilgi Mehnat kodeksi uy mehnatini birinchi marta tan oldi va yozma shartnomani talab qiladi. Roʻyxat faqat pensiya badalini beradi — yiliga taxminan 34 AQSh dollari; kasallik varaqasi va tugʻruq nafaqasi bunga kirmaydi. Shu sababli shartnomani yozma tuzish va shartlarni oldindan kelishib olish muhim.",
+   "ru": "В Узбекистане 260 265 человек зарегистрированы как самозанятые в домашних услугах, около 91% из них — женщины. Регистрация остаётся добровольной.\n\nТрудовой кодекс 2022 года впервые признал домашний труд и требует письменного договора. Регистрация даёт только пенсионные отчисления — около 34 долларов в год; оплата больничного и декретные в неё не входят. Поэтому важно заключать договор письменно и заранее договариваться об условиях.",
+   "en": "In Uzbekistan 260,265 people are registered as self-employed in domestic services, and about 91 per cent of them are women. Registration is voluntary.\n\nThe 2022 Labour Code recognised domestic work for the first time and requires a written contract. Registration brings only pension contributions — about USD 34 a year — and covers neither sick pay nor maternity benefit. That is why the contract is worth putting in writing, with the terms agreed in advance."
+  }
+ },
+ {
+  "slug": "fargonada-raqamli-marketing-kursi",
+  "category": "career",
+  "tone": "sand",
+  "emblem": "💻",
+  "tags": [
+   "raqamli koʻnikma",
+   "fargʻona",
+   "ish"
+  ],
+  "source_name": "UzA",
+  "source_url": "https://uza.uz/en/posts/osce-supports-economic-empowerment-of-women-in-fergana-through-it-skills-and-digital-marketing-training_872166",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-06-17",
+  "title": {
+   "uz": "Fargʻonada 150 dan ortiq ayol raqamli marketing kursini tamomladi",
+   "ru": "Более 150 женщин в Фергане прошли курс цифрового маркетинга",
+   "en": "More than 150 women in Fergana completed digital marketing training"
+  },
+  "summary": {
+   "uz": "Kursni OSCE va IT Park Uzbekistan tashkil qildi; olis tumanlardan kelganlar ham bor.",
+   "ru": "Курс организовали ОБСЕ и IT Park Uzbekistan; среди выпускниц есть женщины из отдалённых районов.",
+   "en": "The course was run by the OSCE and IT Park Uzbekistan, and some graduates came from remote districts."
+  },
+  "body": {
+   "uz": "Fargʻona viloyatidan 150 dan ortiq ayol IT koʻnikmalari va raqamli marketing boʻyicha oʻqishni tamomladi. Kursni OSCE loyihalar muvofiqlashtiruvchisi va IT Park Uzbekistan tashkil qildi, bitiruv marosimi 2026-yil 9-iyunda boʻlib oʻtdi.\n\nDasturda raqamli marketing asoslari, elektron tijorat vositalari va biznesni onlayn targʻib qilish oʻrgatildi. Shunga oʻxshash koʻnikmalarni portalning «Dasturlar» boʻlimidagi bepul kurslardan ham olish mumkin.",
+   "ru": "Более 150 женщин Ферганской области завершили обучение ИТ-навыкам и цифровому маркетингу. Курс организовали координатор проектов ОБСЕ в Узбекистане и IT Park Uzbekistan, выпуск состоялся 9 июня 2026 года.\n\nВ программе были основы цифрового маркетинга, инструменты электронной торговли и продвижение бизнеса в интернете. Похожие навыки можно освоить и на бесплатных курсах в разделе «Программы».",
+   "en": "More than 150 women from the Fergana region completed training in IT skills and digital marketing, run by the OSCE Project Co-ordinator in Uzbekistan and IT Park Uzbekistan. The graduation ceremony was held on 9 June 2026.\n\nThe programme covered digital marketing fundamentals, e-commerce tools and promoting a business online. Similar skills are taught in the free courses listed in the portal's Programmes section."
+  }
+ },
+ {
+  "slug": "buxoro-osiyo-ayollar-forumi",
+  "category": "announcement",
+  "tone": "plum",
+  "emblem": "🤝",
+  "tags": [
+   "forum",
+   "buxoro",
+   "liderlik"
+  ],
+  "source_name": "UN Women",
+  "source_url": "https://eca.unwomen.org/en/stories/news/2026/05/investing-in-women-building-the-region-what-you-need-to-know-from-the-asian-womens-forum-2026",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-05-16",
+  "title": {
+   "uz": "Buxoroda Osiyo ayollar forumi: Buxoro deklaratsiyasi qabul qilindi",
+   "ru": "Азиатский женский форум в Бухаре: принята Бухарская декларация",
+   "en": "The Asian Women's Forum in Bukhara adopted the Bukhara Declaration"
+  },
+  "summary": {
+   "uz": "18 mamlakatdan 80 dan ortiq parlament aʼzosi va olima qatnashdi.",
+   "ru": "Участвовали более 80 парламентариев и учёных из 18 стран.",
+   "en": "More than 80 parliamentarians and scientists from 18 countries took part."
+  },
+  "body": {
+   "uz": "2026-yil 14–15-may kunlari Buxoroda Osiyo ayollar forumi boʻlib oʻtdi. Unda 18 mamlakatdan 80 dan ortiq parlament aʼzosi, olima va rahbar ayollar qatnashdi.\n\nForum yakunida Buxoro deklaratsiyasi qabul qilindi. U ayollarning davlat idoralari va parlamentlardagi ishtirokini kengaytirishni koʻzda tutadi. Shuningdek, sunʼiy intellekt va raqamli texnologiyalar boʻyicha ayollarni oʻqitadigan mintaqaviy platforma yaratish taklif qilindi.",
+   "ru": "14–15 мая 2026 года в Бухаре прошёл Азиатский женский форум. В нём участвовали более 80 парламентариев, учёных и руководителей из 18 стран.\n\nПринятая Бухарская декларация предусматривает расширение участия женщин в органах власти и парламентах. Отдельно предложено создать региональную платформу обучения женщин искусственному интеллекту и цифровым технологиям.",
+   "en": "The Asian Women's Forum was held in Bukhara on 14–15 May 2026, bringing together more than 80 parliamentarians, scientists and women leaders from 18 countries.\n\nThe Bukhara Declaration it adopted commits to widening women's participation in public institutions and parliaments, and proposes a regional platform to train women in artificial intelligence and digital technologies."
+  }
+ },
+ {
+  "slug": "onalik-olimi-kamaydi",
+  "category": "medicine",
+  "tone": "rose",
+  "emblem": "🏥",
+  "tags": [
+   "onalik",
+   "tibbiyot",
+   "statistika"
+  ],
+  "source_name": "UNFPA",
+  "source_url": "https://eeca.unfpa.org/en/news/data-driven-campaign-leads-historic-drop-maternal-deaths-uzbekistan",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-04-07",
+  "title": {
+   "uz": "Oʻzbekistonda onalik oʻlimi tarixiy darajada kamaydi",
+   "ru": "В Узбекистане материнская смертность снизилась до исторического минимума",
+   "en": "Maternal deaths in Uzbekistan fall to a historic low"
+  },
+  "summary": {
+   "uz": "100 ming tirik tugʻilishga 21 tadan 14,7 tagacha — 2010-yildan 2024-yilgacha.",
+   "ru": "С 21 до 14,7 на 100 тысяч живорождений — с 2010 по 2024 год.",
+   "en": "From 21 to 14.7 per 100,000 live births between 2010 and 2024."
+  },
+  "body": {
+   "uz": "Onalik oʻlimi koʻrsatkichi 2010-yildagi 100 ming tirik tugʻilishga 21 tadan 2024-yilda 14,7 taga tushdi.\n\nUNFPA va Sogʻliqni saqlash vazirligining dasturi doirasida 18 mingdan ortiq tibbiyot xodimi oʻqitildi va mamlakatdagi 231 tugʻruqxona jihozlandi. Homiladorlikni kuzatish boʻyicha savollar bilan oʻz shifokoringiz yoki tumandagi tugʻruqxonaga murojaat qiling.",
+   "ru": "Показатель материнской смертности снизился с 21 случая на 100 тысяч живорождений в 2010 году до 14,7 в 2024-м.\n\nВ рамках программы UNFPA и Министерства здравоохранения обучено более 18 тысяч медицинских работников и оснащены все 231 родильный дом страны. С вопросами о ведении беременности обращайтесь к своему врачу или в районный роддом.",
+   "en": "The maternal mortality ratio fell from 21 deaths per 100,000 live births in 2010 to 14.7 in 2024.\n\nUnder a programme run by UNFPA and the Ministry of Health, more than 18,000 health workers were trained and all 231 maternity hospitals in the country were equipped. For questions about antenatal care, ask your own doctor or the district maternity hospital."
+  }
+ },
+ {
+  "slug": "xotin-qizlarni-qollab-quvvatlash-raqamlarda",
+  "category": "career",
+  "tone": "plum",
+  "emblem": "📈",
+  "tags": [
+   "statistika",
+   "ish",
+   "tadbirkorlik"
+  ],
+  "source_name": "UzA",
+  "source_url": "https://uza.uz/en/posts/xotin-qizlarni-qollab-quvvatlash-jamiyat-barqarorligi-va-taraqqiyotining-muhim-omili_805866",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2026-01-12",
+  "title": {
+   "uz": "Xotin-qizlarni qoʻllab-quvvatlash: 2025-yil raqamlarda",
+   "ru": "Поддержка женщин: 2025 год в цифрах",
+   "en": "Support for women: 2025 in numbers"
+  },
+  "summary": {
+   "uz": "100 mingdan ortiq ayol ish bilan taʼminlandi, 300 mingdan ortigʻi kasb oʻrgandi.",
+   "ru": "Более 100 тысяч женщин трудоустроены, более 300 тысяч обучены профессии.",
+   "en": "More than 100,000 women were employed and more than 300,000 trained in a profession."
+  },
+  "body": {
+   "uz": "2025-yilda 100 mingdan ortiq ayol ish bilan taʼminlandi, 300 mingdan ortigʻi esa talab yuqori kasblar boʻyicha oʻqitildi. 197,7 ming ayolga 3,3 trillion soʻm imtiyozli kredit, 43,5 ming ayolga 240 milliard soʻm oʻzini oʻzi band qilish subsidiyasi berildi.\n\nTadbirkorlar orasida ayollar ulushi 2017-yildagi 21 foizdan 45 foizga yetdi. Parlament quyi palatasida deputatlarning 38 foizi, Senatda 27 foizi — ayollar. IPU Parline reytingida Oʻzbekiston 15 pogʻona koʻtarilib, 183 davlat orasida 37-oʻrinni egalladi.",
+   "ru": "В 2025 году трудоустроено более 100 тысяч женщин, ещё более 300 тысяч прошли обучение востребованным профессиям. 197,7 тысячи женщин получили льготные кредиты на 3,3 триллиона сумов, 43,5 тысячи — субсидии на самозанятость на 240 миллиардов сумов.\n\nДоля женщин среди предпринимателей выросла с 21% в 2017 году до 45%. В нижней палате парламента женщины составляют 38% депутатов, в Сенате — 27%. В рейтинге IPU Parline Узбекистан поднялся на 15 позиций и занял 37-е место среди 183 стран.",
+   "en": "In 2025 more than 100,000 women were placed in work and more than 300,000 were trained in professions that are in demand. Concessional loans of 3.3 trillion soums went to 197,700 women, and self-employment subsidies of 240 billion soums to 43,500.\n\nWomen's share among entrepreneurs rose from 21 per cent in 2017 to 45 per cent. They hold 38 per cent of seats in the lower house of parliament and 27 per cent in the Senate. In the IPU Parline ranking Uzbekistan climbed 15 places to 37th of 183 countries."
+  }
+ },
+ {
+  "slug": "qizlar-talimi-va-stem-unicef",
+  "category": "education",
+  "tone": "sky",
+  "emblem": "🎓",
+  "tags": [
+   "taʼlim",
+   "stem",
+   "statistika"
+  ],
+  "source_name": "UNICEF",
+  "source_url": "https://www.unicef.org/uzbekistan/en/press-releases/investing-girls-education-and-skills-foundational-strengthening-economies",
+  "reading_minutes": 1,
+  "adult": false,
+  "pinned": false,
+  "on": "2024-03-07",
+  "title": {
+   "uz": "Muhandislik va IT yoʻnalishlarida talabalarning atigi 17 foizi — qizlar",
+   "ru": "Среди студентов инженерных и ИТ-направлений только 17% — девушки",
+   "en": "Women are only 17 per cent of engineering and ICT students"
+  },
+  "summary": {
+   "uz": "UNICEF maʼlumotlari: fan va texnologiyada ayollar ulushi hamon kichik.",
+   "ru": "Данные ЮНИСЕФ: доля женщин в науке и технологиях всё ещё мала.",
+   "en": "UNICEF data: the share of women in science and technology is still small."
+  },
+  "body": {
+   "uz": "Oʻzbekistonda muhandislik, ishlab chiqarish, qurilish va axborot texnologiyalari yoʻnalishlarida oʻqiyotganlarning atigi 17 foizi — qizlar.\n\nTabiiy fanlar, muhandislik, tibbiyot va qishloq xoʻjaligi sohasidagi tadqiqotchilarning 37 foizini ayollar tashkil etadi. UNICEF taʼlimga, kasbiy koʻnikmalarga va ijtimoiy himoyaga sarmoya kiritishga chaqiradi — qizning maktabdan keyingi yoʻli koʻp hollarda shu uchtasi bilan hal boʻladi.",
+   "ru": "В Узбекистане среди учащихся инженерных, производственных, строительных и ИТ-направлений девушки составляют лишь 17%.\n\nСреди исследователей в естественных науках, инженерии, медицине и сельском хозяйстве женщин 37%. ЮНИСЕФ призывает вкладываться в образование, профессиональные навыки и социальную защиту — именно они чаще всего определяют путь девушки после школы.",
+   "en": "In Uzbekistan only 17 per cent of students in engineering, manufacturing, construction and ICT programmes are women.\n\nWomen make up 37 per cent of researchers in the natural sciences, engineering, medical and agricultural fields. UNICEF calls for investment in education, technical skills and social protection — the three things that most often decide where a girl goes after school."
+  }
+ }
+]
