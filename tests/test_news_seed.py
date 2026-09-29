@@ -36,6 +36,13 @@ _spec = importlib.util.spec_from_file_location(
 migration = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(migration)
 
+_dates_spec = importlib.util.spec_from_file_location(
+    "news_real_dates_migration",
+    Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0027_news_real_dates.py",
+)
+dates_migration = importlib.util.module_from_spec(_dates_spec)
+_dates_spec.loader.exec_module(dates_migration)
+
 NOW = datetime(2026, 9, 28, 12, tzinfo=UTC)
 
 
@@ -44,9 +51,29 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=UTC)
 
 def test_the_feed_is_not_empty():
     assert len(RECORDS) >= 20
-    # Both dating styles are in use, and each is right for its half.
     assert DATED, "no post carries a real publication date"
-    assert [record for record in RECORDS if not record.get("on")]
+
+
+def test_only_the_portals_own_posts_date_themselves_from_the_load():
+    """A date on a card that names a source is a claim about that source.
+
+    Counting back from the load is honest for a post about the portal as it is
+    today, and false for anybody else's article.
+    """
+    relative = [record for record in RECORDS if not record.get("on")]
+    assert relative, "nothing dates itself from the load any more"
+    for record in relative:
+        assert record["source_url"] is None, record["slug"]
+        assert record["source_name"].startswith("WomanUP"), record["slug"]
+
+
+def test_a_withheld_post_says_why_it_is_written_at_all():
+    """`published: false` is for copy that is correct but describes something
+    the portal cannot show yet. It stays in the file so it can come back."""
+    withheld = [record for record in RECORDS if record.get("published") is False]
+    for record in withheld:
+        for field in ("title", "summary", "body"):
+            assert all(text.strip() for text in record[field].values()), record["slug"]
 
 
 @pytest.mark.parametrize("record", RECORDS, ids=[record["slug"] for record in RECORDS])
@@ -138,14 +165,10 @@ def test_the_migrations_copy_of_the_hash_is_the_real_one():
 
 
 @pytest.mark.asyncio
-async def test_loading_the_feed_publishes_every_post(session):
+async def test_loading_the_feed_writes_every_post(session):
     written = await load_news(session, NOW)
     assert written == len(RECORDS)
-
-    published = await session.scalar(
-        select(func.count()).select_from(NewsPost).where(NewsPost.is_published.is_(True))
-    )
-    assert published == len(RECORDS)
+    assert await session.scalar(select(func.count()).select_from(NewsPost)) == len(RECORDS)
 
 
 @pytest.mark.asyncio
@@ -183,3 +206,39 @@ async def test_a_loaded_post_is_scored_for_ordering(session):
     post = await session.scalar(select(NewsPost).where(NewsPost.slug == RECORDS[0]["slug"]))
     assert post.age_relevance, "nothing scored the post for age"
     assert post.relevance_score is not None
+
+
+# ------------------------------------------------------------ what is shown
+
+
+@pytest.mark.asyncio
+async def test_a_post_pointing_at_an_empty_section_is_not_shown(session):
+    """Two posts send a reader to Opportunities, which holds nothing yet."""
+    await load_news(session, NOW)
+    withheld = [record["slug"] for record in RECORDS if record.get("published") is False]
+    assert withheld, "nothing is held back any more — is that deliberate?"
+    for slug in withheld:
+        post = await session.scalar(select(NewsPost).where(NewsPost.slug == slug))
+        assert post.is_published is False, slug
+
+
+@pytest.mark.asyncio
+async def test_everything_else_is_shown(session):
+    await load_news(session, NOW)
+    shown = await session.scalar(
+        select(func.count()).select_from(NewsPost).where(NewsPost.is_published.is_(True))
+    )
+    expected = sum(1 for record in RECORDS if record.get("published", True))
+    assert shown == expected
+
+
+def test_the_date_migration_reads_the_same_file():
+    """0027 stamps what the loader stamps, or the two would disagree in public."""
+    theirs = {record["slug"]: record for record in dates_migration._records(NOW)}
+    assert set(theirs) == {record["slug"] for record in RECORDS}
+    for record in RECORDS:
+        mine = theirs[record["slug"]]
+        assert mine["published_at"] == published_at(record, NOW), record["slug"]
+        assert mine["published"] == record.get("published", True), record["slug"]
+        if record["source_url"]:
+            assert mine["hash"] == url_hash(record["source_url"]), record["slug"]

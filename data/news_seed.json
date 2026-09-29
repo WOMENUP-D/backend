@@ -91,7 +91,8 @@
    "uz": "«Imkoniyatlar» boʻlimida grantlar, vakansiyalar va investitsiya takliflari toʻplangan. Ular hamkor platformalardan keladi va profilingizga mos ravishda saralanadi.\n\nAriza yuborishdan oldin portal sizdan aniq roziligingizni soʻraydi va nima uzatilishini koʻrsatadi: taxallus identifikatori va kasbiy maʼlumotlar. Telefon raqamingiz, pochtangiz va toʻliq ismingiz hamkorga yuborilmaydi.\n\nRoziligingizni istalgan vaqtda qaytarib olishingiz mumkin.",
    "ru": "В разделе «Возможности» собраны гранты, вакансии и инвестиционные предложения. Они приходят с партнёрских платформ и подбираются под ваш профиль.\n\nПеред отправкой заявки портал запрашивает ваше явное согласие и показывает, что именно будет передано: псевдонимный идентификатор и профессиональные данные. Телефон, почта и полное имя партнёру не уходят.\n\nСогласие можно отозвать в любой момент.",
    "en": "The Opportunities section gathers grants, vacancies and investment offers. They arrive from partner platforms and are matched to your profile.\n\nBefore an application is sent the portal asks for your explicit consent and shows exactly what will be shared: a pseudonymous id and professional details. Your phone number, e-mail and full name never reach the partner.\n\nYou can withdraw that consent at any time."
-  }
+  },
+  "published": false
  },
  {
   "slug": "katalin-kariko-mrna-nobel",
@@ -108,7 +109,6 @@
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 2,
   "title": {
    "uz": "Katalin Karikó: oʻn yillik rad javoblardan Nobel mukofotigacha",
    "ru": "Каталин Карико: от десятилетий отказов до Нобелевской премии",
@@ -123,7 +123,8 @@
    "uz": "Katalin Karikó Vengriyada tugʻilgan biokimyogar. Uning gʻoyasi — hujayraga kerakli oqsilni oʻzi ishlab chiqarishni «aytib» beruvchi mRNK molekulasidan dori sifatida foydalanish — koʻp yillar davomida grant komissiyalari tomonidan rad etilgan. 1995-yilda universitetda uning lavozimi pasaytirilgan.\n\nDrew Weissman bilan birgalikda u asosiy toʻsiqni yechdi: sunʼiy mRNK organizmda kuchli yalligʻlanish reaksiyasini keltirib chiqarardi. Ular nukleozidlarni modifikatsiya qilish — molekulaning bir «harfini» almashtirish — bu reaksiyani susaytirishini koʻrsatishdi.\n\nOʻsha modifikatsiya keyinchalik COVID-19ga qarshi mRNK vaksinalarining asosi boʻldi. 2023-yilda Karolinska instituti Nobel assambleyasi ikkalasiga fiziologiya va tibbiyot boʻyicha Nobel mukofotini berdi.\n\nBu tarixning eng qiziq tomoni — kashfiyot toʻxtab qolmagani emas, balki uni davom ettirgan odam butun karerasi davomida «bu istiqbolsiz» degan javobni eshitgani.",
    "ru": "Каталин Карико — биохимик, родившаяся в Венгрии. Её идея использовать молекулу мРНК как лекарство — «сказать» клетке, какой белок произвести, — годами отклонялась грантовыми комиссиями. В 1995 году её понизили в должности в университете.\n\nВместе с Дрю Вайсманом она сняла главное препятствие: искусственная мРНК вызывала в организме сильную воспалительную реакцию. Они показали, что модификация нуклеозидов — замена одной «буквы» молекулы — эту реакцию гасит.\n\nИменно эта модификация легла в основу мРНК-вакцин против COVID-19. В 2023 году Нобелевская ассамблея Каролинского института присудила обоим премию по физиологии и медицине.\n\nСамое примечательное в этой истории не то, что открытие состоялось, а то, что человек, доведший его до конца, всю карьеру слышал: «это бесперспективно».",
    "en": "Katalin Karikó is a Hungarian-born biochemist. Her idea — using an mRNA molecule as a medicine, telling a cell which protein to make — was turned down by grant committees for years. In 1995 she was demoted at her university.\n\nWith Drew Weissman she removed the central obstacle: synthetic mRNA provoked a strong inflammatory response in the body. They showed that modifying its nucleosides — swapping a single 'letter' of the molecule — quiets that response.\n\nThat modification became the foundation of the mRNA vaccines against COVID-19. In 2023 the Nobel Assembly at Karolinska Institutet awarded them both the prize in Physiology or Medicine.\n\nThe striking part of the story is not that the discovery happened, but that the person who saw it through spent a career being told it was going nowhere."
-  }
+  },
+  "on": "2023-10-02"
  },
  {
   "slug": "crispr-genom-tahriri-nobel",
@@ -140,7 +141,6 @@
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 5,
   "title": {
    "uz": "Genom «qaychisi»: kimyo boʻyicha Nobel mukofotini ikki ayol oldi",
    "ru": "«Ножницы» для генома: Нобелевскую премию по химии получили две женщины",
@@ -155,7 +155,8 @@
    "uz": "2020-yilda Shvetsiya Qirollik fanlar akademiyasi kimyo boʻyicha Nobel mukofotini Emmanuelle Charpentier va Jennifer Doudnaga berdi. Bu — mukofot tarixida birinchi marta kimyo boʻyicha ikki ayolga birgalikda berilgani.\n\nCRISPR-Cas9 dastlab bakteriyalarning viruslardan himoyalanish tizimi sifatida topilgan. Tadqiqotchilar uni universal vositaga aylantirishdi: endi DNK zanjirini oldindan belgilangan joyda kesish mumkin.\n\nUsul oʻroqsimon hujayrali anemiya va beta-talassemiya kabi irsiy kasalliklarni davolash usullarini ishlab chiqishda qoʻllanilmoqda, shuningdek qishloq xoʻjaligi va fundamental biologiyada.\n\nCharpentier mukofotdan keyin aytgan gap koʻp iqtibos keltiriladi: u yosh qizlarga fan «ayollar uchun ham» ekanini emas, balki fan ularniki ekanini koʻrsatishga umid qiladi.",
    "ru": "В 2020 году Шведская королевская академия наук присудила Нобелевскую премию по химии Эмманюэль Шарпантье и Дженнифер Даудне. Это первый случай в истории премии, когда химическую награду разделили две женщины.\n\nCRISPR-Cas9 изначально нашли как систему защиты бактерий от вирусов. Исследовательницы превратили её в универсальный инструмент: теперь цепочку ДНК можно разрезать в заранее заданном месте.\n\nМетод применяется при разработке методов лечения наследственных болезней — серповидноклеточной анемии и бета-талассемии, — а также в сельском хозяйстве и фундаментальной биологии.\n\nФразу Шарпантье после награждения часто цитируют: она надеется показать девочкам не то, что наука «в том числе для женщин», а то, что наука — их.",
    "en": "In 2020 the Royal Swedish Academy of Sciences awarded the Nobel Prize in Chemistry to Emmanuelle Charpentier and Jennifer Doudna — the first time in the prize's history that two women shared the chemistry award.\n\nCRISPR-Cas9 was first found as a bacterial defence system against viruses. The two researchers turned it into a general-purpose tool: a DNA strand can now be cut at a position chosen in advance.\n\nThe method is being used to develop treatments for inherited diseases such as sickle-cell anaemia and beta-thalassaemia, as well as in agriculture and basic biology.\n\nCharpentier's line after the award is often quoted: she hopes to show girls not that science is 'also for women', but that science is theirs."
-  }
+  },
+  "on": "2020-10-07"
  },
  {
   "slug": "andrea-ghez-qora-tuynuk",
@@ -172,7 +173,6 @@
   "reading_minutes": 2,
   "adult": false,
   "pinned": false,
-  "days_ago": 8,
   "title": {
    "uz": "Andrea Ghez: galaktikamiz markazida nima borligini oʻlchagan ayol",
    "ru": "Андреа Гез: женщина, которая измерила, что находится в центре нашей галактики",
@@ -187,7 +187,8 @@
    "uz": "Andrea Ghez — fizika boʻyicha Nobel mukofotini olgan toʻrtinchi ayol. U oʻttiz yil davomida Somon yoʻli markazi atrofidagi yulduzlarning harakatini kuzatgan.\n\nYulduzlar juda tez va juda kichik orbitada aylanardi. Buni faqat bitta narsa tushuntira olardi: markazda Quyoshdan millionlab marta ogʻirroq, lekin juda kichik hajmdagi obyekt bor.\n\nKuzatish uchun u atmosfera buzilishini kompensatsiya qiluvchi adaptiv optikadan foydalandi — bu texnikaning oʻzi ham astronomiyani oʻzgartirdi.\n\n2020-yilda u Reinhard Genzel bilan mukofotni boʻlishdi — Yerdan koʻrinmaydigan narsani, uning atrofidagi harakat orqali oʻlchash mumkinligini isbotlagani uchun.",
    "ru": "Андреа Гез — четвёртая женщина, получившая Нобелевскую премию по физике. Тридцать лет она наблюдала за движением звёзд вокруг центра Млечного Пути.\n\nЗвёзды двигались слишком быстро и по слишком тесным орбитам. Объяснение было только одно: в центре находится объект в миллионы раз тяжелее Солнца, но занимающий крошечный объём.\n\nДля наблюдений она применила адаптивную оптику, компенсирующую искажения атмосферы, — эта техника сама по себе изменила астрономию.\n\nВ 2020 году она разделила премию с Райнхардом Генцелем — за доказательство того, что невидимое с Земли можно измерить по движению вокруг него.",
    "en": "Andrea Ghez is the fourth woman to receive the Nobel Prize in Physics. For thirty years she tracked the motion of stars around the centre of the Milky Way.\n\nThe stars moved too fast, on orbits too tight. Only one thing could explain it: an object at the centre millions of times heavier than the Sun, packed into a tiny volume.\n\nTo see them she used adaptive optics, which cancels the blurring of the atmosphere — a technique that reshaped astronomy in its own right.\n\nIn 2020 she shared the prize with Reinhard Genzel, for proving that something invisible from Earth can be measured by what moves around it."
-  }
+  },
+  "on": "2020-10-06"
  },
  {
   "slug": "ayollar-ilm-fanda-har-uchinchi-tadqiqotchi",
@@ -204,7 +205,6 @@
   "reading_minutes": 2,
   "adult": false,
   "pinned": false,
-  "days_ago": 11,
   "title": {
    "uz": "Dunyoda har uch tadqiqotchidan bittasi — ayol",
    "ru": "В мире женщина — каждый третий исследователь",
@@ -219,7 +219,8 @@
    "uz": "UNESCO statistika instituti maʼlumotlariga koʻra, dunyodagi tadqiqotchilarning taxminan 33 foizi ayollar. Bu raqam oʻn yil ichida deyarli oʻzgarmadi.\n\nFarq soha boʻyicha keskin: hayot haqidagi fanlarda ayollar koʻp, muhandislik, informatika va sunʼiy intellektda esa ancha kam. Yuqori lavozimlarda va tadqiqot rahbarligida nomutanosiblik yanada kuchayadi.\n\nSabab qobiliyatda emas. Tadqiqotlar koʻrsatishicha, asosiy yoʻqotish maktabdan universitetgacha va universitetdan ilmiy karerangacha boʻlgan oʻtishlarda sodir boʻladi — yaʼni tanlov qilinadigan nuqtalarda.\n\nShuning uchun mentorlik va aniq namunalar muhim: qiz oʻz yoʻnalishida ayolni koʻrsa, bu yoʻl unga ham ochiq ekani koʻrinadi.",
    "ru": "По данным Института статистики ЮНЕСКО, женщины составляют около 33% исследователей в мире. За десятилетие эта доля почти не изменилась.\n\nРазрыв резко различается по областям: в науках о жизни женщин много, в инженерии, информатике и искусственном интеллекте — заметно меньше. На руководящих позициях и в управлении исследованиями диспропорция усиливается.\n\nПричина не в способностях. Исследования показывают, что основные потери происходят на переходах: школа — университет и университет — научная карьера, то есть в точках выбора.\n\nПоэтому важны наставничество и конкретные примеры: если девушка видит женщину в своей области, этот путь становится для неё видимым.",
    "en": "According to the UNESCO Institute for Statistics, women make up about 33% of the world's researchers. That share has barely moved in a decade.\n\nThe gap varies sharply by field: women are well represented in the life sciences and much less so in engineering, computing and artificial intelligence. In senior posts and research leadership the imbalance widens further.\n\nThe cause is not ability. Studies point to the transitions — school to university, university to a research career — as where the losses happen: the points where a choice is made.\n\nThat is why mentorship and concrete examples matter: when a girl sees a woman working in her field, the path becomes visible to her too."
-  }
+  },
+  "on": "2024-12-08"
  },
  {
   "slug": "bachadon-buyni-saratonini-oldini-olish",
@@ -232,11 +233,10 @@
    "hpv"
   ],
   "source_name": "World Health Organization",
-  "source_url": "https://www.who.int/initiatives/cervical-cancer-elimination-initiative",
+  "source_url": "https://www.who.int/news-room/fact-sheets/detail/cervical-cancer",
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 4,
   "title": {
    "uz": "Bachadon boʻyni saratoni — oldini olish mumkin boʻlgan kam sonli saratonlardan biri",
    "ru": "Рак шейки матки — один из немногих видов рака, который можно предотвратить",
@@ -248,10 +248,11 @@
    "en": "The WHO strategy rests on three numbers: vaccination, screening and treatment coverage."
   },
   "body": {
-   "uz": "Jahon sogʻliqni saqlash tashkiloti bachadon boʻyni saratonini yoʻq qilish boʻyicha global strategiyani qabul qilgan. U «90–70–90» deb ataladigan uchta maqsadga asoslanadi: 15 yoshgacha qizlarning 90 foizini HPVga qarshi emlash, ayollarning 70 foizini yuqori aniqlikdagi test bilan skriningdan oʻtkazish va aniqlangan holatlarning 90 foizini davolash bilan taʼminlash.\n\nKasallikning asosiy sababi — inson papillomavirusining yuqori onkogen turlari bilan uzoq davom etuvchi infeksiya. Aynan shuning uchun emlash profilaktika sifatida ishlaydi.\n\nSkrining muhim, chunki oʻzgarishlar saratonga aylanguncha yillar kerak boʻladi va bu bosqichda ular deyarli har doim davolanadi. Erta bosqichda kasallik odatda hech qanday belgi bermaydi — «hech narsa ogʻrimayapti» degani sogʻlom degani emas.\n\nQaysi yoshda va qanday davriylikda tekshiruvdan oʻtish kerakligini shifokoringiz aytadi — bu yoshga va mahalliy protokolga bogʻliq.",
-   "ru": "Всемирная организация здравоохранения приняла глобальную стратегию элиминации рака шейки матки. Она строится на трёх целях, известных как «90–70–90»: привить против ВПЧ 90% девочек до 15 лет, охватить скринингом высокоточным тестом 70% женщин и обеспечить лечением 90% выявленных случаев.\n\nОсновная причина болезни — длительная инфекция онкогенными типами вируса папилломы человека. Именно поэтому вакцинация работает как профилактика.\n\nСкрининг важен потому, что изменениям нужны годы, чтобы стать раком, и на этой стадии они почти всегда излечимы. На ранней стадии болезнь обычно не даёт никаких симптомов — «ничего не болит» не означает «здорова».\n\nВ каком возрасте и с какой периодичностью проходить обследование, скажет ваш врач — это зависит от возраста и местного протокола.",
-   "en": "The World Health Organization has adopted a global strategy to eliminate cervical cancer. It rests on three targets known as '90–70–90': vaccinate 90% of girls against HPV by age 15, screen 70% of women with a high-performance test, and treat 90% of identified cases.\n\nThe disease is caused by persistent infection with high-risk types of human papillomavirus. That is precisely why vaccination works as prevention.\n\nScreening matters because those changes take years to become cancer, and at that stage they are almost always treatable. Early on the disease usually causes no symptoms at all — 'nothing hurts' does not mean 'healthy'.\n\nYour doctor will tell you at what age and how often to be screened: it depends on your age and the local protocol."
-  }
+   "uz": "Jahon sogʻliqni saqlash tashkiloti bachadon boʻyni saratonini yoʻq qilish boʻyicha global strategiyani qabul qilgan. U «90–70–90» deb ataladigan uchta maqsadga asoslanadi: 15 yoshgacha qizlarning 90 foizini HPVga qarshi emlash, ayollarning 70 foizini 35 va 45 yoshga qadar yuqori aniqlikdagi test bilan tekshirish va aniqlangan holatlarning 90 foizini davolash bilan taʼminlash.\n\nKasallikning asosiy sababi — inson papillomavirusining yuqori onkogen turlari bilan uzoq davom etuvchi infeksiya. Aynan shuning uchun emlash profilaktika sifatida ishlaydi.\n\nSkrining muhim, chunki oʻzgarishlar saratonga aylanguncha yillar kerak boʻladi va bu bosqichda ular deyarli har doim davolanadi. Erta bosqichda kasallik odatda hech qanday belgi bermaydi — «hech narsa ogʻrimayapti» degani sogʻlom degani emas.\n\nQaysi yoshda va qanday davriylikda tekshiruvdan oʻtish kerakligini shifokoringiz aytadi — bu yoshga va mahalliy protokolga bogʻliq.",
+   "ru": "Всемирная организация здравоохранения приняла глобальную стратегию элиминации рака шейки матки. Она строится на трёх целях, известных как «90–70–90»: привить против ВПЧ 90% девочек до 15 лет, обследовать высокоточным тестом 70% женщин — к 35 и к 45 годам и обеспечить лечением 90% выявленных случаев.\n\nОсновная причина болезни — длительная инфекция онкогенными типами вируса папилломы человека. Именно поэтому вакцинация работает как профилактика.\n\nСкрининг важен потому, что изменениям нужны годы, чтобы стать раком, и на этой стадии они почти всегда излечимы. На ранней стадии болезнь обычно не даёт никаких симптомов — «ничего не болит» не означает «здорова».\n\nВ каком возрасте и с какой периодичностью проходить обследование, скажет ваш врач — это зависит от возраста и местного протокола.",
+   "en": "The World Health Organization has adopted a global strategy to eliminate cervical cancer. It rests on three targets known as '90–70–90': vaccinate 90% of girls against HPV by age 15, screen 70% of women with a high-performance test by ages 35 and 45, and treat 90% of identified cases.\n\nThe disease is caused by persistent infection with high-risk types of human papillomavirus. That is precisely why vaccination works as prevention.\n\nScreening matters because those changes take years to become cancer, and at that stage they are almost always treatable. Early on the disease usually causes no symptoms at all — 'nothing hurts' does not mean 'healthy'.\n\nYour doctor will tell you at what age and how often to be screened: it depends on your age and the local protocol."
+  },
+  "on": "2026-07-03"
  },
  {
   "slug": "kokrak-saratonini-erta-aniqlash",
@@ -268,7 +269,6 @@
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 6,
   "title": {
    "uz": "Koʻkrak saratoni: erta aniqlash omon qolish ehtimolini keskin oshiradi",
    "ru": "Рак груди: раннее выявление резко повышает шансы",
@@ -283,7 +283,8 @@
    "uz": "Koʻkrak saratoni — dunyoda ayollar orasida eng koʻp tashxis qoʻyiladigan saraton. JSSTning global tashabbusi oʻlim darajasini har yili 2,5 foizga kamaytirishni maqsad qilgan.\n\nBu maqsadning asosi — murakkab texnologiya emas, balki uchta oddiy narsa: kasallik haqida bilim, tashxisning kechikmasligi va davolashning uzilishsiz boʻlishi.\n\nAmalda bu shuni anglatadi: koʻkrakdagi oʻzgarishni — tugun, shakl yoki teri oʻzgarishi, soʻrgʻichdan ajralma — sezgan ayol haftalar emas, kunlar ichida shifokorga murojaat qilishi kerak.\n\nMammografiya skriningi qaysi yoshdan boshlanishi mamlakat protokoliga bogʻliq. Oilangizda koʻkrak yoki tuxumdon saratoni boʻlgan boʻlsa, buni albatta shifokorga ayting — bu tekshiruv jadvalini oʻzgartirishi mumkin.\n\nBu post tashxis qoʻymaydi. Har qanday xavotirni koʻrikdan oʻtkazadigan yagona odam — shifokor.",
    "ru": "Рак груди — самый часто диагностируемый рак у женщин в мире. Глобальная инициатива ВОЗ ставит целью снижать смертность на 2,5% в год.\n\nВ основе этой цели не сложная технология, а три простые вещи: знание о болезни, отсутствие задержки с диагнозом и непрерывность лечения.\n\nНа практике это значит: женщина, заметившая изменение в груди — уплотнение, изменение формы или кожи, выделения из соска, — должна обратиться к врачу в течение дней, а не недель.\n\nС какого возраста начинается маммографический скрининг, зависит от протокола страны. Если в вашей семье был рак груди или яичников, обязательно скажите об этом врачу — это может изменить график обследований.\n\nЭтот пост не ставит диагноз. Единственный, кто может оценить любую тревогу, — врач.",
    "en": "Breast cancer is the most frequently diagnosed cancer in women worldwide. WHO's global initiative aims to reduce mortality by 2.5% per year.\n\nWhat underpins that target is not advanced technology but three simple things: knowing about the disease, not delaying diagnosis, and treatment that is not interrupted.\n\nIn practice this means a woman who notices a change in her breast — a lump, a change in shape or skin, discharge from the nipple — should see a doctor within days, not weeks.\n\nThe age at which mammography screening begins depends on the national protocol. If breast or ovarian cancer runs in your family, tell your doctor — it may change your screening schedule.\n\nThis post does not diagnose. The only person who can assess a worry is a doctor."
-  }
+  },
+  "on": "2026-07-03"
  },
  {
   "slug": "homiladorlikda-folat-kislotasi",
@@ -295,11 +296,10 @@
    "profilaktika"
   ],
   "source_name": "World Health Organization",
-  "source_url": "https://www.who.int/tools/elena/interventions/folate-periconceptional",
+  "source_url": "https://www.who.int/publications/i/item/9789241549042",
   "reading_minutes": 2,
   "adult": true,
   "pinned": false,
-  "days_ago": 9,
   "title": {
    "uz": "Folat kislotasi homiladorlikni rejalashtirishdan oldin boshlanadi",
    "ru": "Фолиевая кислота начинается до планирования беременности",
@@ -313,8 +313,9 @@
   "body": {
    "uz": "Asab naychasi nuqsonlari homiladorlikning birinchi haftalarida — koʻpincha ayol hali homiladorligini bilmagan paytda — shakllanadi. Aynan shuning uchun JSST folat kislotasini homiladorlikdan oldin boshlashni tavsiya qiladi.\n\nBu qoida oddiy koʻrinadi, lekin uning maʼnosi vaqtda: homiladorlikni tasdiqlagandan keyin boshlangan qabul koʻpincha kech boʻladi.\n\nDozani shifokor belgilaydi — u sizning anamnezingizga va boshqa qabul qilayotgan preparatlaringizga bogʻliq. Bu post dozani tavsiya qilmaydi.",
    "ru": "Дефекты нервной трубки формируются в первые недели беременности — часто когда женщина ещё не знает, что беременна. Именно поэтому ВОЗ рекомендует начинать приём фолиевой кислоты до беременности.\n\nПравило выглядит простым, но его смысл — во времени: приём, начатый после подтверждения беременности, часто уже поздний.\n\nДозу определяет врач — она зависит от вашего анамнеза и других принимаемых препаратов. Этот пост дозу не назначает.",
-   "en": "Neural tube defects form in the first weeks of pregnancy — often before a woman knows she is pregnant. That is exactly why WHO recommends starting folic acid before conception.\n\nThe rule looks simple, but its meaning is about timing: supplements started after a pregnancy is confirmed are often already late.\n\nThe dose is set by your doctor and depends on your history and any other medication you take. This post does not prescribe one."
-  }
+   "en": "Neural tube defects form in the first weeks of pregnancy — often before a woman knows she is pregnant. That is exactly why WHO recommends starting folic acid before conception.\n\nThe rule looks simple, but its meaning is about timing: supplements started after a pregnancy is confirmed are often already late.\n\nThe dose is set by your doctor and depends on your history and any other medication you take. That number is hers to give, not this post's."
+  },
+  "on": "2015-04-16"
  },
  {
   "slug": "temir-tanqisligi-kamqonlik",
@@ -331,7 +332,6 @@
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 7,
   "title": {
    "uz": "Doimiy charchoq har doim ham «shunchaki charchoq» emas",
    "ru": "Постоянная усталость не всегда «просто усталость»",
@@ -346,7 +346,8 @@
    "uz": "Kamqonlik — dunyodagi eng keng tarqalgan ovqatlanish bilan bogʻliq muammolardan biri, va u ayollarga erkaklarga qaraganda ancha koʻp taʼsir qiladi. JSST baholariga koʻra, 15–49 yoshdagi ayollarning taxminan uchdan biri kamqonlikka ega.\n\nBelgilari koʻpincha kundalik hayotga «yozib qoʻyiladi»: charchoq, bosh aylanishi, teri oqarishi, diqqatni jamlashning qiyinlashuvi, sochning toʻkilishi. Ayol buni ish, uy yumushi yoki uyqusizlik bilan izohlaydi va yillar davomida shifokorga murojaat qilmaydi.\n\nKamqonlikning oʻzi tashxis emas — bu belgi. Sababi temir tanqisligi ham, boshqa holat ham boʻlishi mumkin. Shuning uchun temir preparatlarini oʻz-oʻzidan boshlash notoʻgʻri: ortiqcha temir zararli, va asosiy sabab yashirinib qoladi.\n\nToʻgʻri qadam oddiy — umumiy qon tahlili. Bu arzon, tez va koʻpincha savolga javob beradi.",
    "ru": "Анемия — одна из самых распространённых в мире проблем, связанных с питанием, и женщин она затрагивает заметно чаще мужчин. По оценкам ВОЗ, около трети женщин 15–49 лет живут с анемией.\n\nСимптомы обычно «списывают» на повседневность: усталость, головокружение, бледность, трудности с концентрацией, выпадение волос. Женщина объясняет это работой, домом или недосыпом и годами не доходит до врача.\n\nСама анемия — не диагноз, а признак. Причиной может быть дефицит железа, а может — другое состояние. Поэтому начинать приём железа самостоятельно неправильно: избыток железа вреден, а настоящая причина остаётся скрытой.\n\nПравильный шаг простой — общий анализ крови. Он недорогой, быстрый и часто отвечает на вопрос.",
    "en": "Anaemia is one of the most widespread nutrition-related problems in the world, and it affects women considerably more than men. WHO estimates that around a third of women aged 15–49 live with it.\n\nThe symptoms are usually written off as ordinary life: tiredness, dizziness, pallor, trouble concentrating, hair loss. A woman puts it down to work, the house or poor sleep, and goes years without seeing a doctor.\n\nAnaemia itself is not a diagnosis — it is a sign. The cause may be iron deficiency, or something else entirely. Starting iron on your own is therefore the wrong move: excess iron is harmful, and the real cause stays hidden.\n\nThe right step is a simple one — a full blood count. It is cheap, quick, and often answers the question."
-  }
+  },
+  "on": "2025-02-10"
  },
  {
   "slug": "haftasiga-150-daqiqa-harakat",
@@ -363,7 +364,6 @@
   "reading_minutes": 2,
   "adult": false,
   "pinned": false,
-  "days_ago": 10,
   "title": {
    "uz": "Haftasiga 150 daqiqa — sport zali shart emas",
    "ru": "150 минут в неделю — спортзал не обязателен",
@@ -378,7 +378,8 @@
    "uz": "JSSTning jismoniy faollik boʻyicha tavsiyasi kattalar uchun bitta raqamga sigʻadi: haftasiga 150 dan 300 daqiqagacha oʻrtacha jadallikdagi harakat. Bu kuniga taxminan 20–40 daqiqa.\n\n«Oʻrtacha jadallik» — bu yugurish shart emas degani. Tez yurish, zinapoya, velosiped, uy yumushlari va raqs ham hisobga oladi. Meʼyor — gapira olasiz, lekin qoʻshiq ayta olmaysiz.\n\nBu tavsiyaning eng foydali qismi — uni boʻlaklarga boʻlish mumkin. Kuniga uch marta oʻn daqiqa — bu bir marta oʻttiz daqiqa bilan bir xil hisoblanadi.\n\nHar qanday harakat harakatsizlikdan yaxshiroq. Agar hozir nolga yaqin boʻlsangiz, birinchi maqsad 150 daqiqa emas — birinchi maqsad bugungi yurish.",
    "ru": "Рекомендация ВОЗ по физической активности умещается для взрослых в одну цифру: от 150 до 300 минут умеренной активности в неделю. Это примерно 20–40 минут в день.\n\n«Умеренная активность» означает, что бегать не обязательно. Быстрая ходьба, лестница, велосипед, домашние дела и танцы тоже считаются. Ориентир — вы можете говорить, но не можете петь.\n\nСамая полезная часть этой рекомендации в том, что её можно дробить. Три раза по десять минут в день считаются так же, как один тридцатиминутный подход.\n\nЛюбое движение лучше его отсутствия. Если сейчас у вас почти ноль, первая цель — не 150 минут, а сегодняшняя прогулка.",
    "en": "WHO's physical activity guidance fits into a single number for adults: 150 to 300 minutes of moderate activity per week. That is roughly 20–40 minutes a day.\n\n'Moderate' means running is not required. Brisk walking, stairs, cycling, housework and dancing all count. The rule of thumb: you can talk, but you cannot sing.\n\nThe most useful part of the guidance is that it can be broken up. Three ten-minute bouts in a day count the same as one block of thirty.\n\nAny movement beats none. If you are near zero right now, the first target is not 150 minutes — it is today's walk."
-  }
+  },
+  "on": "2024-06-26"
  },
  {
   "slug": "ruhiy-salomatlik-va-charchoq",
@@ -395,7 +396,6 @@
   "reading_minutes": 3,
   "adult": false,
   "pinned": false,
-  "days_ago": 13,
   "title": {
    "uz": "Charchoq — dangasalik emas, signal",
    "ru": "Выгорание — не лень, а сигнал",
@@ -410,7 +410,8 @@
    "uz": "Xalqaro kasalliklar tasnifida charchoq (burnout) kasallik emas, balki «kasbiy hodisa» sifatida taʼriflangan: bartaraf etilmagan surunkali ish stressi natijasi. Uning uchta belgisi bor — quvvatning tugashi, ishdan ruhiy uzoqlashish va samaradorlikning pasayishi.\n\nAyollar uchun bu koʻpincha ikki qavatli boʻladi: ish va uydagi koʻrinmas mehnat. Ikkinchisi jadvalga yozilmaydi, shuning uchun «men shunchaki dam olmayapman» degan tuygʻu tushunarsiz koʻrinadi.\n\nNima yordam beradi: uyqu rejimini tiklash, kunda ish bilan bogʻliq boʻlmagan aniq vaqt, yordam soʻrash koʻnikmasi va yuklamani baham koʻrish. Bular kichik qadamlar, lekin ular tekshirilgan.\n\nAgar holat ikki haftadan koʻproq davom etsa, kundalik ishlarga xalaqit bersa yoki oʻzingizga zarar yetkazish fikrlari paydo boʻlsa — bu mutaxassisga murojaat qilish sababi, kuchsizlik belgisi emas.",
    "ru": "В международной классификации болезней выгорание описано не как болезнь, а как «профессиональное явление»: результат хронического рабочего стресса, с которым не справились. У него три признака — истощение, психологическое отдаление от работы и снижение результативности.\n\nУ женщин это часто двухслойно: работа плюс невидимый труд дома. Второй в расписание не записывается, поэтому ощущение «я просто не отдыхаю» выглядит необъяснимым.\n\nЧто помогает: восстановление режима сна, чёткое время в дне, не связанное с работой, навык просить помощь и разделение нагрузки. Это небольшие шаги, но проверенные.\n\nЕсли состояние длится дольше двух недель, мешает обычным делам или появляются мысли о причинении себе вреда — это повод обратиться к специалисту, а не признак слабости.",
    "en": "In the international classification of diseases, burnout is described not as a disease but as an 'occupational phenomenon': the result of chronic workplace stress that was not successfully managed. It has three markers — exhaustion, mental distance from the job, and reduced effectiveness.\n\nFor women it is often two-layered: paid work plus invisible work at home. The second never goes on a schedule, which is why the feeling of 'I just never rest' seems inexplicable.\n\nWhat helps: restoring a sleep pattern, a defined part of the day with no work in it, the skill of asking for help, and sharing the load. These are small steps, but they are tested ones.\n\nIf it lasts more than two weeks, interferes with ordinary tasks, or thoughts of harming yourself appear — that is a reason to see a professional, not a sign of weakness."
-  }
+  },
+  "on": "2026-09-11"
  },
  {
   "slug": "raqamli-koniklar-va-ish-bozori",
@@ -442,7 +443,8 @@
    "uz": "«Imkoniyatlar» boʻlimidagi vakansiyalarni koʻrsangiz, bir naqsh koʻrinadi: talab qilinadigan koʻnikmalarning katta qismi — bu diplom emas, balki aniq amaliy mahoratlar.\n\nEng koʻp uchraydiganlari: elektron jadvallar bilan ishlash, oddiy hisobot tayyorlash, mijoz bilan yozma muloqot, ijtimoiy tarmoqda kontent va buxgalteriya dasturlarining boshlangʻich darajasi.\n\nBu yaxshi xabar, chunki bunday koʻnikmalar bir necha oyda oʻzlashtiriladi. Portaldagi dasturlar katalogi aynan shu koʻnikmalar boʻyicha qidiruvni qoʻllab-quvvatlaydi — kurs nomi bilan emas, siz qila olishni istagan ish bilan.\n\nAgar diagnostikadan oʻtgan boʻlsangiz, reja shu boʻshliqlarni hisobga oladi.",
    "ru": "Если просмотреть вакансии в разделе «Возможности», виден один рисунок: большая часть требуемых навыков — это не диплом, а конкретные прикладные умения.\n\nЧаще всего встречаются: работа с электронными таблицами, подготовка простого отчёта, письменная коммуникация с клиентом, контент в соцсетях и начальный уровень бухгалтерских программ.\n\nЭто хорошая новость, потому что такие навыки осваиваются за несколько месяцев. Каталог программ на портале поддерживает поиск именно по навыкам — не по названию курса, а по тому, что вы хотите уметь делать.\n\nЕсли вы прошли диагностику, план учитывает эти пробелы.",
    "en": "Look through the vacancies in the Opportunities section and one pattern stands out: most of the skills asked for are not a degree but specific, practical abilities.\n\nThe most frequent are spreadsheets, putting together a simple report, written communication with a client, social media content, and a basic level of accounting software.\n\nThat is good news, because skills like these take months, not years. The programme catalogue on the portal supports searching by skill — not by course title, but by what you want to be able to do.\n\nIf you have taken the assessment, your plan already accounts for those gaps."
-  }
+  },
+  "published": false
  },
  {
   "slug": "mentorlik-sessiyalari-ochiq",
@@ -677,8 +679,8 @@
    "stem",
    "statistika"
   ],
-  "source_name": "UNICEF",
-  "source_url": "https://www.unicef.org/uzbekistan/en/press-releases/investing-girls-education-and-skills-foundational-strengthening-economies",
+  "source_name": "UNICEF · United Nations in Uzbekistan",
+  "source_url": "https://uzbekistan.un.org/en/263099-investing-girls%E2%80%99-education-and-skills-foundational-strengthening-economies",
   "reading_minutes": 1,
   "adult": false,
   "pinned": false,

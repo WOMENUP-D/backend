@@ -15,13 +15,18 @@ reader to a doctor for what is hers.
 `adult` marks a post that belongs to adult care. The feed withholds those from
 a minor and from a reader whose age is not known — see `services.age_gate`.
 
-A record dates itself one of two ways, and both are needed. `days_ago` counts
-back from the moment of loading, which is right for the portal's own evergreen
-posts: they read as current whenever the feed is installed rather than as the
-day this repository was written. `on` is a real publication date, and that is
-what the posts taken from an outside source carry — re-dating somebody else's
-article to today would be a false statement about when it was written, on a
-card that names them as the source.
+A record dates itself one of two ways. `on` is the date the source itself
+shows, and everything that names an outside source carries one: re-dating
+somebody else's article to today would be a false statement about when it was
+written, on a card that names them as the source. `days_ago` counts back from
+the moment of loading, and only the portal's own announcements use it — those
+are about the portal as it is today, so the day the feed was installed is the
+honest date for them.
+
+`published: false` holds a post back. It is there for copy that is written and
+correct but describes something the portal cannot show yet — a post pointing at
+an empty section promises a woman something that is not there, and that is
+worse than a shorter feed.
 
 Nothing carries hand-written age scores. Each post is read by the keyword rules
 in `services.news_age` as it is loaded, which is the same reading the feed
@@ -57,7 +62,7 @@ def load_records() -> list[dict]:
 
 
 def published_at(record: dict, now: datetime) -> datetime:
-    """See the module docstring: either counted back from now, or a real date."""
+    """See the module docstring: the source's own date, or counted back from now."""
     if record.get("on"):
         return datetime.fromisoformat(record["on"]).replace(tzinfo=UTC)
     return now - timedelta(days=record["days_ago"])
@@ -82,7 +87,7 @@ def apply_record(post: NewsPost, record: dict, now: datetime) -> None:
     post.reading_minutes = record["reading_minutes"]
     post.is_adult_only = record["adult"]
     post.is_pinned = record["pinned"]
-    post.is_published = True
+    post.is_published = record.get("published", True)
     post.published_at = published_at(record, now)
 
     # Scored from the text that was just written onto the post, so the ordering
