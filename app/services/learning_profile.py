@@ -67,6 +67,7 @@ def derive(answers: dict[str, Any]) -> dict[str, Any]:
         "occupations": occupations,
         "educations": educations,
         "current_field": (answers.get("field") or "").strip() or None,
+        "workplace": (answers.get("workplace") or "").strip() or None,
         "target_field": target,
         "goals": goals,
         "goal_3_6": (answers.get("goal_3_6") or "").strip() or None,
@@ -169,7 +170,8 @@ async def fill_profile_from_answers(
 
     put("employment_status", _first(answers.get("occupation")))
     put("education_level", _first(answers.get("education")))
-    put("education_field", _first(answers.get("field")))
+    # The field can now hold several ("Savdo, IT"); the column holds 120.
+    put("education_field", (_first(answers.get("field")) or "")[:120] or None)
     put("profession", _first(answers.get("target_field")))
     put("languages", _phrases(answers.get("language")))
 
