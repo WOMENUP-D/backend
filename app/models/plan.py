@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -20,6 +21,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import GoalHorizon, PlanItemStatus, Priority, ScoreDimension
 from app.models.base import Base, TimestampMixin, UUIDMixin, str_enum
+
+if TYPE_CHECKING:
+    from app.models.program import Program
 
 
 class DevelopmentPlan(UUIDMixin, TimestampMixin, Base):
@@ -99,3 +103,12 @@ class PlanItem(UUIDMixin, TimestampMixin, Base):
     )
 
     plan: Mapped[DevelopmentPlan] = relationship(back_populates="items")
+    # Loaded with the item, so a step can link straight to the course's own
+    # site without a second round trip from the page.
+    program: Mapped[Program | None] = relationship(lazy="selectin", viewonly=True)
+
+    @property
+    def program_url(self) -> str | None:
+        """Where the course lives when it is someone else's (Stepik, a
+        university): the step opens that page rather than a catalogue card."""
+        return self.program.external_url if self.program is not None else None

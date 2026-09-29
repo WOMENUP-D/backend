@@ -21,6 +21,8 @@ class PlanItemRead(ORMModel):
     status: PlanItemStatus
     due_date: date | None = None
     program_id: uuid.UUID | None = None
+    # Set only for a course hosted elsewhere; the step links straight to it.
+    program_url: str | None = None
     opportunity_id: uuid.UUID | None = None
 
 
