@@ -10,9 +10,16 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, client_ip
 from app.core.constants import SUBJECT_SCOPES, ConsentScope, DataClassification, Role
+from app.models.career import EducationEntry, WorkExperience
 from app.models.profile import Goal, Profile
 from app.models.user import User
 from app.schemas.admin import ConsentRead, ConsentUpdate
+from app.schemas.career import (
+    EducationIn,
+    EducationRead,
+    WorkExperienceIn,
+    WorkExperienceRead,
+)
 from app.schemas.common import Message
 from app.schemas.user import (
     ActivityDay,
@@ -174,6 +181,117 @@ async def delete_goal(goal_id: uuid.UUID, user: CurrentUserDep, session: DbSessi
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
     await session.delete(goal)
     return Message(detail="Goal deleted")
+
+
+# --- Career history: where she has worked and studied ---------------------
+#
+# Newest first, and an entry still running ("to the present") above any that
+# ended — the order a CV is read in. Owner-scoped throughout: no route takes a
+# user id, and someone else's entry is a 404, never a 403 that confirms it
+# exists.
+
+
+async def _history(session: DbSession, model: type, user_id: uuid.UUID) -> list:
+    rows = await session.execute(
+        select(model)
+        .where(model.user_id == user_id)
+        .order_by(
+            model.end_date.desc().nulls_first(),
+            model.start_date.desc().nulls_last(),
+            model.created_at.desc(),
+        )
+    )
+    return list(rows.scalars())
+
+
+async def _own_entry(session: DbSession, model: type, entry_id: uuid.UUID, user_id: uuid.UUID):
+    entry = await session.get(model, entry_id)
+    if entry is None or entry.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    return entry
+
+
+async def _create_entry(session: DbSession, model: type, payload, user_id: uuid.UUID):
+    # A retried save carries the same client_ref: hand back the entry it made.
+    if payload.client_ref is not None:
+        existing = await session.scalar(
+            select(model).where(model.user_id == user_id, model.client_ref == payload.client_ref)
+        )
+        if existing is not None:
+            return existing
+    entry = model(user_id=user_id, **payload.model_dump())
+    session.add(entry)
+    await session.flush()
+    return entry
+
+
+async def _replace_entry(
+    session: DbSession, model: type, entry_id: uuid.UUID, payload, user_id: uuid.UUID
+):
+    entry = await _own_entry(session, model, entry_id, user_id)
+    # The whole entry is sent back from the form, so clearing a field clears it.
+    for field, value in payload.model_dump(exclude={"client_ref"}).items():
+        setattr(entry, field, value)
+    await session.flush()
+    return entry
+
+
+@router.get("/me/experience", response_model=list[WorkExperienceRead])
+async def list_experience(user: CurrentUserDep, session: DbSession) -> list[WorkExperience]:
+    return await _history(session, WorkExperience, uuid.UUID(user.id))
+
+
+@router.post(
+    "/me/experience", response_model=WorkExperienceRead, status_code=status.HTTP_201_CREATED
+)
+async def create_experience(
+    payload: WorkExperienceIn, user: CurrentUserDep, session: DbSession
+) -> WorkExperience:
+    return await _create_entry(session, WorkExperience, payload, uuid.UUID(user.id))
+
+
+@router.put("/me/experience/{entry_id}", response_model=WorkExperienceRead)
+async def update_experience(
+    entry_id: uuid.UUID, payload: WorkExperienceIn, user: CurrentUserDep, session: DbSession
+) -> WorkExperience:
+    return await _replace_entry(session, WorkExperience, entry_id, payload, uuid.UUID(user.id))
+
+
+@router.delete("/me/experience/{entry_id}", response_model=Message)
+async def delete_experience(
+    entry_id: uuid.UUID, user: CurrentUserDep, session: DbSession
+) -> Message:
+    entry = await _own_entry(session, WorkExperience, entry_id, uuid.UUID(user.id))
+    await session.delete(entry)
+    return Message(detail="Entry deleted")
+
+
+@router.get("/me/education", response_model=list[EducationRead])
+async def list_education(user: CurrentUserDep, session: DbSession) -> list[EducationEntry]:
+    return await _history(session, EducationEntry, uuid.UUID(user.id))
+
+
+@router.post("/me/education", response_model=EducationRead, status_code=status.HTTP_201_CREATED)
+async def create_education(
+    payload: EducationIn, user: CurrentUserDep, session: DbSession
+) -> EducationEntry:
+    return await _create_entry(session, EducationEntry, payload, uuid.UUID(user.id))
+
+
+@router.put("/me/education/{entry_id}", response_model=EducationRead)
+async def update_education(
+    entry_id: uuid.UUID, payload: EducationIn, user: CurrentUserDep, session: DbSession
+) -> EducationEntry:
+    return await _replace_entry(session, EducationEntry, entry_id, payload, uuid.UUID(user.id))
+
+
+@router.delete("/me/education/{entry_id}", response_model=Message)
+async def delete_education(
+    entry_id: uuid.UUID, user: CurrentUserDep, session: DbSession
+) -> Message:
+    entry = await _own_entry(session, EducationEntry, entry_id, uuid.UUID(user.id))
+    await session.delete(entry)
+    return Message(detail="Entry deleted")
 
 
 @router.get("/me/consents", response_model=dict[str, bool])
