@@ -9,6 +9,7 @@ from app.models.assessment import (
 )
 from app.models.audit import AiInteraction, AuditLog, RiskFlag
 from app.models.base import Base
+from app.models.career import EducationEntry, WorkExperience
 from app.models.career_path import CareerPath, UserCareerPath
 from app.models.consent import ConsentLog
 from app.models.integration import IntegrationEvent
@@ -37,17 +38,18 @@ from app.models.user import OtpChallenge, User, UserRole
 __all__ = [
     "AiInteraction",
     "Application",
-    "AuthThrottle",
     "Assessment",
     "AssessmentAnswer",
     "AssessmentQuestion",
     "AuditLog",
+    "AuthThrottle",
     "Base",
     "CareerPath",
     "Certificate",
     "ConsentLog",
     "DevelopmentPlan",
     "DevelopmentScore",
+    "EducationEntry",
     "Enrollment",
     "Goal",
     "IntegrationEvent",
@@ -66,6 +68,7 @@ __all__ = [
     "OrganizationMember",
     "OtpChallenge",
     "OutcomeRecord",
+    "PageView",
     "PlanItem",
     "PortfolioProject",
     "PracticalTask",
@@ -73,7 +76,6 @@ __all__ = [
     "Program",
     "ProgramLesson",
     "ProgramModule",
-    "PageView",
     "RiskFlag",
     "SavedOpportunity",
     "Skill",
@@ -84,4 +86,5 @@ __all__ = [
     "UserLearningPath",
     "UserRole",
     "UserSkill",
+    "WorkExperience",
 ]

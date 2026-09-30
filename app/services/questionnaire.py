@@ -17,7 +17,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-VERSION = 2
+VERSION = 3
 
 
 class QuestionType(StrEnum):
@@ -40,6 +40,7 @@ def _q(
     placeholder: tuple[str, str, str] | None = None,
     suggestions: list[tuple[str, str, str]] | None = None,
     suggest_mode: str = "set",
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     question: dict[str, Any] = {
         "id": qid,
@@ -66,7 +67,23 @@ def _q(
         # "set" replaces the field (one answer); "add" appends to a
         # comma-separated list (several).
         question["suggest_mode"] = suggest_mode
+    if detail:
+        # A short free-text line under the options, saved under its own id
+        # beside the choice. Where she studies or works is not a level of
+        # education, but it is asked on the same screen because it is the next
+        # thing she would say about it.
+        question["detail"] = detail
     return question
+
+
+def _detail(
+    did: str, label: tuple[str, str, str], placeholder: tuple[str, str, str]
+) -> dict[str, Any]:
+    return {
+        "id": did,
+        "label_i18n": {"uz": label[0], "ru": label[1], "en": label[2]},
+        "placeholder_i18n": {"uz": placeholder[0], "ru": placeholder[1], "en": placeholder[2]},
+    }
 
 
 def _o(value: str, uz: str, ru: str, en: str) -> dict[str, Any]:
@@ -138,6 +155,19 @@ QUESTIONS: list[dict[str, Any]] = [
             _o("master", "Oliy (magistr)", "Высшее (магистр)", "Master's"),
             _o("studying_now", "Hozir oʻqiyapman", "Учусь сейчас", "Currently studying"),
         ],
+        detail=_detail(
+            "workplace",
+            (
+                "Qayerda oʻqiysiz yoki ishlaysiz?",
+                "Где вы учитесь или работаете?",
+                "Where do you study or work?",
+            ),
+            (
+                "Masalan: TDIU, 45-maktab, «Anor» doʻkoni",
+                "Например: ТГЭУ, школа № 45, магазин «Анор»",
+                "For example: TSUE, School No. 45, Anor shop",
+            ),
+        ),
     ),
     _q(
         "field",
@@ -162,6 +192,9 @@ QUESTIONS: list[dict[str, Any]] = [
             ("Davlat xizmati", "Госслужба", "Public service"),
             ("Hozircha ishlamayman", "Пока не работаю", "Not working yet"),
         ],
+        # A nurse who also sells on Instagram, a teacher who keeps the books:
+        # a field is rarely one. Several can be picked, and she can still type.
+        suggest_mode="add",
     ),
     _q(
         "experience",

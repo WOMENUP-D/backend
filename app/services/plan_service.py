@@ -6,14 +6,18 @@ The AI proposes; nothing activates until the user accepts (section 06).
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import (
+    EnrollmentStatus,
     GoalHorizon,
+    Language,
     PlanItemStatus,
     Priority,
     ScoreDimension,
@@ -25,6 +29,7 @@ from app.models.plan import DevelopmentPlan, PlanItem
 from app.models.profile import Goal, Profile
 from app.models.program import Program
 from app.models.user import User
+from app.services import learning_profile, recommendation
 from app.services import skills as skill_service
 from app.services.llm_gateway import (
     LlmGateway,
@@ -32,7 +37,6 @@ from app.services.llm_gateway import (
     llm_gateway,
 )
 from app.services.prompts import ROADMAP_SCHEMA, ROADMAP_SYSTEM
-from app.services.score_insights import DIMENSION_PROGRAM_CATEGORIES
 from app.services.scoring import weakest_dimensions
 
 logger = logging.getLogger(__name__)
@@ -115,15 +119,16 @@ async def generate_plan(
     score_map = {s.dimension: s.current for s in scores}
     focus = focus_dimensions or weakest_dimensions(score_map, limit=3)
 
-    programs = list(
-        (
-            await session.execute(select(Program).where(Program.is_published.is_(True)).limit(60))
-        ).scalars()
-    )
+    # The courses the platform actually has, ranked for her. This used to be
+    # the first sixty published rows in whatever order Postgres returned them —
+    # out of a catalogue of eight hundred — so the plan named courses at random
+    # and the same one could fill two steps.
+    picks = await _ranked_for_focus(session, user_id, focus, lang)
+    programs = _shortlist(picks)
 
     if not gateway.enabled:
         logger.info("AI disabled — generating rule-based plan for %s", user_id)
-        return await _fallback_plan(session, user_id, horizon, focus, programs, lang)
+        return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
 
     # Canonical skills, not the labels she once typed: the roadmap should
     # build on what the platform can actually evidence, and should know the
@@ -139,11 +144,11 @@ async def generate_plan(
         )
     except LlmUnavailableError as exc:
         logger.warning("roadmap generation unavailable (%s) — using fallback", exc)
-        return await _fallback_plan(session, user_id, horizon, focus, programs, lang)
+        return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
 
     payload = response.parsed
     if not payload:
-        return await _fallback_plan(session, user_id, horizon, focus, programs, lang)
+        return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
 
     plan = DevelopmentPlan(
         user_id=user_id,
@@ -209,6 +214,97 @@ async def generate_plan(
     await session.flush()
     await session.refresh(plan)
     return plan
+
+
+# Words shorter than this carry no topic ("va", "и", "for") and would match
+# every title in the catalogue.
+_MIN_TERM = 4
+_WORD = re.compile(r"[\w'ʻʼ‘’-]+", re.UNICODE)
+
+# How many courses per focus dimension the model is shown. Sixty in all keeps
+# the prompt the size it always was, now filled with the best of the catalogue.
+_PER_DIMENSION = 20
+_SHORTLIST = 60
+
+
+def _interest_terms(derived: dict[str, Any]) -> list[str]:
+    """What she said she wants to learn and works in, as matchable words.
+
+    Stems rather than words: the first five letters, so "dizayn" finds
+    "dizayner" and "маркетинг" finds "маркетингу".
+    """
+    texts: list[str] = []
+    for key in ("target_field", "current_field", "goal_3_6"):
+        value = derived.get(key)
+        if isinstance(value, str):
+            texts.append(value)
+    for key in ("interests", "skills", "tools"):
+        value = derived.get(key)
+        if isinstance(value, list):
+            texts += [str(v) for v in value]
+    stems: list[str] = []
+    for word in _WORD.findall(" ".join(texts).lower()):
+        if len(word) >= _MIN_TERM and word[:5] not in stems:
+            stems.append(word[:5])
+    return stems
+
+
+def _relevance(program: Program, stems: list[str]) -> int:
+    """How many of her words the course speaks to, in any of its languages."""
+    if not stems:
+        return 0
+    haystack = " ".join(
+        [
+            *program.title_i18n.values(),
+            *program.description_i18n.values(),
+            *program.skills_taught,
+        ]
+    ).lower()
+    return sum(1 for stem in stems if stem in haystack)
+
+
+async def _ranked_for_focus(
+    session: AsyncSession, user_id: uuid.UUID, focus: list[ScoreDimension], lang: str
+) -> list[tuple[ScoreDimension, list[Program]]]:
+    """For each focus dimension, the courses that build it, best for her first.
+
+    The recommendation engine's own order — a course she has started, then one
+    she can read, then the category closest to the dimension — with what she
+    told the questionnaire she wants to learn lifted above the rest. The sort is
+    stable, so among equally relevant courses the engine's order holds.
+    """
+    ctx = await recommendation.load_context(session, user_id)
+    # Rank for the language she is reading the plan in, not the stored one.
+    ctx.language = Language(lang) if lang in {item.value for item in Language} else ctx.language
+
+    record = await learning_profile.get(session, user_id)
+    stems = _interest_terms(record.derived if record and record.derived else {})
+
+    def started(program: Program) -> bool:
+        enrollment = ctx.enrollments.get(program.id)
+        return enrollment is not None and enrollment.status in (
+            EnrollmentStatus.ENROLLED,
+            EnrollmentStatus.IN_PROGRESS,
+        )
+
+    ranked: list[tuple[ScoreDimension, list[Program]]] = []
+    for dimension in focus or list(ScoreDimension)[:3]:
+        pool = recommendation.programs_for_dimension(ctx, dimension)
+        pool.sort(key=lambda p: (not started(p), -_relevance(p, stems)))
+        ranked.append((dimension, pool))
+    return ranked
+
+
+def _shortlist(picks: list[tuple[ScoreDimension, list[Program]]]) -> list[Program]:
+    """The best few per dimension, no repeats — what the model may choose from."""
+    seen: set[uuid.UUID] = set()
+    out: list[Program] = []
+    for _, pool in picks:
+        for program in pool[:_PER_DIMENSION]:
+            if program.id not in seen:
+                seen.add(program.id)
+                out.append(program)
+    return out[:_SHORTLIST]
 
 
 def _program_title(program: Program, lang: str = "uz") -> str:
@@ -278,13 +374,14 @@ async def _fallback_plan(
     user_id: uuid.UUID,
     horizon: GoalHorizon,
     focus: list[ScoreDimension],
-    programs: list[Program],
+    picks: list[tuple[ScoreDimension, list[Program]]],
     lang: str = "uz",
 ) -> DevelopmentPlan:
     """Deterministic plan used when the model is unreachable.
 
-    Suggests one published programme per weak dimension. It is intentionally
-    plain: a working plan beats an error screen, and the user can regenerate.
+    Suggests one course per weak dimension: the best-ranked for her that no
+    earlier step has already taken. It is intentionally plain: a working plan
+    beats an error screen, and the user can regenerate.
     """
     plan = DevelopmentPlan(
         user_id=user_id,
@@ -302,17 +399,13 @@ async def _fallback_plan(
     await session.flush()
 
     today = date.today()
-    for index, dimension in enumerate(focus or list(ScoreDimension)[:3]):
-        # The first category that builds the dimension and has a programme.
-        match = next(
-            (
-                program
-                for category in DIMENSION_PROGRAM_CATEGORIES[dimension]
-                for program in programs
-                if program.category == category
-            ),
-            None,
-        )
+    used: set[uuid.UUID] = set()
+    for index, (dimension, pool) in enumerate(picks):
+        # Two weak dimensions often share a category; the second one gets the
+        # next course down rather than the same course a second time.
+        match = next((program for program in pool if program.id not in used), None)
+        if match is not None:
+            used.add(match.id)
         session.add(
             PlanItem(
                 plan_id=plan.id,

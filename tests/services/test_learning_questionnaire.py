@@ -97,4 +97,18 @@ def test_an_empty_multi_answer_counts_as_unanswered():
 def test_the_version_moved_with_the_wording():
     """`version` is stamped on every completed run so an old answer set stays
     identifiable after questions change shape."""
-    assert questionnaire.VERSION == 2
+    assert questionnaire.VERSION == 3
+
+
+def test_a_field_can_hold_several_answers():
+    """A nurse who also sells online works in two fields, not one."""
+    assert by_id("field")["suggest_mode"] == "add"
+
+
+def test_where_she_studies_or_works_is_asked_beside_her_education():
+    detail = by_id("education")["detail"]
+    assert detail["id"] == "workplace"
+    assert set(detail["label_i18n"]) == set(detail["placeholder_i18n"]) == {"uz", "ru", "en"}
+    # Kept apart from the question ids, so it can never become required.
+    assert detail["id"] not in {q["id"] for q in questionnaire.QUESTIONS}
+    assert derive({"workplace": " 45-maktab "})["workplace"] == "45-maktab"
