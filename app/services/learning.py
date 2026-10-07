@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import EnrollmentStatus
 from app.models.program import Certificate, Enrollment, Program, ProgramLesson, ProgramModule
-from app.services import learning_path, skills
+from app.services import learning_path, score_progress, skills
 from app.services.plan_service import close_plan_items_for_program
 
 
@@ -178,6 +178,9 @@ async def complete_course(
     await learning_path.on_program_completed(
         session, user_id=enrollment.user_id, program_id=enrollment.program_id, now=now
     )
+
+    # Finishing a course is evidence the dimension it teaches has moved.
+    await score_progress.on_program_completed(session, user_id=enrollment.user_id, program=program)
 
     if not program.has_certificate:
         return

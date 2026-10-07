@@ -58,6 +58,7 @@ from app.schemas.practice import (
     TaskSubmitIn,
 )
 from app.schemas.skill import SkillRef
+from app.services import score_progress
 from app.services import skills as skill_service
 from app.services.llm_gateway import LlmUnavailableError, llm_gateway
 from app.services.prompts import PRACTICE_REVIEW_SCHEMA, PRACTICE_REVIEW_SYSTEM
@@ -606,6 +607,10 @@ async def record_evaluation(
             index=index,
         )
     await session.flush()
+    # A pass is work done in a dimension; the same task counts once.
+    await score_progress.on_task_passed(
+        session, user_id=attempt.user_id, task_id=task.id, labels=labels
+    )
     return attempt
 
 

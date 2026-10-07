@@ -77,7 +77,7 @@ from app.schemas.opportunity import (
     SkillFacet,
 )
 from app.services import career_path as career_service
-from app.services import eligibility
+from app.services import eligibility, score_progress
 from app.services import employer as employer_service
 from app.services import recommendation as engine
 from app.services import skills as skill_service
@@ -668,6 +668,12 @@ async def apply(
     )
     session.add(application)
     await session.flush()
+
+    # Applying for work is a career step; each listing counts once.
+    if opportunity.type in (OpportunityType.VACANCY, OpportunityType.INTERNSHIP):
+        await score_progress.on_application_submitted(
+            session, user_id=user_id, opportunity_id=opportunity.id
+        )
 
     if system is not None:
         record = await session.get(User, user_id)
