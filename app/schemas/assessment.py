@@ -16,7 +16,8 @@ from app.schemas.skill import SkillRef
 
 class QuestionRead(ORMModel):
     id: uuid.UUID
-    dimension: ScoreDimension
+    code: str | None = None
+    dimension: ScoreDimension | None = None
     order_index: int
     question_type: str
     text_i18n: dict

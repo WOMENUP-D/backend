@@ -33,7 +33,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from app.services import activity, skills
+from app.services import activity, score_progress, skills
 from app.services.audit_service import current_consents, record_audit, record_consent
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -222,6 +222,8 @@ async def _create_entry(session: DbSession, model: type, payload, user_id: uuid.
     entry = model(user_id=user_id, **payload.model_dump())
     session.add(entry)
     await session.flush()
+    # A new line on her CV is a career step — counted once per measurement.
+    await score_progress.on_cv_updated(session, user_id=user_id)
     return entry
 
 

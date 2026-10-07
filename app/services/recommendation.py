@@ -29,7 +29,6 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import (
-    SCORE_WEIGHTS,
     DimensionBand,
     EnrollmentStatus,
     Language,
@@ -75,7 +74,7 @@ from app.services.score_insights import (
     focus_order,
     split_answers,
 )
-from app.services.scoring import composite_score, weakest_dimensions
+from app.services.scoring import DIMENSION_WEIGHT, composite_score, weakest_dimensions
 
 
 def _normalise(skill: str) -> str:
@@ -1367,7 +1366,7 @@ async def dimension_insights(session: AsyncSession, user_id: uuid.UUID) -> Score
                 current=score.current,
                 target=score.target,
                 progress=score.progress,
-                weight=SCORE_WEIGHTS[dimension],
+                weight=DIMENSION_WEIGHT,
                 band=band_for(score.current),
                 strengths=[_answer_insight(answer) for answer in strengths],
                 weaknesses=[_answer_insight(answer) for answer in weaknesses],

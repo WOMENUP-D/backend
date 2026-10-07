@@ -15,8 +15,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,16 +30,35 @@ class AssessmentQuestion(UUIDMixin, TimestampMixin, Base):
     scores stay reproducible when the instrument changes."""
 
     __tablename__ = "assessment_questions"
-    __table_args__ = (Index("ix_assessment_questions_version_dimension", "version", "dimension"),)
+    __table_args__ = (
+        Index("ix_assessment_questions_version_dimension", "version", "dimension"),
+        Index(
+            "uq_assessment_questions_version_code",
+            "version",
+            "code",
+            unique=True,
+            postgresql_where=text("code IS NOT NULL"),
+        ),
+    )
 
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    dimension: Mapped[ScoreDimension] = mapped_column(str_enum(ScoreDimension, 40), nullable=False)
+    # Language-independent id within a version ("edu.q1", "goals.q25"). Null
+    # only on version-1 questions, which predate it.
+    code: Mapped[str | None] = mapped_column(String(40))
+    # Null for a question that measures no dimension — the goals question.
+    dimension: Mapped[ScoreDimension | None] = mapped_column(str_enum(ScoreDimension, 40))
     order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # "single_choice" is scored; "routing" and "goals" steer recommendations
+    # and carry weight 0, so they can never move the score.
     question_type: Mapped[str] = mapped_column(String(30), default="single_choice")
     # Localised text: {"uz": "...", "ru": "...", "en": "..."}
     text_i18n: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    # [{"value": 1, "label_i18n": {...}, "weight": 0.25}, ...]
+    # v2: [{"id": "a", "score": 0, "value": 0, "label_i18n": {...}}, ...] where
+    # value = score * 25, so a dimension's mean value is (q1+q2+q3) / 12 * 100.
+    # v1: [{"value": 0..100, "label_i18n": {...}}].
     options: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    # {"hint_i18n": {...}, "max_choices": 3} — presentation details.
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     weight: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -50,6 +70,13 @@ class Assessment(UUIDMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_assessments_user_completed", "user_id", "completed_at"),
         Index("ix_assessments_completed_at", "completed_at"),
+        Index(
+            "uq_assessments_user_client_ref",
+            "user_id",
+            "client_ref",
+            unique=True,
+            postgresql_where=text("client_ref IS NOT NULL"),
+        ),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -59,6 +86,19 @@ class Assessment(UUIDMixin, TimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_baseline: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # What this attempt measured, frozen with it. `development_scores` holds
+    # only where she stands now; the history of attempts reads from here.
+    overall_score: Mapped[float | None] = mapped_column(Float)
+    dimension_scores: Mapped[dict | None] = mapped_column(JSONB)
+    # Goal ids she chose (Q25) and the family topic she routed to (Q19).
+    goals: Mapped[list[str]] = mapped_column(ARRAY(String(40)), default=list, nullable=False)
+    family_focus: Mapped[str | None] = mapped_column(String(10))
+    # [{"dimension", "priority", "need", "goal_match", "skill_gap", "urgency"}]
+    priorities: Mapped[list | None] = mapped_column(JSONB)
+    # The browser's id for this attempt. A double tap on "finish" sends it
+    # twice; the second request returns the first attempt instead of a copy.
+    client_ref: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True))
 
     answers: Mapped[list[AssessmentAnswer]] = relationship(
         back_populates="assessment", cascade="all, delete-orphan", lazy="selectin"
@@ -114,3 +154,40 @@ class DevelopmentScore(UUIDMixin, TimestampMixin, Base):
         if self.target is None or self.target <= self.baseline:
             return 0.0
         return min(max((self.current - self.baseline) / (self.target - self.baseline), 0.0), 1.0)
+
+
+class ScoreAdjustment(UUIDMixin, TimestampMixin, Base):
+    """Points a dimension gained from something she did after the diagnostic.
+
+    Append-only and tied to the attempt it builds on: a new diagnostic is a
+    fresh measurement, so earlier adjustments stop counting rather than being
+    stacked on top of it. One row per (attempt, dimension, kind, source) — the
+    same course or application can never be counted twice.
+    """
+
+    __tablename__ = "score_adjustments"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_id",
+            "dimension",
+            "kind",
+            "source_type",
+            "source_id",
+            name="uq_score_adjustments_source",
+        ),
+        Index("ix_score_adjustments_user_dimension", "user_id", "dimension"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False
+    )
+    dimension: Mapped[ScoreDimension] = mapped_column(str_enum(ScoreDimension, 40), nullable=False)
+    # What earned it: "program_completed", "task_passed", "cv_updated", "applied".
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # As awarded, before the per-dimension cap — the cap is applied on read.
+    points: Mapped[float] = mapped_column(Float, nullable=False)

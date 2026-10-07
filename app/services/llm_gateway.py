@@ -29,7 +29,7 @@ from app.core.logging import scrub_pii
 logger = logging.getLogger(__name__)
 
 # Bump when any system prompt below changes — persisted with every interaction.
-PROMPT_VERSION = "2026.09.1"
+PROMPT_VERSION = "2026.10.1"
 
 # Pinned tool versions. Both are the _20260209 generation, which carries its
 # own dynamic filtering: `code_execution` must NOT be declared beside them, or
