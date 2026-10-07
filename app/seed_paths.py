@@ -169,7 +169,7 @@ PATHS: list[dict] = [
             "and leading, then running a team. The mentoring course is for when you want "
             "to pass your own experience on.",
         ),
-        "dimension": D.SOCIAL_ACTIVITY,
+        "dimension": D.LEADERSHIP,
         "level": L.ELEMENTARY,
         "steps": [
             ("jamoatchilik-nutqi", True),

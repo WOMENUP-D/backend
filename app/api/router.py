@@ -10,6 +10,7 @@ from app.api import (
     assistant,
     auth,
     career_paths,
+    diagnostic,
     events,
     integrations,
     learning_paths,
@@ -32,6 +33,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(assessments.router)
+api_router.include_router(diagnostic.router)
 api_router.include_router(plans.router)
 api_router.include_router(programs.router)
 api_router.include_router(learning_paths.router)

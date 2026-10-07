@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import SCORE_WEIGHTS, ScoreDimension
+from app.core.constants import ScoreDimension
 from app.models.assessment import (
     Assessment,
     AssessmentAnswer,
@@ -22,21 +22,22 @@ from app.models.assessment import (
     DevelopmentScore,
 )
 
+#: Each dimension's share of the composite. Equal by design since diagnostic v2;
+#: still sent with every dimension so the cabinet need not hard-code it.
+DIMENSION_WEIGHT = round(1 / len(ScoreDimension), 4)
+
 
 def composite_score(dimension_scores: dict[ScoreDimension, float]) -> float:
-    """Weighted mean over the dimensions actually present.
+    """The plain mean of the dimensions actually present.
 
-    Weights are renormalised across supplied dimensions, so a partial
-    assessment still yields a comparable 0-100 figure.
+    Every dimension counts the same (diagnostic v2): (EDU + CAR + … + LEA) / 8.
+    Averaging over what is present keeps a partial reading comparable — a
+    record from before digital skills existed has seven dimensions, not a zero.
     """
-    present = {d: v for d, v in dimension_scores.items() if v is not None}
+    present = [v for v in dimension_scores.values() if v is not None]
     if not present:
         return 0.0
-    total_weight = sum(SCORE_WEIGHTS[d] for d in present)
-    if total_weight == 0:
-        return 0.0
-    weighted = sum(SCORE_WEIGHTS[d] * v for d, v in present.items())
-    return round(weighted / total_weight, 2)
+    return round(sum(present) / len(present), 2)
 
 
 def weakest_dimensions(

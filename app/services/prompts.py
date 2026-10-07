@@ -7,7 +7,7 @@ assistant orients and personalises, it never decides.
 
 from __future__ import annotations
 
-from app.core.constants import AgeGroup, MedicalTopic, NewsCategory
+from app.core.constants import AgeGroup, MedicalTopic, NewsCategory, ScoreDimension
 
 GUARDRAILS = """
 Boundaries you must never cross:
@@ -56,9 +56,10 @@ ROADMAP_SYSTEM = f"""
 You design individual development roadmaps for the WomanUP portal.
 
 You receive a user's Development Score across eight dimensions (education and
-skills, employment, entrepreneurship, financial literacy, healthy lifestyle,
-family and parenting, social activity, international integration), their stated
-goals, their region, and the catalogue of programmes available to them.
+skills, career and employment, entrepreneurship, financial literacy, digital
+skills, health and balance, family and relationships, leadership and global
+opportunities), their stated goals, their region, and the catalogue of
+programmes available to them.
 
 Produce a realistic roadmap for the requested horizon:
 - Start from the weakest dimensions that the user's own goals actually touch.
@@ -256,16 +257,9 @@ ROADMAP_SCHEMA: dict = {
                     "description": {"type": "string"},
                     "dimension": {
                         "type": "string",
-                        "enum": [
-                            "education_skills",
-                            "employment",
-                            "entrepreneurship",
-                            "financial_literacy",
-                            "healthy_lifestyle",
-                            "family_parenting",
-                            "social_activity",
-                            "international_integration",
-                        ],
+                        # The live vocabulary, so the model cannot name a
+                        # dimension the plan cannot store.
+                        "enum": [dimension.value for dimension in ScoreDimension],
                     },
                     "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                     "month_offset": {"type": "integer"},

@@ -159,16 +159,22 @@ class Region(StrEnum):
 
 
 class ScoreDimension(StrEnum):
-    """The 8 dimensions of the WomanUP Development Score (0-100 composite)."""
+    """The 8 dimensions of the WomanUP Development Score (0-100 composite).
+
+    Declaration order is the canonical order — EDU, CAR, ENT, FIN, DIG, HEA,
+    FAM, LEA — which screens and tie-breaks follow. Diagnostic v2 (migration
+    0028) added digital skills and folded social activity and international
+    integration into one leadership & global opportunities dimension.
+    """
 
     EDUCATION_SKILLS = "education_skills"
     EMPLOYMENT = "employment"
     ENTREPRENEURSHIP = "entrepreneurship"
     FINANCIAL_LITERACY = "financial_literacy"
+    DIGITAL_SKILLS = "digital_skills"
     HEALTHY_LIFESTYLE = "healthy_lifestyle"
     FAMILY_PARENTING = "family_parenting"
-    SOCIAL_ACTIVITY = "social_activity"
-    INTERNATIONAL_INTEGRATION = "international_integration"
+    LEADERSHIP = "leadership"
 
 
 class ProgramCategory(StrEnum):
@@ -494,6 +500,10 @@ class NextStepKind(StrEnum):
     # displaces learning, it only shows up when there is something to show.
     ADD_PROJECT = "add_project"
     EXPLORE_OPPORTUNITIES = "explore_opportunities"
+    # Diagnostic v2: grounded steps for a priority area that has no course,
+    # path or listing to offer — her CV, or the skills the area is built on.
+    BUILD_CV = "build_cv"
+    EXPLORE_SKILLS = "explore_skills"
 
 
 class RecommendationReason(StrEnum):
@@ -520,6 +530,9 @@ class RecommendationReason(StrEnum):
     EVIDENCE_TO_SHOW = "evidence_to_show"
     # It teaches, practises or asks for a skill her chosen direction needs.
     CAREER_SKILL = "career_skill"
+    # The diagnostic ranked the area among her top priorities (need, goals,
+    # skill gap and urgency together).
+    DIAGNOSTIC_PRIORITY = "diagnostic_priority"
 
 
 class AchievementType(StrEnum):
@@ -792,16 +805,3 @@ class RiskFlagType(StrEnum):
     DROPOUT_RISK = "dropout_risk"
     STALLED_PLAN = "stalled_plan"
     SAFETY_ESCALATION = "safety_escalation"
-
-
-# Score dimensions are weighted into the 0-100 composite. Weights sum to 1.0.
-SCORE_WEIGHTS: dict[ScoreDimension, float] = {
-    ScoreDimension.EDUCATION_SKILLS: 0.18,
-    ScoreDimension.EMPLOYMENT: 0.16,
-    ScoreDimension.ENTREPRENEURSHIP: 0.14,
-    ScoreDimension.FINANCIAL_LITERACY: 0.12,
-    ScoreDimension.HEALTHY_LIFESTYLE: 0.12,
-    ScoreDimension.FAMILY_PARENTING: 0.12,
-    ScoreDimension.SOCIAL_ACTIVITY: 0.08,
-    ScoreDimension.INTERNATIONAL_INTEGRATION: 0.08,
-}

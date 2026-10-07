@@ -8,6 +8,7 @@ from app.core.constants import ScoreDimension
 from app.models.assessment import AssessmentQuestion
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.models.user import User
+from app.services import diagnostic
 
 RECOMMENDATIONS = "/api/v1/ai/recommendations"
 INSIGHTS = "/api/v1/assessments/score/insights"
@@ -33,32 +34,35 @@ async def test_insights_wait_for_an_assessment(client, auth_headers):
 async def test_submitting_the_diagnostic_produces_insights(client, session, auth_headers, user_id):
     session.add(User(id=user_id, phone=_phone()))
     questions = [
-        AssessmentQuestion(dimension=dimension, order_index=0, text_i18n={"en": dimension.value})
-        for dimension in (ScoreDimension.EMPLOYMENT, ScoreDimension.HEALTHY_LIFESTYLE)
+        AssessmentQuestion(**row) for row in diagnostic.question_rows(diagnostic.load_bank())
     ]
     session.add_all(questions)
     await session.flush()
 
+    def option(question: AssessmentQuestion) -> list[str]:
+        if question.question_type == "goals":
+            return ["find_job"]
+        if question.dimension == ScoreDimension.EMPLOYMENT:
+            return ["b"]  # 25
+        if question.dimension == ScoreDimension.HEALTHY_LIFESTYLE:
+            return ["e"]  # 100
+        return ["c"]  # 50
+
     submitted = await client.post(
-        "/api/v1/assessments/submit",
-        json={
-            "answers": [
-                {"question_id": str(questions[0].id), "value": 25},
-                {"question_id": str(questions[1].id), "value": 100},
-            ]
-        },
+        "/api/v1/diagnostic/attempt",
+        json={"answers": [{"question_id": str(q.id), "option_ids": option(q)} for q in questions]},
         headers=auth_headers,
     )
-    assert submitted.status_code == 200
+    assert submitted.status_code == 201
 
     response = await client.get(INSIGHTS, headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert {d["dimension"]: d["band"] for d in body["dimensions"]} == {
-        "employment": "focus",
-        "healthy_lifestyle": "strong",
-    }
-    assert body["focus_dimensions"] == ["employment"]
+    bands = {d["dimension"]: d["band"] for d in body["dimensions"]}
+    assert len(bands) == 8
+    assert bands["employment"] == "focus"
+    assert bands["healthy_lifestyle"] == "strong"
+    assert body["focus_dimensions"][0] == "employment"
 
 
 @pytest.mark.asyncio

@@ -38,7 +38,6 @@ from sqlalchemy import Select, and_, case, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import (
-    SCORE_WEIGHTS,
     ApplicationStatus,
     EnrollmentStatus,
     EvaluatorKind,
@@ -827,16 +826,16 @@ async def score(session: AsyncSession, f: Filters) -> ResultsScore:
         session, select(func.count(func.distinct(DevelopmentScore.user_id))).where(mine)
     )
 
-    weight = case(
-        *[(DevelopmentScore.dimension == dim, SCORE_WEIGHTS[dim]) for dim in ScoreDimension],
-        else_=0.0,
-    )
+    # The plain mean of her dimensions, as the cabinet computes it. Only the
+    # current dimensions count, so a row left from an older instrument cannot
+    # tilt it.
+    current_dims = list(ScoreDimension)
     per_person = (
         select(
             DevelopmentScore.user_id,
-            (func.sum(weight * DevelopmentScore.current) / func.nullif(func.sum(weight), 0)).label(
-                "composite"
-            ),
+            func.avg(DevelopmentScore.current)
+            .filter(DevelopmentScore.dimension.in_(current_dims))
+            .label("composite"),
         )
         .where(mine)
         .group_by(DevelopmentScore.user_id)

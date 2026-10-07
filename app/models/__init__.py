@@ -6,6 +6,7 @@ from app.models.assessment import (
     AssessmentAnswer,
     AssessmentQuestion,
     DevelopmentScore,
+    ScoreAdjustment,
 )
 from app.models.audit import AiInteraction, AuditLog, RiskFlag
 from app.models.base import Base
@@ -49,6 +50,7 @@ __all__ = [
     "ConsentLog",
     "DevelopmentPlan",
     "DevelopmentScore",
+    "ScoreAdjustment",
     "EducationEntry",
     "Enrollment",
     "Goal",

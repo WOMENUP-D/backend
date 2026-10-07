@@ -60,9 +60,8 @@ from app.seed_news import load_news
 from app.seed_paths import load_paths
 from app.seed_skills import backfill, load_skills
 from app.seed_tasks import load_tasks
-from app.services import rag
+from app.services import diagnostic, rag
 from app.services.news_age import group_for_age
-from app.services.scoring import calculate_dimension_scores, persist_scores
 
 logger = logging.getLogger(__name__)
 
@@ -338,38 +337,38 @@ PLAN_ACTIONS: dict[ScoreDimension, list[tuple[str, str, str]]] = {
             "Finish the parenting programme",
         ),
     ],
-    ScoreDimension.SOCIAL_ACTIVITY: [
+    ScoreDimension.DIGITAL_SKILLS: [
+        (
+            "Raqamli savodxonlik dasturining birinchi modulini tugatish",
+            "Завершить первый модуль программы по цифровой грамотности",
+            "Finish the first module of a digital literacy programme",
+        ),
+        (
+            "Ish yoki oʻqishdagi bitta vazifani AI yordamida bajarib koʻrish",
+            "Выполнить одну рабочую или учебную задачу с помощью ИИ",
+            "Do one work or study task with the help of AI",
+        ),
+        (
+            "Akkauntlarga ikki bosqichli himoyani yoqish",
+            "Включить двухфакторную защиту на своих аккаунтах",
+            "Turn on two-factor protection for your accounts",
+        ),
+    ],
+    ScoreDimension.LEADERSHIP: [
         (
             "Mahalladagi tashabbusga qoʻshilish",
             "Присоединиться к инициативе в махалле",
             "Join an initiative in your community",
         ),
         (
-            "Kasbiy hamjamiyatda roʻyxatdan oʻtish",
-            "Зарегистрироваться в профессиональном сообществе",
-            "Register with a professional community",
-        ),
-        (
             "Mentor bilan birinchi uchrashuvni oʻtkazish",
             "Провести первую встречу с ментором",
             "Hold your first meeting with a mentor",
-        ),
-    ],
-    ScoreDimension.INTERNATIONAL_INTEGRATION: [
-        (
-            "Ingliz tili darajasini baholash",
-            "Оценить свой уровень английского",
-            "Assess your level of English",
         ),
         (
             "Xalqaro dastur talablarini oʻrganish",
             "Изучить требования международной программы",
             "Study the requirements of an international programme",
-        ),
-        (
-            "Motivatsion xat qoralamasini tayyorlash",
-            "Подготовить черновик мотивационного письма",
-            "Draft a motivation letter",
         ),
     ],
 }
@@ -386,153 +385,8 @@ PLAN_SUMMARY = {
 }
 
 
-# --------------------------------------------------------------------------
-# Diagnostic instrument: 8 dimensions x 3 questions
-# --------------------------------------------------------------------------
-
-QUESTIONS: dict[ScoreDimension, list[tuple[str, str, str]]] = {
-    ScoreDimension.EDUCATION_SKILLS: [
-        (
-            "Taʼlim darajangizni qanday baholaysiz?",
-            "Как вы оцениваете свой уровень образования?",
-            "How do you rate your level of education?",
-        ),
-        (
-            "Soʻnggi yilda yangi kasbiy koʻnikma oʻrgandingizmi?",
-            "Осваивали ли вы новый профессиональный навык за последний год?",
-            "Have you learned a new professional skill in the past year?",
-        ),
-        (
-            "Kompyuter va internetdan qanchalik erkin foydalanasiz?",
-            "Насколько свободно вы пользуетесь компьютером и интернетом?",
-            "How confidently do you use a computer and the internet?",
-        ),
-    ],
-    ScoreDimension.EMPLOYMENT: [
-        (
-            "Hozirgi bandlik holatingiz qanday?",
-            "Каков ваш текущий статус занятости?",
-            "What is your current employment status?",
-        ),
-        (
-            "Rezyume va suhbatga tayyorgarligingizni qanday baholaysiz?",
-            "Как вы оцениваете готовность резюме и к собеседованию?",
-            "How ready are your CV and interview skills?",
-        ),
-        (
-            "Kasbiy aloqalar tarmogʻingiz qanchalik keng?",
-            "Насколько широка ваша сеть профессиональных контактов?",
-            "How wide is your professional network?",
-        ),
-    ],
-    ScoreDimension.ENTREPRENEURSHIP: [
-        (
-            "Biznes yuritish tajribangiz bormi?",
-            "Есть ли у вас опыт ведения бизнеса?",
-            "Do you have experience running a business?",
-        ),
-        (
-            "Biznes-reja tuza olasizmi?",
-            "Умеете ли вы составить бизнес-план?",
-            "Can you put together a business plan?",
-        ),
-        (
-            "Mahsulot yoki xizmatingizni sotish kanallari bormi?",
-            "Есть ли каналы сбыта вашего товара или услуги?",
-            "Do you have sales channels for your product or service?",
-        ),
-    ],
-    ScoreDimension.FINANCIAL_LITERACY: [
-        (
-            "Oilaviy budjetni muntazam yuritasizmi?",
-            "Ведёте ли вы регулярно семейный бюджет?",
-            "Do you keep a household budget regularly?",
-        ),
-        ("Jamgʻarmangiz bormi?", "Есть ли у вас сбережения?", "Do you have savings?"),
-        (
-            "Kredit shartlarini mustaqil tahlil qila olasizmi?",
-            "Можете ли самостоятельно разобрать условия кредита?",
-            "Can you assess loan terms on your own?",
-        ),
-    ],
-    ScoreDimension.HEALTHY_LIFESTYLE: [
-        (
-            "Profilaktik tibbiy koʻrikdan muntazam oʻtasizmi?",
-            "Проходите ли регулярно профилактические осмотры?",
-            "Do you attend preventive health check-ups regularly?",
-        ),
-        (
-            "Jismoniy faollik darajangiz qanday?",
-            "Каков ваш уровень физической активности?",
-            "What is your level of physical activity?",
-        ),
-        (
-            "Uyqu va stressni boshqarish holatingiz qanday?",
-            "Как обстоят дела со сном и управлением стрессом?",
-            "How are your sleep and stress management?",
-        ),
-    ],
-    ScoreDimension.FAMILY_PARENTING: [
-        (
-            "Farzand tarbiyasi boʻyicha yetarli bilimingiz bormi?",
-            "Достаточно ли у вас знаний по воспитанию детей?",
-            "Do you have enough knowledge about raising children?",
-        ),
-        (
-            "Oilada muloqot sifatini qanday baholaysiz?",
-            "Как оцениваете качество общения в семье?",
-            "How do you rate communication in your family?",
-        ),
-        (
-            "Bolalarning onlayn xavfsizligini nazorat qilasizmi?",
-            "Контролируете ли онлайн-безопасность детей?",
-            "Do you supervise your children's online safety?",
-        ),
-    ],
-    ScoreDimension.SOCIAL_ACTIVITY: [
-        (
-            "Mahalla yoki jamoat tashabbuslarida qatnashasizmi?",
-            "Участвуете ли в инициативах махалли или сообщества?",
-            "Do you take part in community initiatives?",
-        ),
-        (
-            "Boshqalarga maslahat berish tajribangiz bormi?",
-            "Есть ли опыт наставничества для других?",
-            "Do you have experience mentoring others?",
-        ),
-        (
-            "Oʻz huquqlaringizni bilasizmi va himoya qila olasizmi?",
-            "Знаете ли свои права и умеете ли их защищать?",
-            "Do you know your rights and can you defend them?",
-        ),
-    ],
-    ScoreDimension.INTERNATIONAL_INTEGRATION: [
-        (
-            "Chet tilini qay darajada bilasiz?",
-            "На каком уровне вы владеете иностранным языком?",
-            "What is your foreign language level?",
-        ),
-        (
-            "Xalqaro dastur yoki grantlarda qatnashganmisiz?",
-            "Участвовали ли в международных программах или грантах?",
-            "Have you taken part in international programmes or grants?",
-        ),
-        (
-            "Eksport yoki xalqaro hamkorlik tajribangiz bormi?",
-            "Есть ли опыт экспорта или международного сотрудничества?",
-            "Do you have export or international cooperation experience?",
-        ),
-    ],
-}
-
-# Five-point scale reused by every question.
-OPTIONS = [
-    {"value": 0, "label_i18n": {"uz": "Umuman yoʻq", "ru": "Совсем нет", "en": "Not at all"}},
-    {"value": 25, "label_i18n": {"uz": "Juda kam", "ru": "Очень мало", "en": "Very little"}},
-    {"value": 50, "label_i18n": {"uz": "Oʻrtacha", "ru": "Средне", "en": "Moderate"}},
-    {"value": 75, "label_i18n": {"uz": "Yaxshi", "ru": "Хорошо", "en": "Good"}},
-    {"value": 100, "label_i18n": {"uz": "Aʼlo darajada", "ru": "Отлично", "en": "Excellent"}},
-]
+# The diagnostic instrument is `data/diagnostic_v2.json`, loaded through
+# `services.diagnostic` exactly as migration 0028 loads it.
 
 
 PROGRAMS = [
@@ -2714,7 +2568,8 @@ def _answer_bias(profile: Profile) -> dict[ScoreDimension, float]:
 
     if profile.education_level and profile.education_level.startswith("oliy"):
         bias[ScoreDimension.EDUCATION_SKILLS] += 20
-        bias[ScoreDimension.INTERNATIONAL_INTEGRATION] += 9
+        bias[ScoreDimension.DIGITAL_SKILLS] += 12
+        bias[ScoreDimension.LEADERSHIP] += 6
     elif profile.education_level == "oʻrta":
         bias[ScoreDimension.EDUCATION_SKILLS] -= 16
 
@@ -2730,18 +2585,37 @@ def _answer_bias(profile: Profile) -> dict[ScoreDimension, float]:
         bias[ScoreDimension.ENTREPRENEURSHIP] -= 10
 
     if "en" in profile.languages:
-        bias[ScoreDimension.INTERNATIONAL_INTEGRATION] += 26
+        bias[ScoreDimension.LEADERSHIP] += 16
     else:
-        bias[ScoreDimension.INTERNATIONAL_INTEGRATION] -= 12
+        bias[ScoreDimension.LEADERSHIP] -= 8
 
     if (profile.children_count or 0) > 0:
         bias[ScoreDimension.FAMILY_PARENTING] += 16
     if len(profile.interests) >= 3:
-        bias[ScoreDimension.SOCIAL_ACTIVITY] += 12
+        bias[ScoreDimension.LEADERSHIP] += 8
     if profile.years_of_experience and profile.years_of_experience >= 8:
         bias[ScoreDimension.EDUCATION_SKILLS] += 8
         bias[ScoreDimension.EMPLOYMENT] += 8
     return bias
+
+
+def _demo_answers(
+    questions: list[AssessmentQuestion], centre_for
+) -> list[tuple[object, list[str]]]:
+    """One option per question: scored ones snapped to the option nearest the
+    centre for its dimension, a family topic, and one to three goals."""
+    answers = []
+    for question in questions:
+        ids = [option["id"] for option in question.options]
+        if question.question_type == "goals":
+            answers.append((question.id, random.sample(ids, random.randint(1, 3))))
+        elif question.question_type == "routing":
+            answers.append((question.id, [random.choice(ids)]))
+        else:
+            centre = centre_for(question)
+            option = min(question.options, key=lambda o: abs(o["value"] - centre))
+            answers.append((question.id, [option["id"]]))
+    return answers
 
 
 async def _run_assessment(
@@ -2752,37 +2626,21 @@ async def _run_assessment(
     *,
     taken_at: datetime,
 ) -> dict[ScoreDimension, float]:
-    """A completed diagnostic plus the scores it produces, through the same
-    scoring service the API uses — so demo numbers and live numbers agree."""
-    assessment = Assessment(
+    """A completed diagnostic through the same service the API uses — so demo
+    numbers and live numbers agree."""
+    bias = _answer_bias(profile)
+    # Small per-question noise only — the dimension-level offset is what makes
+    # a dimension consistently strong or weak for this person.
+    answers = _demo_answers(questions, lambda q: 48 + bias[q.dimension] + random.gauss(0, 9))
+    attempt, _ = await diagnostic.submit(
+        session,
         user_id=user.id,
-        version=1,
+        answers=answers,
+        client_ref=None,
         started_at=taken_at - timedelta(minutes=random.randint(9, 22)),
         completed_at=taken_at,
-        is_baseline=True,
     )
-    session.add(assessment)
-    await session.flush()
-
-    bias = _answer_bias(profile)
-    for question in questions:
-        # Small per-question noise only — the dimension-level offset above is
-        # what makes a dimension consistently strong or weak for this person.
-        centre = 48 + bias[question.dimension] + random.gauss(0, 9)
-        # Answers are one of the four fixed options, so snap to the scale.
-        value = min(OPTIONS, key=lambda o: abs(o["value"] - centre))["value"]
-        session.add(
-            AssessmentAnswer(
-                assessment_id=assessment.id,
-                question_id=question.id,
-                value=value,
-            )
-        )
-    await session.flush()
-
-    scores = await calculate_dimension_scores(session, assessment.id)
-    await persist_scores(session, user.id, assessment.id, scores)
-    return scores
+    return {ScoreDimension(k): float(v) for k, v in (attempt.dimension_scores or {}).items()}
 
 
 def _make_plan(
@@ -2955,20 +2813,10 @@ async def seed(*, force: bool = False) -> None:
 
         # --- Diagnostic questions -----------------------------------------
         questions: list[AssessmentQuestion] = []
-        for dimension, items in QUESTIONS.items():
-            for index, (uz, ru, en) in enumerate(items):
-                question = AssessmentQuestion(
-                    version=1,
-                    dimension=dimension,
-                    order_index=index,
-                    question_type="single_choice",
-                    text_i18n={"uz": uz, "ru": ru, "en": en},
-                    options=OPTIONS,
-                    weight=1.0,
-                    is_active=True,
-                )
-                session.add(question)
-                questions.append(question)
+        for row in diagnostic.question_rows(diagnostic.load_bank()):
+            question = AssessmentQuestion(**row)
+            session.add(question)
+            questions.append(question)
         await session.flush()
         logger.info("seeded %s assessment questions", len(questions))
 
@@ -3182,40 +3030,34 @@ async def seed(*, force: bool = False) -> None:
                 )
             )
 
-        # A completed baseline assessment for the demo user.
-        assessment = Assessment(
+        # A completed baseline assessment for the demo user: a fixed reading,
+        # so the demo cabinet always shows the same strengths and priorities.
+        demo_options = {
+            ScoreDimension.EDUCATION_SKILLS: ["d", "c", "d"],
+            ScoreDimension.EMPLOYMENT: ["b", "c", "b"],
+            ScoreDimension.ENTREPRENEURSHIP: ["a", "b", "a"],
+            ScoreDimension.FINANCIAL_LITERACY: ["c", "b", "c"],
+            ScoreDimension.DIGITAL_SKILLS: ["c", "b", "c"],
+            ScoreDimension.HEALTHY_LIFESTYLE: ["c", "c", "d"],
+            ScoreDimension.FAMILY_PARENTING: ["d", "c"],
+            ScoreDimension.LEADERSHIP: ["b", "b", "c"],
+        }
+        demo_answers = []
+        for question in questions:
+            if question.question_type == "goals":
+                demo_answers.append((question.id, ["find_job", "digital_ai"]))
+            elif question.question_type == "routing":
+                demo_answers.append((question.id, ["e"]))
+            else:
+                demo_answers.append((question.id, [demo_options[question.dimension].pop(0)]))
+        demo_attempt, _ = await diagnostic.submit(
+            session,
             user_id=demo_user.id,
-            version=1,
+            answers=demo_answers,
+            client_ref=None,
             started_at=now - timedelta(minutes=15),
             completed_at=now,
-            is_baseline=True,
         )
-        session.add(assessment)
-        await session.flush()
-
-        demo_values = {
-            ScoreDimension.EDUCATION_SKILLS: [75, 50, 75],
-            ScoreDimension.EMPLOYMENT: [25, 50, 25],
-            ScoreDimension.ENTREPRENEURSHIP: [0, 25, 0],
-            ScoreDimension.FINANCIAL_LITERACY: [50, 25, 50],
-            ScoreDimension.HEALTHY_LIFESTYLE: [50, 50, 75],
-            ScoreDimension.FAMILY_PARENTING: [75, 75, 50],
-            ScoreDimension.SOCIAL_ACTIVITY: [25, 25, 50],
-            ScoreDimension.INTERNATIONAL_INTEGRATION: [25, 0, 0],
-        }
-        for question in questions:
-            values = demo_values[question.dimension]
-            session.add(
-                AssessmentAnswer(
-                    assessment_id=assessment.id,
-                    question_id=question.id,
-                    value=values[question.order_index],
-                )
-            )
-        await session.flush()
-
-        scores = await calculate_dimension_scores(session, assessment.id)
-        await persist_scores(session, demo_user.id, assessment.id, scores)
 
         session.add(
             Enrollment(
@@ -3241,6 +3083,9 @@ async def seed(*, force: bool = False) -> None:
 
         # An accepted plan, so the demo cabinet opens on a live roadmap rather
         # than an empty "generate a plan" state.
+        scores = {
+            ScoreDimension(k): float(v) for k, v in (demo_attempt.dimension_scores or {}).items()
+        }
         demo_plan = _make_plan(
             demo_user,
             scores,

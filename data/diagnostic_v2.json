@@ -1,0 +1,1487 @@
+{
+ "version": 2,
+ "questions": [
+  {
+   "code": "edu.q1",
+   "dimension": "education_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Hozir kasbiy koʻnikmalaringizni qanday baholaysiz?",
+    "ru": "Как вы сейчас оцениваете свои профессиональные навыки?",
+    "en": "How would you rate your professional skills right now?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha kasbiy koʻnikmalarim koʻp emas",
+      "ru": "Профессиональных навыков у меня пока немного",
+      "en": "I don't have many professional skills yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Faqat asoslarini bilaman",
+      "ru": "Я знаю только основы",
+      "en": "I know only the basics"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Amalda qoʻllay oladigan asosiy koʻnikmalarim bor",
+      "ru": "У меня есть базовые навыки, которые я могу применять",
+      "en": "I have basic skills that I can apply"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Koʻnikmalarimni amalda ishonch bilan qoʻllayman",
+      "ru": "Я уверенно применяю свои навыки на практике",
+      "en": "I confidently use my skills in practice"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Yuqori darajadaman va boshqalarni oʻrgata olaman",
+      "ru": "У меня продвинутый уровень, и я могу учить других",
+      "en": "I have an advanced level and can teach others"
+     }
+    }
+   ]
+  },
+  {
+   "code": "edu.q2",
+   "dimension": "education_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Qanchalik tez-tez yangi narsa oʻrganasiz?",
+    "ru": "Как часто вы узнаёте что-то новое?",
+    "en": "How often do you learn something new?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Deyarli hech qachon",
+      "ru": "Почти никогда",
+      "en": "Almost never"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Faqat zarurat boʻlganda",
+      "ru": "Только когда это необходимо",
+      "en": "Only when necessary"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Baʼzan kurslarda yoki mustaqil oʻqiyman",
+      "ru": "Иногда прохожу курсы или учусь сама",
+      "en": "Sometimes I take courses or learn independently"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Muntazam yangi koʻnikmalarni rivojlantiraman",
+      "ru": "Я регулярно осваиваю новые навыки",
+      "en": "I regularly develop new skills"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Doimiy oʻqish rejam bor",
+      "ru": "У меня есть постоянный план обучения",
+      "en": "I have a consistent learning plan"
+     }
+    }
+   ]
+  },
+  {
+   "code": "edu.q3",
+   "dimension": "education_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Maqsadlaringiz uchun qaysi koʻnikmalar kerakligini qanchalik tushunasiz?",
+    "ru": "Насколько хорошо вы понимаете, какие навыки нужны для ваших целей?",
+    "en": "How well do you understand which skills you need for your goals?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha bilmayman",
+      "ru": "Пока не знаю",
+      "en": "I don't know yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Umumiy tasavvurim bor",
+      "ru": "У меня есть общее представление",
+      "en": "I have a general idea"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Kerakli asosiy koʻnikmalarni tushunaman",
+      "ru": "Я понимаю основные навыки, которые мне нужны",
+      "en": "I understand the main skills I need"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Nimalar yetishmasligini aniq tushunaman",
+      "ru": "Я чётко понимаю, чего мне не хватает",
+      "en": "I clearly understand what I am missing"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Koʻnikmalarni rivojlantirishning aniq rejam bor",
+      "ru": "У меня есть чёткий план развития навыков",
+      "en": "I have a clear skill-development plan"
+     }
+    }
+   ]
+  },
+  {
+   "code": "car.q4",
+   "dimension": "employment",
+   "type": "single_choice",
+   "text": {
+    "uz": "Hozirgi kasbiy holatingizni qaysi gap yaxshiroq ifodalaydi?",
+    "ru": "Какое утверждение лучше всего описывает вашу нынешнюю карьерную ситуацию?",
+    "en": "Which statement best describes your current career situation?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Ishlamayman va qaysi yoʻnalishni tanlashni bilmayman",
+      "ru": "Я не работаю и не знаю, какое направление выбрать",
+      "en": "I am not working and don't know which direction to take"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Mumkin boʻlgan yoʻnalishlarni oʻrganyapman",
+      "ru": "Я изучаю возможные направления",
+      "en": "I am exploring possible career directions"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Oʻqiyapman yoki ishga tayyorlanyapman",
+      "ru": "Я учусь или готовлюсь к работе",
+      "en": "I am studying or preparing for work"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Ishlayman yoki faol ish qidiryapman",
+      "ru": "Я работаю или активно ищу работу",
+      "en": "I work or actively search for work"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Ishlayman va keyingi kasbiy qadamimni bilaman",
+      "ru": "Я работаю и знаю свой следующий карьерный шаг",
+      "en": "I work and know my next career step"
+     }
+    }
+   ]
+  },
+  {
+   "code": "car.q5",
+   "dimension": "employment",
+   "type": "single_choice",
+   "text": {
+    "uz": "Ish qidirishga qanchalik tayyorsiz?",
+    "ru": "Насколько вы готовы к поиску работы?",
+    "en": "How ready are you to look for a job?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Nimadan boshlashni bilmayman",
+      "ru": "Не знаю, с чего начать",
+      "en": "I don't know where to start"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Ish kerakligini bilaman, lekin hali tayyor emasman",
+      "ru": "Я знаю, что мне нужна работа, но пока не готова",
+      "en": "I know I need a job but I'm not prepared yet"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Rezyume yoki asosiy tayyorgarligim bor",
+      "ru": "У меня есть резюме или базовая подготовка",
+      "en": "I have a CV or basic preparation"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Rezyume, koʻnikmalar bor, suhbatlarga bora olaman",
+      "ru": "У меня есть резюме и навыки, я могу ходить на собеседования",
+      "en": "I have a CV, skills and can attend interviews"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Faol ariza topshiraman va bir nechta kanaldan foydalanaman",
+      "ru": "Я активно откликаюсь и использую несколько каналов поиска",
+      "en": "I actively apply and use several job-search channels"
+     }
+    }
+   ]
+  },
+  {
+   "code": "car.q6",
+   "dimension": "employment",
+   "type": "single_choice",
+   "text": {
+    "uz": "Qanday ish istashingizni qanchalik aniq tushunasiz?",
+    "ru": "Насколько ясно вы понимаете, какую работу хотите?",
+    "en": "How clearly do you understand what kind of work you want?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha bilmayman",
+      "ru": "Пока не знаю",
+      "en": "I don't know yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Bir nechta gʻoyam bor",
+      "ru": "У меня есть несколько идей",
+      "en": "I have several ideas"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Yoʻnalishni taxminan bilaman",
+      "ru": "Я примерно знаю направление",
+      "en": "I roughly know the direction"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Istagan kasbim yoki sohamni bilaman",
+      "ru": "Я знаю, какую профессию или сферу хочу",
+      "en": "I know the profession/field I want"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Kasbni, talablarni va keyingi qadamni bilaman",
+      "ru": "Я знаю профессию, требования и следующий шаг",
+      "en": "I know the profession, requirements and next step"
+     }
+    }
+   ]
+  },
+  {
+   "code": "ent.q7",
+   "dimension": "entrepreneurship",
+   "type": "single_choice",
+   "text": {
+    "uz": "Oʻz biznesingiz yoki loyihangizni boshlashga qanchalik tayyorsiz?",
+    "ru": "Насколько вы готовы начать свой бизнес или проект?",
+    "en": "How ready are you to start your own business or project?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Qanday boshlashni bilmayman",
+      "ru": "Не знаю, как начать",
+      "en": "I don't know how to start"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Qiziqaman, lekin bilimim kam",
+      "ru": "Мне интересно, но знаний пока мало",
+      "en": "I'm interested but have little knowledge"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Sinab koʻrmoqchi boʻlgan gʻoyam bor",
+      "ru": "У меня есть идея, которую я хотела бы попробовать",
+      "en": "I have an idea I would like to try"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Gʻoyam bor va dastlabki qadamlarni tushunaman",
+      "ru": "У меня есть идея, и я понимаю первые шаги",
+      "en": "I have an idea and understand the first steps"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Biznesim/loyiham yoki aniq ishga tushirish rejam bor",
+      "ru": "У меня уже есть бизнес/проект или чёткий план запуска",
+      "en": "I already have a business/project or a clear launch plan"
+     }
+    }
+   ]
+  },
+  {
+   "code": "ent.q8",
+   "dimension": "entrepreneurship",
+   "type": "single_choice",
+   "text": {
+    "uz": "Biznes asoslarini qanchalik yaxshi tushunasiz?",
+    "ru": "Насколько хорошо вы понимаете основы бизнеса?",
+    "en": "How well do you understand the basics of business?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha deyarli hech narsa bilmayman",
+      "ru": "Пока почти ничего не знаю",
+      "en": "I know almost nothing yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Baʼzi asosiy tushunchalarni bilaman",
+      "ru": "Я знаю некоторые базовые понятия",
+      "en": "I know some basic concepts"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Asosiy tamoyillarni tushunaman",
+      "ru": "Я понимаю основные принципы",
+      "en": "I understand the main principles"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Oddiy biznes modelini oʻzim tuza olaman",
+      "ru": "Я могу сама составить простую бизнес-модель",
+      "en": "I can create a basic business model myself"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Biznes modeli, mijozlar va moliyani yaxshi tushunaman",
+      "ru": "Я хорошо понимаю бизнес-модели, клиентов и финансы",
+      "en": "I understand business models, customers and finances well"
+     }
+    }
+   ]
+  },
+  {
+   "code": "ent.q9",
+   "dimension": "entrepreneurship",
+   "type": "single_choice",
+   "text": {
+    "uz": "Hozir biznes gʻoyasini haqiqiy loyihaga aylantira olasizmi?",
+    "ru": "Можете ли вы сейчас превратить бизнес-идею в реальный проект?",
+    "en": "Can you currently turn a business idea into a real project?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha gʻoyam ham, resurslarim ham yoʻq",
+      "ru": "Пока нет ни идеи, ни ресурсов",
+      "en": "I don't have an idea or resources yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Gʻoyam bor, lekin qanday amalga oshirishni bilmayman",
+      "ru": "Идея есть, но я не знаю, как её реализовать",
+      "en": "I have an idea but don't know how to implement it"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Gʻoyam bor va kichik qadamdan boshlay olaman",
+      "ru": "Есть идея, и я могу начать с небольшого шага",
+      "en": "I have an idea and can start with a small step"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Resurslar/hamkorlar/boshlangʻich rejam bor",
+      "ru": "У меня есть ресурсы/партнёры/стартовый план",
+      "en": "I have resources/partners/a starting plan"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Loyihani allaqachon sinab koʻryapman yoki rivojlantiryapman",
+      "ru": "Я уже тестирую или развиваю проект",
+      "en": "I am already testing or developing a project"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fin.q10",
+   "dimension": "financial_literacy",
+   "type": "single_choice",
+   "text": {
+    "uz": "Shaxsiy byudjetingizni qanchalik yaxshi boshqarasiz?",
+    "ru": "Насколько хорошо вы управляете личным бюджетом?",
+    "en": "How well do you manage your personal budget?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Byudjetimni kuzatmayman",
+      "ru": "Я не отслеживаю свой бюджет",
+      "en": "I don't track my budget"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Baʼzan xarajatlarimni taxminan kuzataman",
+      "ru": "Иногда примерно отслеживаю расходы",
+      "en": "I sometimes roughly track my expenses"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Asosiy xarajatlarimni bilaman",
+      "ru": "Я знаю свои основные расходы",
+      "en": "I know my main expenses"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Daromad va xarajatlarni muntazam rejalashtiraman",
+      "ru": "Я регулярно планирую доходы и расходы",
+      "en": "I regularly plan income and expenses"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Byudjet tizimim va moliyaviy maqsadlarim bor",
+      "ru": "У меня есть система бюджета и финансовые цели",
+      "en": "I have a budgeting system and financial goals"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fin.q11",
+   "dimension": "financial_literacy",
+   "type": "single_choice",
+   "text": {
+    "uz": "Daromad olganingizdan keyin pulingiz bilan odatda nima boʻladi?",
+    "ru": "Что обычно происходит с деньгами после того, как вы получаете доход?",
+    "en": "What usually happens with your money after you receive income?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Odatda hammasini sarflayman",
+      "ru": "Обычно трачу всё",
+      "en": "I usually spend everything"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Faqat ortib qolsa, jamgʻaraman",
+      "ru": "Откладываю, только если что-то остаётся",
+      "en": "I save only if something is left"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Baʼzan jamgʻaraman",
+      "ru": "Иногда откладываю",
+      "en": "I sometimes save"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Daromadimning bir qismini muntazam jamgʻaraman",
+      "ru": "Я регулярно откладываю часть дохода",
+      "en": "I regularly save part of my income"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Jamgʻarmam bor va pulni maqsadlarga koʻra taqsimlayman",
+      "ru": "У меня есть сбережения, и я распределяю деньги по целям",
+      "en": "I have savings and allocate money according to goals"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fin.q12",
+   "dimension": "financial_literacy",
+   "type": "single_choice",
+   "text": {
+    "uz": "Moliyaviy qarorlarni qanchalik ishonch bilan qabul qilasiz?",
+    "ru": "Насколько уверенно вы принимаете финансовые решения?",
+    "en": "How confidently do you make financial decisions?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Odatda nimani tanlashni bilmayman",
+      "ru": "Обычно не знаю, что выбрать",
+      "en": "I usually don't know what to choose"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Koʻpincha boshqalarning maslahatiga tayanaman",
+      "ru": "Часто полагаюсь на советы других",
+      "en": "I often rely on other people's advice"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Oddiy moliyaviy qarorlarni hal qila olaman",
+      "ru": "Справляюсь с простыми финансовыми решениями",
+      "en": "I can handle simple financial decisions"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Variantlarni solishtiraman va mustaqil qaror qilaman",
+      "ru": "Сравниваю варианты и решаю самостоятельно",
+      "en": "I compare options and make decisions independently"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Xavflar, maqsadlar va uzoq muddatli oqibatlarni hisobga olaman",
+      "ru": "Учитываю риски, цели и долгосрочные последствия",
+      "en": "I consider risks, goals and long-term consequences"
+     }
+    }
+   ]
+  },
+  {
+   "code": "dig.q13",
+   "dimension": "digital_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Raqamli vositalardan qanchalik ishonch bilan foydalanasiz?",
+    "ru": "Насколько уверенно вы пользуетесь цифровыми инструментами?",
+    "en": "How confidently do you use digital tools?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Koʻpincha yordam kerak boʻladi",
+      "ru": "Мне часто нужна помощь",
+      "en": "I often need help"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Faqat oddiy ilovalardan foydalana olaman",
+      "ru": "Пользуюсь только базовыми приложениями",
+      "en": "I can use only basic applications"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Keng tarqalgan raqamli vositalardan ishonch bilan foydalanaman",
+      "ru": "Уверенно пользуюсь распространёнными цифровыми инструментами",
+      "en": "I confidently use common digital tools"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Yangi dastur va xizmatlarni tez oʻrganaman",
+      "ru": "Быстро осваиваю новые программы и сервисы",
+      "en": "I quickly learn new software and services"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Murakkab raqamli/AI vositalardan ishonch bilan foydalanaman",
+      "ru": "Уверенно пользуюсь продвинутыми цифровыми/AI-инструментами",
+      "en": "I confidently use advanced digital/AI tools"
+     }
+    }
+   ]
+  },
+  {
+   "code": "dig.q14",
+   "dimension": "digital_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Oʻqish yoki ish uchun sunʼiy intellektdan foydalanasizmi?",
+    "ru": "Используете ли вы ИИ для учёбы или работы?",
+    "en": "Do you use AI for study or work?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "AIdan foydalanmayman",
+      "ru": "Я не пользуюсь ИИ",
+      "en": "I don't use AI"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Bir necha marta sinab koʻrganman",
+      "ru": "Пробовала несколько раз",
+      "en": "I've tried it a few times"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Oddiy vazifalar uchun foydalanaman",
+      "ru": "Использую для простых задач",
+      "en": "I use it for simple tasks"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Oʻqish/ish uchun muntazam foydalanaman",
+      "ru": "Регулярно использую ИИ для учёбы/работы",
+      "en": "I regularly use AI for study/work"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Bir nechta AI vositasidan samarali foydalanaman",
+      "ru": "Эффективно использую несколько ИИ-инструментов",
+      "en": "I effectively use several AI tools"
+     }
+    }
+   ]
+  },
+  {
+   "code": "dig.q15",
+   "dimension": "digital_skills",
+   "type": "single_choice",
+   "text": {
+    "uz": "Raqamli xavfsizlikni qanchalik yaxshi tushunasiz?",
+    "ru": "Насколько хорошо вы понимаете цифровую безопасность?",
+    "en": "How well do you understand digital safety?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Asosiy qoidalarni bilmayman",
+      "ru": "Не знаю основных правил",
+      "en": "I don't know the basic rules"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Kuchli parollar muhimligini bilaman",
+      "ru": "Знаю, что важны надёжные пароли",
+      "en": "I know that strong passwords are important"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Asosiy xavfsizlik choralarini qoʻllayman",
+      "ru": "Использую базовые меры безопасности",
+      "en": "I use basic security measures"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Fishing, firibgarlik va maʼlumotlar sizib chiqishini tushunaman",
+      "ru": "Понимаю, что такое фишинг, мошенничество и утечки данных",
+      "en": "I understand phishing, scams and data leaks"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Akkauntlarim va raqamli maʼlumotlarimni ishonch bilan himoya qilaman",
+      "ru": "Уверенно защищаю свои аккаунты и цифровые данные",
+      "en": "I confidently protect my accounts and digital data"
+     }
+    }
+   ]
+  },
+  {
+   "code": "hea.q16",
+   "dimension": "healthy_lifestyle",
+   "type": "single_choice",
+   "text": {
+    "uz": "Uyqu va dam olish muvozanatini qanchalik yaxshi saqlaysiz?",
+    "ru": "Насколько хорошо вы поддерживаете баланс сна и отдыха?",
+    "en": "How well do you maintain a healthy balance of sleep and rest?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Kamdan-kam yetarlicha dam olaman",
+      "ru": "Редко достаточно отдыхаю",
+      "en": "I rarely get enough rest"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Koʻpincha yetarlicha dam olmayman",
+      "ru": "Часто не высыпаюсь и не отдыхаю",
+      "en": "I often don't get enough rest"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Umuman yaxshi, lekin baʼzan qiyin",
+      "ru": "В целом нормально, но иногда бывает сложно",
+      "en": "It's generally okay, but sometimes difficult"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Odatda yetarlicha dam olaman",
+      "ru": "Обычно мне хватает отдыха",
+      "en": "I usually have enough rest"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Barqaror tartibim va tiklanish uchun yetarli vaqtim bor",
+      "ru": "У меня стабильный режим и достаточно времени на восстановление",
+      "en": "I have a stable routine and enough time to recover"
+     }
+    }
+   ]
+  },
+  {
+   "code": "hea.q17",
+   "dimension": "healthy_lifestyle",
+   "type": "single_choice",
+   "text": {
+    "uz": "Stress va ortiqcha yuklamani odatda qanday yengasiz?",
+    "ru": "Как вы обычно справляетесь со стрессом и перегрузкой?",
+    "en": "How do you usually handle stress and overload?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Koʻpincha uddalay olmayotgandek his qilaman",
+      "ru": "Часто чувствую, что не справляюсь",
+      "en": "I often feel unable to cope"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Tiklanishim qiyin",
+      "ru": "Мне трудно восстанавливаться",
+      "en": "It is difficult for me to recover"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Baʼzan yaxshi uddalayman, baʼzan qiyin",
+      "ru": "Иногда справляюсь хорошо, иногда тяжело",
+      "en": "Sometimes I cope well, sometimes it is difficult"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Tiklanishning bir necha usulini bilaman",
+      "ru": "Знаю несколько способов восстановиться",
+      "en": "I know several ways to recover"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Ortiqcha yuklamani erta sezaman va yuklamamni moslashtiraman",
+      "ru": "Замечаю перегрузку заранее и корректирую нагрузку",
+      "en": "I notice overload early and adjust my workload"
+     }
+    }
+   ]
+  },
+  {
+   "code": "hea.q18",
+   "dimension": "healthy_lifestyle",
+   "type": "single_choice",
+   "text": {
+    "uz": "Ish/oʻqish va shaxsiy hayot muvozanatini qanchalik yaxshi saqlaysiz?",
+    "ru": "Насколько хорошо вы совмещаете работу/учёбу и личную жизнь?",
+    "en": "How well do you balance work/study and personal life?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Deyarli muvozanat yoʻq",
+      "ru": "Баланса почти нет",
+      "en": "I have almost no balance"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Koʻpincha dam olish va shaxsiy vaqtimni qurbon qilaman",
+      "ru": "Часто жертвую отдыхом и личным временем",
+      "en": "I often sacrifice rest and personal time"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Baʼzan muvozanatni saqlay olaman",
+      "ru": "Иногда удаётся сохранять баланс",
+      "en": "I sometimes manage to maintain balance"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Odatda vaqtimni yaxshi boshqaraman",
+      "ru": "Обычно хорошо управляю своим временем",
+      "en": "I usually manage my time well"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Barqaror muvozanat va sogʻlom chegaralarim bor",
+      "ru": "У меня устойчивый баланс и здоровые границы",
+      "en": "I have a stable balance and healthy boundaries"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fam.q19",
+   "dimension": "family_parenting",
+   "type": "routing",
+   "text": {
+    "uz": "Hozir siz uchun eng dolzarb mavzu qaysi?",
+    "ru": "Что для вас сейчас наиболее актуально?",
+    "en": "What is most relevant to you right now?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "label": {
+      "uz": "Oilaviy munosabatlar",
+      "ru": "Отношения в семье",
+      "en": "Family relationships"
+     }
+    },
+    {
+     "id": "b",
+     "label": {
+      "uz": "Sogʻlom munosabatlar qurish",
+      "ru": "Построение здоровых отношений",
+      "en": "Building healthy relationships"
+     }
+    },
+    {
+     "id": "c",
+     "label": {
+      "uz": "Oilaviy hayotga tayyorgarlik",
+      "ru": "Подготовка к семейной жизни",
+      "en": "Preparing for family life"
+     }
+    },
+    {
+     "id": "d",
+     "label": {
+      "uz": "Farzand tarbiyasi",
+      "ru": "Воспитание детей",
+      "en": "Parenting"
+     }
+    },
+    {
+     "id": "e",
+     "label": {
+      "uz": "Shaxsiy chegaralar va muloqot",
+      "ru": "Личные границы и общение",
+      "en": "Personal boundaries and communication"
+     }
+    },
+    {
+     "id": "f",
+     "label": {
+      "uz": "Bu mavzu hozir men uchun dolzarb emas",
+      "ru": "Эта тема сейчас для меня не актуальна",
+      "en": "This topic is not relevant to me right now"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fam.q20",
+   "dimension": "family_parenting",
+   "type": "single_choice",
+   "text": {
+    "uz": "Shaxsiy chegaralaringizni qanchalik ishonch bilan belgilaysiz va ifodalaysiz?",
+    "ru": "Насколько уверенно вы устанавливаете и обозначаете личные границы?",
+    "en": "How confidently do you set and communicate personal boundaries?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Bu men uchun juda qiyin",
+      "ru": "Мне это очень трудно",
+      "en": "It is very difficult for me"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Chegaralarimni tushunaman, lekin aytish qiyin",
+      "ru": "Я понимаю свои границы, но мне трудно о них сказать",
+      "en": "I understand my boundaries but struggle to communicate them"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Odatda ehtiyojlarimni ayta olaman",
+      "ru": "Обычно могу сказать о своих потребностях",
+      "en": "I can usually communicate my needs"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Chegaralarimni ishonch bilan ifodalayman",
+      "ru": "Уверенно обозначаю свои границы",
+      "en": "I confidently communicate my boundaries"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Chegaralarni ochiq muhokama qilaman va boshqalarnikini hurmat qilaman",
+      "ru": "Открыто обсуждаю границы и уважаю границы других",
+      "en": "I openly discuss boundaries and respect other people's boundaries"
+     }
+    }
+   ]
+  },
+  {
+   "code": "fam.q21",
+   "dimension": "family_parenting",
+   "type": "single_choice",
+   "text": {
+    "uz": "Oilaviy yoki munosabatlardagi masalalarni xotirjam muloqot orqali hal qilish siz uchun qanchalik qulay?",
+    "ru": "Насколько вам комфортно решать семейные вопросы или вопросы в отношениях спокойным разговором?",
+    "en": "How comfortable are you solving family or relationship issues through calm communication?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Ularni muhokama qilish men uchun juda qiyin",
+      "ru": "Мне очень трудно их обсуждать",
+      "en": "It is very difficult for me to discuss them"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Koʻpincha ogʻir suhbatlardan qochaman",
+      "ru": "Часто избегаю трудных разговоров",
+      "en": "I often avoid difficult conversations"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Oddiy masalalarni muhokama qila olaman",
+      "ru": "Могу обсуждать простые вопросы",
+      "en": "I can discuss simple issues"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Odatda xotirjam gaplashib, kelishuvga erishaman",
+      "ru": "Обычно спокойно договариваюсь",
+      "en": "I usually communicate and find agreements calmly"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Murakkab masalalarni ham konstruktiv muhokama qilib, yechim topaman",
+      "ru": "Могу конструктивно обсуждать сложные вопросы и находить решения",
+      "en": "I can constructively discuss difficult issues and find solutions"
+     }
+    }
+   ]
+  },
+  {
+   "code": "lea.q22",
+   "dimension": "leadership",
+   "type": "single_choice",
+   "text": {
+    "uz": "Boshqalar oldida fikringizni qanchalik ishonch bilan bildirasiz?",
+    "ru": "Насколько уверенно вы высказываете своё мнение перед другими?",
+    "en": "How confidently do you express your opinion in front of others?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Odatda gapirishdan qochaman",
+      "ru": "Обычно избегаю высказываться",
+      "en": "I usually avoid speaking up"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Faqat yaxshi taniydigan odamlar oldida gapiraman",
+      "ru": "Говорю только среди хорошо знакомых людей",
+      "en": "I speak only around people I know well"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Tanish guruhda fikrimni ayta olaman",
+      "ru": "Могу высказаться в знакомой группе",
+      "en": "I can express my opinion in a familiar group"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Muhokama va taqdimotlarda ishonch bilan qatnashaman",
+      "ru": "Уверенно участвую в обсуждениях и презентациях",
+      "en": "I confidently participate in discussions and presentations"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Taqdimot qila olaman, ishontira olaman va boshqalarni boshqara olaman",
+      "ru": "Могу выступать, убеждать и вести за собой других",
+      "en": "I can present, persuade and lead others"
+     }
+    }
+   ]
+  },
+  {
+   "code": "lea.q23",
+   "dimension": "leadership",
+   "type": "single_choice",
+   "text": {
+    "uz": "Yetakchilik yoki loyiha tajribangiz qanchalik koʻp?",
+    "ru": "Насколько у вас есть опыт лидерства или проектной работы?",
+    "en": "How much leadership or project experience do you have?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Hozircha yoʻq",
+      "ru": "Пока нет",
+      "en": "None yet"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Baʼzan jamoa aʼzosi sifatida qatnashaman",
+      "ru": "Иногда участвую как член команды",
+      "en": "I sometimes participate as a team member"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Loyihalar/tadbirlarda qatnashganman",
+      "ru": "Участвовала в проектах/мероприятиях",
+      "en": "I have participated in projects/events"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Loyihalar tashkil qilganman yoki kichik jamoaga rahbarlik qilganman",
+      "ru": "Организовывала проекты или руководила небольшой командой",
+      "en": "I have organized projects or led a small team"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Muntazam yetakchilik masʼuliyatini olaman va boshqalarni qoʻllab-quvvatlayman",
+      "ru": "Регулярно беру на себя лидерство и поддерживаю других",
+      "en": "I regularly take leadership responsibility and support others"
+     }
+    }
+   ]
+  },
+  {
+   "code": "lea.q24",
+   "dimension": "leadership",
+   "type": "single_choice",
+   "text": {
+    "uz": "Odatiy doirangizdan tashqaridagi imkoniyatlardan qanchalik tez-tez foydalanasiz?",
+    "ru": "Как часто вы пользуетесь возможностями за пределами привычного круга?",
+    "en": "How often do you use opportunities outside your usual circle?"
+   },
+   "options": [
+    {
+     "id": "a",
+     "score": 0,
+     "label": {
+      "uz": "Deyarli hech qachon",
+      "ru": "Почти никогда",
+      "en": "Almost never"
+     }
+    },
+    {
+     "id": "b",
+     "score": 1,
+     "label": {
+      "uz": "Baʼzan imkoniyatlarni koʻraman, lekin qatnashmayman",
+      "ru": "Иногда вижу возможности, но не участвую",
+      "en": "I sometimes see opportunities but don't participate"
+     }
+    },
+    {
+     "id": "c",
+     "score": 2,
+     "label": {
+      "uz": "Baʼzan ariza topshiraman yoki qatnashaman",
+      "ru": "Иногда подаю заявки или участвую",
+      "en": "I sometimes apply or participate"
+     }
+    },
+    {
+     "id": "d",
+     "score": 3,
+     "label": {
+      "uz": "Imkoniyatlarni muntazam qidiraman va foydalanaman",
+      "ru": "Регулярно ищу и использую возможности",
+      "en": "I regularly search for and use opportunities"
+     }
+    },
+    {
+     "id": "e",
+     "score": 4,
+     "label": {
+      "uz": "Faol xalqaro aloqalar quraman va dasturlarda qatnashaman",
+      "ru": "Активно выстраиваю международные связи и участвую в программах",
+      "en": "I actively build international connections and participate in programs"
+     }
+    }
+   ],
+   "hint": {
+    "uz": "Masalan: tanlovlar, grantlar, konferensiyalar, almashinuv dasturlari, networking, xalqaro dasturlar.",
+    "ru": "Например: конкурсы, гранты, конференции, обмены, нетворкинг, международные программы.",
+    "en": "For example: competitions, grants, conferences, exchanges, networking, international programs."
+   }
+  },
+  {
+   "code": "goals.q25",
+   "dimension": null,
+   "type": "goals",
+   "text": {
+    "uz": "Keyingi 6–12 oyda eng koʻp nimani oʻzgartirmoqchisiz?",
+    "ru": "Что вы больше всего хотели бы изменить в ближайшие 6–12 месяцев?",
+    "en": "What would you most like to change in the next 6–12 months?"
+   },
+   "options": [
+    {
+     "id": "learn_skills",
+     "label": {
+      "uz": "Yangi koʻnikmalar oʻrganish / yangi kasb egallash",
+      "ru": "Освоить новые навыки / получить новую профессию",
+      "en": "Learn new skills / get a new profession"
+     }
+    },
+    {
+     "id": "find_job",
+     "label": {
+      "uz": "Ish topish",
+      "ru": "Найти работу",
+      "en": "Find a job"
+     }
+    },
+    {
+     "id": "grow_career",
+     "label": {
+      "uz": "Kasbda oʻsish",
+      "ru": "Вырасти в карьере",
+      "en": "Grow in my career"
+     }
+    },
+    {
+     "id": "digital_ai",
+     "label": {
+      "uz": "Raqamli/AI koʻnikmalarini oʻrganish",
+      "ru": "Освоить цифровые/AI-навыки",
+      "en": "Learn digital/AI skills"
+     }
+    },
+    {
+     "id": "finances",
+     "label": {
+      "uz": "Moliyaviy ahvolimni yaxshilash",
+      "ru": "Улучшить финансовое положение",
+      "en": "Improve my financial situation"
+     }
+    },
+    {
+     "id": "business",
+     "label": {
+      "uz": "Biznes boshlash yoki rivojlantirish",
+      "ru": "Начать или развить бизнес",
+      "en": "Start or grow a business"
+     }
+    },
+    {
+     "id": "personal_skills",
+     "label": {
+      "uz": "Shaxsiy koʻnikmalarni rivojlantirish",
+      "ru": "Развить личные качества и навыки",
+      "en": "Develop personal skills"
+     }
+    },
+    {
+     "id": "wellbeing",
+     "label": {
+      "uz": "Farovonlik va muvozanatni yaxshilash",
+      "ru": "Улучшить самочувствие и баланс",
+      "en": "Improve wellbeing and balance"
+     }
+    },
+    {
+     "id": "family",
+     "label": {
+      "uz": "Oila/munosabatlar haqida koʻproq bilish",
+      "ru": "Больше узнать о семье и отношениях",
+      "en": "Learn more about family/relationships"
+     }
+    },
+    {
+     "id": "international",
+     "label": {
+      "uz": "Xalqaro tajriba orttirish",
+      "ru": "Получить международный опыт",
+      "en": "Gain international experience"
+     }
+    },
+    {
+     "id": "leadership",
+     "label": {
+      "uz": "Yetakchilik va muloqot koʻnikmalarini rivojlantirish",
+      "ru": "Развить лидерство и навыки общения",
+      "en": "Develop leadership and communication skills"
+     }
+    }
+   ],
+   "hint": {
+    "uz": "3 tagacha variant tanlang.",
+    "ru": "Выберите до 3 вариантов.",
+    "en": "Choose up to 3 options."
+   },
+   "max_choices": 3
+  }
+ ]
+}

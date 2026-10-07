@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
@@ -12,13 +11,11 @@ from app.api.deps import CurrentUserDep, DbSession
 from app.core.constants import ScoreDimension
 from app.models.assessment import (
     Assessment,
-    AssessmentAnswer,
     AssessmentQuestion,
     DevelopmentScore,
 )
 from app.schemas.assessment import (
     AssessmentRead,
-    AssessmentSubmit,
     DevelopmentScoreRead,
     LearningAnswers,
     LearningProfileRead,
@@ -29,10 +26,7 @@ from app.schemas.assessment import (
 from app.services import learning_profile, questionnaire
 from app.services.recommendation import dimension_insights
 from app.services.scoring import (
-    calculate_dimension_scores,
     composite_score,
-    is_baseline_assessment,
-    persist_scores,
     weakest_dimensions,
 )
 
@@ -53,64 +47,16 @@ async def list_questions(
     return list((await session.execute(stmt)).scalars())
 
 
-@router.post("/submit", response_model=DevelopmentScoreRead)
-async def submit_assessment(
-    payload: AssessmentSubmit, user: CurrentUserDep, session: DbSession
-) -> DevelopmentScoreRead:
-    """Score a completed diagnostic and store the result."""
-    user_id = uuid.UUID(user.id)
-    baseline = await is_baseline_assessment(session, user_id)
+@router.post("/submit", status_code=status.HTTP_410_GONE, deprecated=True)
+async def submit_assessment(user: CurrentUserDep) -> None:
+    """Retired: this endpoint took the score of each answer from the browser.
 
-    question_ids = [answer.question_id for answer in payload.answers]
-    known = set(
-        (
-            await session.execute(
-                select(AssessmentQuestion.id).where(AssessmentQuestion.id.in_(question_ids))
-            )
-        ).scalars()
-    )
-    unknown = set(question_ids) - known
-    if unknown:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unknown question ids: {sorted(str(i) for i in unknown)}",
-        )
-
-    now = datetime.now(UTC)
-    assessment = Assessment(user_id=user_id, started_at=now, completed_at=now, is_baseline=baseline)
-    session.add(assessment)
-    await session.flush()
-
-    for answer in payload.answers:
-        session.add(
-            AssessmentAnswer(
-                assessment_id=assessment.id,
-                question_id=answer.question_id,
-                value=answer.value,
-                raw_answer=answer.raw_answer,
-            )
-        )
-    await session.flush()
-
-    dimension_scores = await calculate_dimension_scores(session, assessment.id)
-    scores = await persist_scores(session, user_id, assessment.id, dimension_scores)
-    await session.flush()
-
-    return DevelopmentScoreRead(
-        composite=composite_score(dimension_scores),
-        dimensions=[
-            ScoreRead(
-                dimension=score.dimension,
-                baseline=score.baseline,
-                current=score.current,
-                target=score.target,
-                progress=score.progress,
-            )
-            for score in scores
-        ],
-        assessment_id=assessment.id,
-        measured_at=now,
-        weakest_dimensions=weakest_dimensions(dimension_scores),
+    The diagnostic is now `POST /diagnostic/attempt`, which receives only the
+    chosen options and scores them on the server.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Use POST /api/v1/diagnostic/attempt",
     )
 
 

@@ -30,17 +30,17 @@ def test_bands_follow_the_thresholds():
     assert band_for(0) is DimensionBand.FOCUS
 
 
-def test_focus_order_puts_the_lowest_first_and_breaks_ties_by_weight():
+def test_focus_order_puts_the_lowest_first_and_keeps_canonical_order_on_ties():
     scores = {
-        ScoreDimension.SOCIAL_ACTIVITY: 30.0,  # weight 0.08
-        ScoreDimension.EDUCATION_SKILLS: 30.0,  # weight 0.18
+        ScoreDimension.LEADERSHIP: 30.0,
+        ScoreDimension.EDUCATION_SKILLS: 30.0,
         ScoreDimension.EMPLOYMENT: 10.0,
         ScoreDimension.HEALTHY_LIFESTYLE: 80.0,
     }
     assert focus_order(scores) == [
         ScoreDimension.EMPLOYMENT,
         ScoreDimension.EDUCATION_SKILLS,
-        ScoreDimension.SOCIAL_ACTIVITY,
+        ScoreDimension.LEADERSHIP,
         ScoreDimension.HEALTHY_LIFESTYLE,
     ]
 

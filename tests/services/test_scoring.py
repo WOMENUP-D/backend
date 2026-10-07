@@ -9,19 +9,15 @@ def test_composite_of_uniform_scores_equals_that_score():
     assert composite_score(scores) == 60.0
 
 
-def test_composite_respects_dimension_weights():
-    # education_skills carries the largest weight (0.18), social_activity the
-    # smallest (0.08) — a high score on the heavier dimension must pull more.
-    heavy = composite_score(
-        {ScoreDimension.EDUCATION_SKILLS: 100.0, ScoreDimension.SOCIAL_ACTIVITY: 0.0}
+def test_composite_is_the_plain_mean_every_dimension_counting_the_same():
+    one = composite_score({ScoreDimension.EDUCATION_SKILLS: 100.0, ScoreDimension.LEADERSHIP: 0.0})
+    other = composite_score(
+        {ScoreDimension.EDUCATION_SKILLS: 0.0, ScoreDimension.LEADERSHIP: 100.0}
     )
-    light = composite_score(
-        {ScoreDimension.EDUCATION_SKILLS: 0.0, ScoreDimension.SOCIAL_ACTIVITY: 100.0}
-    )
-    assert heavy > light
+    assert one == other == 50.0
 
 
-def test_partial_assessment_renormalises_weights():
+def test_partial_assessment_averages_what_is_present():
     """A single answered dimension must not be diluted by unanswered ones."""
     assert composite_score({ScoreDimension.EMPLOYMENT: 80.0}) == 80.0
 

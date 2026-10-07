@@ -16,7 +16,6 @@ import uuid
 from dataclasses import dataclass
 
 from app.core.constants import (
-    SCORE_WEIGHTS,
     DimensionBand,
     OpportunityType,
     ProgramCategory,
@@ -39,10 +38,7 @@ WEAKNESS_ANSWER_UP_TO = 25.0
 #: of the score. Order matters: the first category with a suitable programme
 #: supplies the recommendation.
 DIMENSION_PROGRAM_CATEGORIES: dict[ScoreDimension, tuple[ProgramCategory, ...]] = {
-    ScoreDimension.EDUCATION_SKILLS: (
-        ProgramCategory.VOCATIONAL_SKILLS,
-        ProgramCategory.DIGITAL_SAFETY,
-    ),
+    ScoreDimension.EDUCATION_SKILLS: (ProgramCategory.VOCATIONAL_SKILLS,),
     ScoreDimension.EMPLOYMENT: (
         ProgramCategory.VOCATIONAL_SKILLS,
         ProgramCategory.LEGAL_LITERACY,
@@ -53,18 +49,19 @@ DIMENSION_PROGRAM_CATEGORIES: dict[ScoreDimension, tuple[ProgramCategory, ...]] 
         ProgramCategory.LEADERSHIP,
     ),
     ScoreDimension.FINANCIAL_LITERACY: (ProgramCategory.FINANCIAL_LITERACY,),
+    ScoreDimension.DIGITAL_SKILLS: (ProgramCategory.DIGITAL_SAFETY,),
     ScoreDimension.HEALTHY_LIFESTYLE: (ProgramCategory.HEALTH,),
     ScoreDimension.FAMILY_PARENTING: (
         ProgramCategory.PARENTING,
         ProgramCategory.ETHICS_CULTURE,
     ),
-    ScoreDimension.SOCIAL_ACTIVITY: (
-        ProgramCategory.VOLUNTEERING,
+    ScoreDimension.LEADERSHIP: (
         ProgramCategory.LEADERSHIP,
-        ProgramCategory.LEGAL_LITERACY,
+        ProgramCategory.INTERNATIONAL,
+        ProgramCategory.VOLUNTEERING,
         ProgramCategory.MENTORSHIP_NETWORKING,
+        ProgramCategory.LEGAL_LITERACY,
     ),
-    ScoreDimension.INTERNATIONAL_INTEGRATION: (ProgramCategory.INTERNATIONAL,),
 }
 
 #: Listing types that act on each dimension. Empty where no listing moves it —
@@ -80,10 +77,14 @@ DIMENSION_OPPORTUNITY_TYPES: dict[ScoreDimension, tuple[OpportunityType, ...]] =
         OpportunityType.CONSULTATION,
     ),
     ScoreDimension.FINANCIAL_LITERACY: (),
+    ScoreDimension.DIGITAL_SKILLS: (OpportunityType.TRAINING,),
     ScoreDimension.HEALTHY_LIFESTYLE: (),
     ScoreDimension.FAMILY_PARENTING: (),
-    ScoreDimension.SOCIAL_ACTIVITY: (OpportunityType.MENTORSHIP,),
-    ScoreDimension.INTERNATIONAL_INTEGRATION: (OpportunityType.INTERNATIONAL_PROGRAM,),
+    ScoreDimension.LEADERSHIP: (
+        OpportunityType.INTERNATIONAL_PROGRAM,
+        OpportunityType.MENTORSHIP,
+        OpportunityType.COMPETITION,
+    ),
 }
 
 _CANONICAL = list(ScoreDimension)
@@ -101,11 +102,11 @@ def band_for(value: float) -> DimensionBand:
 def focus_order(scores: dict[ScoreDimension, float]) -> list[ScoreDimension]:
     """Dimensions from where acting helps most to where it helps least.
 
-    Lowest score first. Between equal scores the dimension weighted more
-    heavily in the composite comes first, because the same gain moves her
-    overall score further there.
+    Lowest score first. Every dimension counts the same in the composite, so
+    equal scores keep the canonical order (EDU, CAR, ENT, FIN, DIG, HEA, FAM,
+    LEA) and the reading is repeatable.
     """
-    return sorted(scores, key=lambda d: (scores[d], -SCORE_WEIGHTS[d], _CANONICAL.index(d)))
+    return sorted(scores, key=lambda d: (scores[d], _CANONICAL.index(d)))
 
 
 @dataclass(slots=True, frozen=True)
