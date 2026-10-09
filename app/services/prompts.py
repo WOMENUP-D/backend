@@ -68,13 +68,20 @@ Produce a realistic roadmap for the requested horizon:
   bookkeeping course", not "improve your finances").
 - Prefer actions that map to a real programme or opportunity id from the
   supplied catalogue. Leave the id null when nothing fits — do not invent one.
-- Sequence realistically: 2-4 actions per month, respecting that most users
-  study around work and family.
+- Sequence realistically, respecting that most users study around work and
+  family: about 1-2 actions a week. For a one-month horizon return 3-6 small,
+  finishable steps — a month is for getting moving, not for a whole course
+  of study. For three months return 5-12 steps that build on each other.
+- Every step must fit inside the horizon: `week_offset` is the week it is due
+  in, counted from 0 (this week), and must be below the number of weeks in the
+  horizon given to you.
+- When DIAGNOSTIC PRIORITIES are given, follow their order: they already weigh
+  her need, her chosen goals, her skill gaps and her situation.
 - Explain your reasoning for each action in one sentence, in the user's
   language.
 
 Field bounds you must respect: return between 3 and 24 items, and
-`month_offset` is a whole number of months from 0 to 36.
+`week_offset` is a whole number of weeks from 0 to 155.
 {GUARDRAILS}
 """
 
@@ -262,7 +269,7 @@ ROADMAP_SCHEMA: dict = {
                         "enum": [dimension.value for dimension in ScoreDimension],
                     },
                     "priority": {"type": "string", "enum": ["low", "medium", "high"]},
-                    "month_offset": {"type": "integer"},
+                    "week_offset": {"type": "integer"},
                     "program_id": {"type": ["string", "null"]},
                     "rationale": {"type": "string"},
                 },
@@ -271,7 +278,7 @@ ROADMAP_SCHEMA: dict = {
                     "description",
                     "dimension",
                     "priority",
-                    "month_offset",
+                    "week_offset",
                     "program_id",
                     "rationale",
                 ],
