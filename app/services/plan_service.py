@@ -42,11 +42,57 @@ from app.services.scoring import weakest_dimensions
 logger = logging.getLogger(__name__)
 
 HORIZON_MONTHS: dict[GoalHorizon, int] = {
+    GoalHorizon.M1: 1,
     GoalHorizon.M3: 3,
     GoalHorizon.M6: 6,
     GoalHorizon.M12: 12,
     GoalHorizon.M36: 36,
 }
+
+#: How long each horizon runs, in days — the last day a step may fall due.
+HORIZON_DAYS: dict[GoalHorizon, int] = {h: 30 * months for h, months in HORIZON_MONTHS.items()}
+#: How many steps a horizon can hold. A month crammed with twelve steps is a
+#: month of failing at a plan; the model is asked for fewer and held to this.
+MAX_ITEMS: dict[GoalHorizon, int] = {
+    GoalHorizon.M1: 6,
+    GoalHorizon.M3: 12,
+    GoalHorizon.M6: 18,
+    GoalHorizon.M12: 24,
+    GoalHorizon.M36: 24,
+}
+
+
+def due_for(horizon: GoalHorizon, week_offset: object, today: date) -> date:
+    """The day a step falls due: the end of its week, never past the horizon."""
+    try:
+        week = max(0, int(week_offset or 0))
+    except (TypeError, ValueError):
+        week = 0
+    return today + timedelta(days=min(7 * (week + 1), HORIZON_DAYS[horizon]))
+
+
+def spread_due(horizon: GoalHorizon, index: int, count: int, today: date) -> date:
+    """Steps of the rule-based plan, spaced evenly across the horizon."""
+    days = HORIZON_DAYS[horizon]
+    return today + timedelta(days=max(7, round(days * (index + 1) / max(count, 1))))
+
+
+async def diagnostic_focus(
+    session: AsyncSession, user_id: uuid.UUID
+) -> tuple[list[ScoreDimension], list[str]]:
+    """Her top priorities and chosen goals from the latest check-in, if any.
+
+    The priorities already weigh need, goals, skill gaps and urgency, so a
+    plan that started from the three lowest scores instead would contradict
+    the result page she has just read.
+    """
+    from app.services import diagnostic
+
+    attempt = await diagnostic.latest_attempt(session, user_id)
+    if attempt is None:
+        return [], []
+    ranked = [p.dimension for p in diagnostic.stored_priorities(attempt) if p.eligible]
+    return ranked[: diagnostic.TOP_PRIORITIES], list(attempt.goals or [])
 
 
 # Static text for the rule-based plan. Localised because this path runs exactly
@@ -117,7 +163,8 @@ async def generate_plan(
     )
 
     score_map = {s.dimension: s.current for s in scores}
-    focus = focus_dimensions or weakest_dimensions(score_map, limit=3)
+    priorities, diagnostic_goals = await diagnostic_focus(session, user_id)
+    focus = focus_dimensions or priorities or weakest_dimensions(score_map, limit=3)
 
     # The courses the platform actually has, ranked for her. This used to be
     # the first sixty published rows in whatever order Postgres returned them —
@@ -134,7 +181,18 @@ async def generate_plan(
     # build on what the platform can actually evidence, and should know the
     # difference between a skill a course taught her and one someone verified.
     notes = await skill_service.notes_for(session, user_id, language=lang)
-    prompt = _build_prompt(profile, score_map, goals, focus, horizon, programs, lang, notes)
+    prompt = _build_prompt(
+        profile,
+        score_map,
+        goals,
+        focus,
+        horizon,
+        programs,
+        lang,
+        notes,
+        priorities=priorities,
+        diagnostic_goals=diagnostic_goals,
+    )
 
     try:
         response = await gateway.complete(
@@ -163,7 +221,11 @@ async def generate_plan(
         trace_id=response.trace_id,
         # Recorded so the reader can be told a plan was written in a language
         # she is no longer browsing in, and offered a regenerate.
-        rationale={"focus_dimensions": [d.value for d in focus], "language": lang},
+        rationale={
+            "focus_dimensions": [d.value for d in focus],
+            "language": lang,
+            "from_diagnostic": bool(priorities) and not focus_dimensions,
+        },
     )
     session.add(plan)
     await session.flush()
@@ -173,7 +235,7 @@ async def generate_plan(
 
     # Same reason as the navigator: the schema carries shape only, so the
     # roadmap length and the month offsets are bounded here.
-    for index, item in enumerate(list(payload.get("items") or [])[:24]):
+    for index, item in enumerate(list(payload.get("items") or [])[: MAX_ITEMS[horizon]]):
         raw_program_id = item.get("program_id")
         # Guard against a hallucinated id pointing at nothing.
         program_id = (
@@ -189,8 +251,7 @@ async def generate_plan(
                 description=item.get("description"),
                 dimension=ScoreDimension(item["dimension"]),
                 priority=Priority(item.get("priority", "medium")),
-                due_date=today
-                + timedelta(days=30 * min(36, max(0, int(item.get("month_offset", 0) or 0)))),
+                due_date=due_for(horizon, item.get("week_offset"), today),
                 program_id=program_id,
             )
         )
@@ -325,11 +386,16 @@ def _build_prompt(
     programs: list[Program],
     lang: str = "uz",
     skill_notes: list[skill_service.SkillNote] | None = None,
+    *,
+    priorities: list[ScoreDimension] | None = None,
+    diagnostic_goals: list[str] | None = None,
 ) -> str:
     """Assemble the user-turn payload. No direct identifiers are included."""
+    weeks = HORIZON_DAYS[horizon] // 7
     lines = [
         f"USER LANGUAGE: {lang}",
-        f"HORIZON: {HORIZON_MONTHS[horizon]} months",
+        f"HORIZON: {HORIZON_MONTHS[horizon]} months ({weeks} weeks; week_offset 0-{weeks - 1})",
+        f"STEPS: at most {MAX_ITEMS[horizon]}",
         "",
         "DEVELOPMENT SCORE:",
     ]
@@ -338,6 +404,12 @@ def _build_prompt(
     ]
 
     lines += ["", "FOCUS DIMENSIONS: " + ", ".join(d.value for d in focus)]
+    if priorities:
+        lines += [
+            "DIAGNOSTIC PRIORITIES (highest first): " + ", ".join(d.value for d in priorities)
+        ]
+    if diagnostic_goals:
+        lines += ["GOALS CHOSEN IN THE DIAGNOSTIC: " + ", ".join(diagnostic_goals)]
 
     lines += ["", "USER GOALS:"]
     lines += [f"- [{g.horizon.value}] {g.title}" for g in goals] or ["- (none stated)"]
@@ -422,7 +494,7 @@ async def _fallback_plan(
                 description=FALLBACK_NOTE.get(lang, FALLBACK_NOTE["uz"]),
                 dimension=dimension,
                 priority=Priority.HIGH if index == 0 else Priority.MEDIUM,
-                due_date=today + timedelta(days=30 * (index + 1)),
+                due_date=spread_due(horizon, index, len(picks), today),
                 program_id=match.id if match else None,
             )
         )

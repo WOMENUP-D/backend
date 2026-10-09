@@ -444,8 +444,10 @@ class ApplicationStatus(StrEnum):
 
 
 class GoalHorizon(StrEnum):
-    """Goal horizons offered in the personal cabinet: 3 / 6 / 12 / 36 months."""
+    """Goal horizons: 1 / 3 / 6 / 12 / 36 months. The plan screen offers the
+    first two — a month to get moving, a quarter to change something."""
 
+    M1 = "1m"
     M3 = "3m"
     M6 = "6m"
     M12 = "12m"
