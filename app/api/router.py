@@ -12,6 +12,7 @@ from app.api import (
     career_paths,
     diagnostic,
     events,
+    insights,
     integrations,
     learning_paths,
     mentors,
@@ -53,4 +54,5 @@ api_router.include_router(notifications.router)
 api_router.include_router(integrations.router)
 api_router.include_router(admin.router)
 api_router.include_router(results.router)
+api_router.include_router(insights.router)
 api_router.include_router(analytics.router)
