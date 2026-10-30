@@ -7,11 +7,11 @@ import io
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
 from app.api.deps import AdminDep, DbSession, StaffDep, coordinator_region
-from app.core.constants import Region, Role
+from app.core.constants import DataClassification, Region, Role, UserStatus
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
 from app.schemas.admin import (
@@ -21,8 +21,9 @@ from app.schemas.admin import (
     TrafficReport,
 )
 from app.schemas.common import Message
+from app.schemas.roster import Roster, RosterCard
 from app.schemas.user import UserRoleAssign
-from app.services import traffic
+from app.services import roster, traffic
 from app.services.analytics import dashboard_overview, kpi_snapshot
 from app.services.audit_service import record_audit
 
@@ -254,3 +255,111 @@ async def region_stats(user: StaffDep, session: DbSession) -> list[dict]:
         .order_by(func.count(User.id).desc())
     )
     return [{"region": region.value, "users": count} for region, count in rows]
+
+
+# --- The participant roster -------------------------------------------------
+#
+# Individual-level data, so: participants only; a name and a masked address
+# for administrators alone, a pseudonymous tag for everyone else; a
+# coordinator sees her region and nobody outside it; opening a card and
+# exporting the table are audited as access to personal data.
+
+
+async def _roster_scope(session, user) -> tuple[Region | None, bool]:
+    """(region the caller is limited to, whether she may see identifiers)."""
+    region = await coordinator_region(session, user)
+    if (
+        region is None
+        and user.has_role(Role.REGIONAL_COORDINATOR)
+        and not user.has_role(Role.ADMIN, Role.MODERATOR)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail={"reason": "no_region_scope"}
+        )
+    return region, user.has_role(Role.ADMIN)
+
+
+@router.get("/users/roster", response_model=Roster)
+async def users_roster(
+    user: StaffDep,
+    session: DbSession,
+    region: Region | None = None,
+    user_status: UserStatus | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None, max_length=80),
+    sort: str = Query(
+        default="last_active",
+        pattern="^(last_active|joined|score|views|active_days|courses|name)$",
+    ),
+    order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=25, ge=1, le=100),
+) -> Roster:
+    """Every participant: how much she uses the portal and where she stands."""
+    scoped, identifiers = await _roster_scope(session, user)
+    return await roster.roster(
+        session,
+        roster.Query(
+            region=scoped if scoped is not None else region,
+            status=user_status,
+            search=search,
+            sort=sort,
+            descending=order == "desc",
+            page=page,
+            size=size,
+            identifiers=identifiers,
+        ),
+    )
+
+
+@router.get("/users/roster/export")
+async def export_roster(
+    user: AdminDep,
+    session: DbSession,
+    region: Region | None = None,
+    user_status: UserStatus | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None, max_length=80),
+) -> Response:
+    """The roster as CSV, with identifiers. Administrators only, and audited."""
+    rows = await roster.all_rows(
+        session,
+        roster.Query(region=region, status=user_status, search=search, identifiers=True),
+    )
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for line in roster.export_rows(rows):
+        writer.writerow(line)
+    await record_audit(
+        session,
+        action="users.export",
+        entity_type="report",
+        actor_id=uuid.UUID(user.id),
+        actor_role=user.role.value,
+        classification=DataClassification.PERSONAL,
+        changes={"rows": len(rows), "region": region.value if region else None},
+    )
+    filename = f"womanup-users-{date.today():%Y%m%d}.csv"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/users/{user_id}/card", response_model=RosterCard)
+async def user_card(user_id: uuid.UUID, user: StaffDep, session: DbSession) -> RosterCard:
+    """One woman's card: her figures, her dimension scores, her courses and
+    her recent steps. Reading it is access to personal data and is audited."""
+    scoped, identifiers = await _roster_scope(session, user)
+    found = await roster.card(session, user_id, region=scoped, identifiers=identifiers)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    await record_audit(
+        session,
+        action="user.view",
+        entity_type="user",
+        entity_id=str(user_id),
+        actor_id=uuid.UUID(user.id),
+        actor_role=user.role.value,
+        classification=DataClassification.PERSONAL,
+    )
+    return found
