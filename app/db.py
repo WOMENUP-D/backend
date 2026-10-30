@@ -28,7 +28,7 @@ SessionLocal = async_sessionmaker(
 )
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_session() -> AsyncGenerator[AsyncSession]:
     """FastAPI dependency: one session per request, rolled back on error."""
     async with SessionLocal() as session:
         try:

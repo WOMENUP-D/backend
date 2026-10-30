@@ -529,7 +529,7 @@ def stored_priorities(attempt: Assessment) -> list[Priority]:
     for row in attempt.priorities or []:
         try:
             dimension = ScoreDimension(row["dimension"])
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             continue
         out.append(
             Priority(

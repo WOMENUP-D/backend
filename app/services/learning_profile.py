@@ -30,7 +30,7 @@ def derive(answers: dict[str, Any]) -> dict[str, Any]:
     experience = str(answers.get("experience") or "none")
     try:
         self_level = int(answers.get("self_level") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         self_level = 0
 
     def as_list(value: Any) -> list[str]:

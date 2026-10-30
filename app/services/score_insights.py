@@ -125,7 +125,7 @@ def answer_label(options: list, value: float) -> dict:
         try:
             if float(option["value"]) == value:
                 return dict(option.get("label_i18n") or {})
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             continue
     return {}
 
