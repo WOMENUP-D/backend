@@ -24,7 +24,7 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.common import Message
-from app.services import auth_service, firebase_auth, mailer, rate_limit
+from app.services import auth_service, firebase_auth, mailer, rate_limit, telemetry
 from app.services.audit_service import record_consent
 from app.services.auth_service import AuthError, EmailTaken, OtpThrottled, StaffOtpBlocked
 from app.services.firebase_auth import (
@@ -199,6 +199,14 @@ async def register(payload: RegisterRequest, request: Request, session: DbSessio
         user_agent=request.headers.get("user-agent"),
     )
 
+    await telemetry.record_event(
+        session,
+        actor=telemetry.actor_from_record(request, user),
+        **telemetry.business(
+            "registration_completed", key=user.id, properties={"provider": "password"}
+        ),
+    )
+
     tokens = auth_service.issue_tokens(user)
     await session.commit()
     return tokens
@@ -220,6 +228,12 @@ async def login(payload: PasswordLogin, request: Request, session: DbSession) ->
         _login_throttle.record_failure(ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
+    await telemetry.record_event(
+        session,
+        name="login_completed",
+        actor=telemetry.actor_from_record(request, user),
+        properties={"provider": "password"},
+    )
     tokens = auth_service.issue_tokens(user)
     await session.commit()
     return tokens
@@ -247,6 +261,12 @@ async def staff_login(payload: StaffLogin, request: Request, session: DbSession)
         _staff_throttle.record_failure(ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
+    await telemetry.record_event(
+        session,
+        name="login_completed",
+        actor=telemetry.actor_from_record(request, user),
+        properties={"provider": "staff"},
+    )
     tokens = auth_service.issue_tokens(user)
     await session.commit()
     return tokens
@@ -289,6 +309,19 @@ async def google_login(
         _google_throttle.record_failure(ip)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    actor = telemetry.actor_from_record(request, user)
+    if created:
+        await telemetry.record_event(
+            session,
+            actor=actor,
+            **telemetry.business(
+                "registration_completed", key=user.id, properties={"provider": "google"}
+            ),
+        )
+    else:
+        await telemetry.record_event(
+            session, name="login_completed", actor=actor, properties={"provider": "google"}
+        )
     tokens = auth_service.issue_tokens(user)
     await session.commit()
 

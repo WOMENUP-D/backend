@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DbSession, client_ip
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip
 from app.core.constants import SUBJECT_SCOPES, ConsentScope, DataClassification, Role
 from app.models.career import EducationEntry, WorkExperience
 from app.models.profile import Goal, Profile
@@ -33,7 +33,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from app.services import activity, score_progress, skills
+from app.services import activity, score_progress, skills, telemetry
 from app.services.audit_service import current_consents, record_audit, record_consent
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -247,9 +247,17 @@ async def list_experience(user: CurrentUserDep, session: DbSession) -> list[Work
     "/me/experience", response_model=WorkExperienceRead, status_code=status.HTTP_201_CREATED
 )
 async def create_experience(
-    payload: WorkExperienceIn, user: CurrentUserDep, session: DbSession
+    payload: WorkExperienceIn, user: CurrentUserDep, session: DbSession, actor: TrackerDep
 ) -> WorkExperience:
-    return await _create_entry(session, WorkExperience, payload, uuid.UUID(user.id))
+    entry = await _create_entry(session, WorkExperience, payload, uuid.UUID(user.id))
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business(
+            "cv_updated", key=entry.id, entity_type="work_experience", entity_id=entry.id
+        ),
+    )
+    return entry
 
 
 @router.put("/me/experience/{entry_id}", response_model=WorkExperienceRead)
@@ -275,9 +283,17 @@ async def list_education(user: CurrentUserDep, session: DbSession) -> list[Educa
 
 @router.post("/me/education", response_model=EducationRead, status_code=status.HTTP_201_CREATED)
 async def create_education(
-    payload: EducationIn, user: CurrentUserDep, session: DbSession
+    payload: EducationIn, user: CurrentUserDep, session: DbSession, actor: TrackerDep
 ) -> EducationEntry:
-    return await _create_entry(session, EducationEntry, payload, uuid.UUID(user.id))
+    entry = await _create_entry(session, EducationEntry, payload, uuid.UUID(user.id))
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business(
+            "cv_updated", key=entry.id, entity_type="education_entry", entity_id=entry.id
+        ),
+    )
+    return entry
 
 
 @router.put("/me/education/{entry_id}", response_model=EducationRead)
@@ -375,12 +391,15 @@ async def my_activity(
 
 
 @router.post("/me/onboarding/complete", response_model=UserRead)
-async def complete_onboarding(user: CurrentUserDep, session: DbSession) -> User:
+async def complete_onboarding(user: CurrentUserDep, session: DbSession, actor: TrackerDep) -> User:
     record = await session.get(User, uuid.UUID(user.id))
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if record.onboarding_completed_at is None:
         record.onboarding_completed_at = datetime.now(UTC)
+        await telemetry.record_event(
+            session, actor=actor, **telemetry.business("onboarding_completed", key=record.id)
+        )
     await session.flush()
     return record
 

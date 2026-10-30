@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DbSession
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.schemas.common import Message
 from app.schemas.plan import (
@@ -17,6 +17,7 @@ from app.schemas.plan import (
     PlanItemUpdate,
     PlanRead,
 )
+from app.services import telemetry
 from app.services.plan_service import accept_plan, generate_plan
 
 router = APIRouter(prefix="/plans", tags=["plans"])
@@ -24,16 +25,22 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 
 @router.post("/generate", response_model=PlanRead, status_code=status.HTTP_201_CREATED)
 async def generate(
-    payload: PlanGenerateRequest, user: CurrentUserDep, session: DbSession
+    payload: PlanGenerateRequest, user: CurrentUserDep, session: DbSession, actor: TrackerDep
 ) -> DevelopmentPlan:
     """Draft a roadmap. It stays inactive until the user accepts it."""
-    return await generate_plan(
+    plan = await generate_plan(
         session,
         user_id=uuid.UUID(user.id),
         horizon=payload.horizon,
         focus_dimensions=payload.focus_dimensions or None,
         language=payload.language,
     )
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business("plan_generated", key=plan.id, entity_type="plan", entity_id=plan.id),
+    )
+    return plan
 
 
 @router.get("/active", response_model=PlanRead)
@@ -65,6 +72,7 @@ async def accept(
     payload: PlanAccept,
     user: CurrentUserDep,
     session: DbSession,
+    actor: TrackerDep,
 ) -> DevelopmentPlan:
     """Confirm a plan — the step that turns an AI proposal into the user's plan."""
     plan = await accept_plan(
@@ -75,6 +83,11 @@ async def accept(
     )
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business("plan_accepted", key=plan.id, entity_type="plan", entity_id=plan.id),
+    )
     return plan
 
 

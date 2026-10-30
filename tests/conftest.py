@@ -33,6 +33,23 @@ TEST_DB_URL = os.getenv(
 
 
 @pytest.fixture(autouse=True)
+def no_error_telemetry(monkeypatch):
+    """A failed request in a test is not a production error.
+
+    The request middleware records every 5xx as an `api_error` event through
+    its own database session — the real one from `.env`, not the per-test
+    schema — so the deliberate 503s the auth tests provoke would land in a
+    developer's local analytics. Replaced here with a no-op.
+    """
+    import app.main as main
+
+    async def quiet(request, status_code):
+        return None
+
+    monkeypatch.setattr(main, "record_api_error", quiet)
+
+
+@pytest.fixture(autouse=True)
 def disable_llm(monkeypatch):
     """No test may call the model provider.
 

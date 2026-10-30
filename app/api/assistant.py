@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DbSession
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep
 from app.core.constants import ConsentScope, GoalHorizon, Region, ScoreDimension
 from app.core.security import decode_token
 from app.models.consent import ConsentLog
@@ -34,7 +34,7 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
-from app.services import ai_assistant, ai_coach
+from app.services import ai_assistant, ai_coach, telemetry
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
@@ -140,6 +140,7 @@ async def ask(
     request: Request,
     session: DbSession,
     user_id: OptionalUserDep,
+    actor: TrackerDep,
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """The one door. Portal documentation, career advice or health — routed."""
@@ -153,6 +154,9 @@ async def ask(
         question=payload.message,
         language=payload.language,
         route=payload.route,
+    )
+    await telemetry.record_event(
+        session, name="ai_assistant_used", actor=actor, properties={"section": "ask"}
     )
     await session.commit()
     return _reply(answer, guest_left)
@@ -184,7 +188,9 @@ async def coach_context(
 
 
 @router.post("/coach", response_model=CoachReply)
-async def coach_ask(payload: CoachAsk, user: CurrentUserDep, session: DbSession) -> CoachReply:
+async def coach_ask(
+    payload: CoachAsk, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+) -> CoachReply:
     """Ask the Coach. Signed in only — there is nothing to coach without a record.
 
     Every programme, path and listing the answer may name is enumerated before
@@ -198,6 +204,9 @@ async def coach_ask(payload: CoachAsk, user: CurrentUserDep, session: DbSession)
         language=payload.language,
         opportunity_id=payload.opportunity_id,
     )
+    await telemetry.record_event(
+        session, name="ai_assistant_used", actor=actor, properties={"section": "coach"}
+    )
     await session.commit()
     return reply
 
@@ -208,6 +217,7 @@ async def education(
     request: Request,
     session: DbSession,
     user_id: OptionalUserDep,
+    actor: TrackerDep,
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Choosing a profession, learning one, or picking up a craft."""
@@ -217,6 +227,9 @@ async def education(
 
     answer = await ai_assistant.ask_education(
         session, user_id=user_id, question=payload.message, language=payload.language
+    )
+    await telemetry.record_event(
+        session, name="ai_assistant_used", actor=actor, properties={"section": "education"}
     )
     await session.commit()
     return _reply(answer, guest_left)
@@ -251,6 +264,7 @@ async def health(
     request: Request,
     session: DbSession,
     user_id: OptionalUserDep,
+    actor: TrackerDep,
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Age-appropriate health information. Never a diagnosis."""
@@ -260,6 +274,9 @@ async def health(
 
     answer = await ai_assistant.ask_health(
         session, user_id=user_id, question=payload.message, language=payload.language
+    )
+    await telemetry.record_event(
+        session, name="ai_assistant_used", actor=actor, properties={"section": "health"}
     )
     await session.commit()
     return _reply(answer, guest_left)
@@ -332,7 +349,7 @@ async def assistant_profile(user: CurrentUserDep, session: DbSession) -> Assista
 
 @router.post("/onboarding", response_model=AssistantProfile)
 async def onboarding(
-    payload: OnboardingIn, user: CurrentUserDep, session: DbSession
+    payload: OnboardingIn, user: CurrentUserDep, session: DbSession, actor: TrackerDep
 ) -> AssistantProfile:
     """The five-field onboarding: name, date of birth, interests, goal, direction.
 
@@ -420,6 +437,9 @@ async def onboarding(
                 account.region = Region(payload.region)
         if account.onboarding_completed_at is None:
             account.onboarding_completed_at = datetime.now(UTC)
+            await telemetry.record_event(
+                session, actor=actor, **telemetry.business("onboarding_completed", key=user_id)
+            )
 
     await session.flush()
     await session.commit()
