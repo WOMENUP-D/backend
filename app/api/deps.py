@@ -148,3 +148,24 @@ def client_ip(request: Request) -> str | None:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else None
+
+
+# --- Analytics -------------------------------------------------------------
+#
+# What a request says about who is acting, for the events the server records
+# beside the records it writes. Imported here so an endpoint declares one
+# dependency and never reads a cookie or a header itself.
+
+from app.services.telemetry import Actor, actor_of  # noqa: E402
+
+
+async def track_actor(request: Request, user: OptionalUserDep) -> Actor:
+    return actor_of(request, user)
+
+
+TrackerDep = Annotated[Actor, Depends(track_actor)]
+
+# National analytics — traffic, funnels, errors — are for the roles that work
+# nationally. A regional coordinator reads her region's figures on the Results
+# dashboard, which scopes them; these screens have no region to scope to.
+NationalStaffDep = Annotated[CurrentUser, Depends(require_roles(Role.ADMIN, Role.MODERATOR))]

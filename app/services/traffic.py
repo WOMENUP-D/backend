@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -22,21 +23,66 @@ from app.models.analytics import PageView
 # Anything longer is a bug or an attack, not a route.
 MAX_PATH = 120
 
-# Routes we are willing to store. Anything else is recorded as "other", so a
-# stray or crafted path can never turn this table into a free-text log.
-KNOWN_PREFIXES: tuple[str, ...] = (
-    "/",
-    "/login",
-    "/welcome",
-    "/kabinet",
-    "/diagnostika",
-    "/reja",
-    "/dasturlar",
-    "/imkoniyatlar",
-    "/yordamchi",
-    "/navigator",
-    "/admin",
+# Routes we are willing to store. The portal's screens, as the browser names
+# them, with every dynamic segment folded to a placeholder: a course page is
+# "/dasturlar/:id" whichever course it was, so a stray or crafted path can
+# never turn this table into a free-text log — and so that one screen is one
+# line on the dashboard. Anything else is recorded as "other".
+#
+# Order matters only within a prefix: the longest pattern is tried first.
+ROUTE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern), name)
+    for pattern, name in (
+        (r"^/$", "/"),
+        (r"^/login$", "/login"),
+        (r"^/welcome$", "/welcome"),
+        (r"^/maxfiylik$", "/maxfiylik"),
+        (r"^/kabinet$", "/kabinet"),
+        (r"^/kabinet/diagnostika$", "/kabinet/diagnostika"),
+        (r"^/kabinet/diagnostika/natija$", "/kabinet/diagnostika/natija"),
+        (r"^/kabinet/portfolio$", "/kabinet/portfolio"),
+        (r"^/diagnostika$", "/diagnostika"),
+        (r"^/reja$", "/reja"),
+        (r"^/dasturlar$", "/dasturlar"),
+        (r"^/dasturlar/[^/]+$", "/dasturlar/:id"),
+        (r"^/imkoniyatlar$", "/imkoniyatlar"),
+        (r"^/imkoniyatlar/arizalarim$", "/imkoniyatlar/arizalarim"),
+        (r"^/imkoniyatlar/biznes$", "/imkoniyatlar/biznes"),
+        (r"^/imkoniyatlar/[^/]+$", "/imkoniyatlar/:id"),
+        (r"^/kasb$", "/kasb"),
+        (r"^/kasb/[^/]+$", "/kasb/:slug"),
+        (r"^/tadbirlar$", "/tadbirlar"),
+        (r"^/tadbirlar/[^/]+$", "/tadbirlar/:id"),
+        (r"^/tashkilot/[^/]+$", "/tashkilot/:slug"),
+        (r"^/portfolio/[^/]+$", "/portfolio/:slug"),
+        (r"^/yordamchi$", "/yordamchi"),
+        (r"^/navigator$", "/navigator"),
+        (r"^/hamkor$", "/hamkor"),
+        (r"^/talim$", "/talim"),
+        (r"^/talim/kurslar$", "/talim/kurslar"),
+        (r"^/talim/kurslar/[^/]+$", "/talim/kurslar/:slug"),
+        (r"^/talim/kurslar/[^/]+/[^/]+$", "/talim/kurslar/:slug/:lesson"),
+        (r"^/talim/yollar$", "/talim/yollar"),
+        (r"^/talim/yollar/[^/]+$", "/talim/yollar/:slug"),
+        (r"^/talim/amaliyot$", "/talim/amaliyot"),
+        (r"^/talim/amaliyot/[^/]+$", "/talim/amaliyot/:slug"),
+        (r"^/talim/kalendar$", "/talim/kalendar"),
+        (r"^/talim/kundalik$", "/talim/kundalik"),
+        (r"^/talim/maqsadlar$", "/talim/maqsadlar"),
+        (r"^/talim/profil$", "/talim/profil"),
+        (r"^/talim/yordamchi$", "/talim/yordamchi"),
+        (r"^/talim/yutuqlar$", "/talim/yutuqlar"),
+        (r"^/admin$", "/admin"),
+        (r"^/admin/login$", "/admin/login"),
+    )
 )
+
+#: The stored names, for anything that wants the vocabulary itself.
+KNOWN_PATHS: tuple[str, ...] = tuple(dict.fromkeys(name for _, name in ROUTE_PATTERNS))
+
+#: Screens that only staff open. Their views are part of running the portal,
+#: not of using it, and are excluded from traffic figures by default.
+STAFF_PATHS: frozenset[str] = frozenset({"/admin", "/admin/login", "/hamkor"})
 
 
 def hash_visitor(visitor_id: str) -> str:
@@ -54,13 +100,16 @@ def hash_visitor(visitor_id: str) -> str:
 
 
 def normalise_path(raw: str) -> str:
-    """Route only: no query string, no fragment, no unexpected paths."""
+    """Route only: no query string, no fragment, no ids, no unexpected paths."""
     path = (raw or "/").split("?")[0].split("#")[0][:MAX_PATH]
     if not path.startswith("/"):
         path = "/" + path
     if len(path) > 1:
         path = path.rstrip("/") or "/"
-    return path if path in KNOWN_PREFIXES else "other"
+    for pattern, name in ROUTE_PATTERNS:
+        if pattern.match(path):
+            return name
+    return "other"
 
 
 async def record_view(
@@ -70,18 +119,33 @@ async def record_view(
     path: str,
     user_id: uuid.UUID | None,
     locale: str | None,
-) -> None:
+    session_id: str | None = None,
+    is_entry: bool = False,
+    referrer_host: str | None = None,
+    device: str | None = None,
+    browser: str | None = None,
+    os: str | None = None,
+    is_staff: bool = False,
+    occurred_at: datetime | None = None,
+) -> PageView:
     """Write one view. Cheap enough to call on every navigation."""
-    session.add(
-        PageView(
-            visitor_hash=hash_visitor(visitor_id),
-            user_id=user_id,
-            path=normalise_path(path),
-            locale=(locale or "")[:10] or None,
-            is_authenticated=user_id is not None,
-            occurred_at=datetime.now(UTC),
-        )
+    view = PageView(
+        visitor_hash=hash_visitor(visitor_id),
+        user_id=user_id,
+        path=normalise_path(path),
+        locale=(locale or "")[:10] or None,
+        is_authenticated=user_id is not None,
+        session_id=session_id,
+        is_entry=is_entry,
+        referrer_host=referrer_host,
+        device=device,
+        browser=browser,
+        os=os,
+        is_staff=is_staff,
+        occurred_at=occurred_at or datetime.now(UTC),
     )
+    session.add(view)
+    return view
 
 
 # ------------------------------------------------------------------ reporting
@@ -119,11 +183,20 @@ def _since(days: int) -> datetime:
 
 
 async def _unique(session: AsyncSession, stmt: Select) -> int:
-    return await session.scalar(stmt) or 0
+    return await session.scalar(_public(stmt)) or 0
+
+
+def _public(stmt: Select) -> Select:
+    """Participants' traffic only: no staff browsing, no management screens."""
+    return stmt.where(PageView.is_staff.is_(False), PageView.path.not_in(STAFF_PATHS))
 
 
 async def report(session: AsyncSession, *, days: int = 30) -> TrafficReport:
-    """Everything the dashboard's traffic card needs, in one pass per metric."""
+    """Everything the dashboard's traffic card needs, in one pass per metric.
+
+    Superseded by `services.insights.traffic`, which the Analytics screen
+    reads; kept for older clients.
+    """
     start_of_today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
     visitors_today = await _unique(
@@ -164,7 +237,7 @@ async def report(session: AsyncSession, *, days: int = 30) -> TrafficReport:
     # A returning visitor is one seen on more than one day in the window: the
     # single number that separates "people came back" from "a campaign ran".
     per_visitor_days = (
-        select(func.count(func.distinct(func.date(PageView.occurred_at))).label("days"))
+        _public(select(func.count(func.distinct(func.date(PageView.occurred_at))).label("days")))
         .where(PageView.occurred_at >= _since(days))
         .group_by(PageView.visitor_hash)
         .subquery()
@@ -177,20 +250,24 @@ async def report(session: AsyncSession, *, days: int = 30) -> TrafficReport:
     )
 
     day_rows = await session.execute(
-        select(
-            func.date(PageView.occurred_at).label("day"),
-            func.count(func.distinct(PageView.visitor_hash)),
-            func.count(PageView.id),
+        _public(
+            select(
+                func.date(PageView.occurred_at).label("day"),
+                func.count(func.distinct(PageView.visitor_hash)),
+                func.count(PageView.id),
+            )
         )
         .where(PageView.occurred_at >= _since(days))
         .group_by("day")
         .order_by("day")
     )
     path_rows = await session.execute(
-        select(
-            PageView.path,
-            func.count(PageView.id),
-            func.count(func.distinct(PageView.visitor_hash)),
+        _public(
+            select(
+                PageView.path,
+                func.count(PageView.id),
+                func.count(func.distinct(PageView.visitor_hash)),
+            )
         )
         .where(PageView.occurred_at >= _since(days))
         .group_by(PageView.path)
