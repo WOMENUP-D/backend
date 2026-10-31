@@ -53,3 +53,30 @@ console can pass it in `WOMANUP_STAFF_PASSWORD` instead.
 someone who registered as a learner — `--update` then promotes that account and
 sets a new password rather than opening a second WomanUP ID. Every grant is
 written to the audit log.
+
+## Analytics
+
+Revision `0029` adds product analytics: a browser session, referrer host and
+device family on `page_views`, an `analytics_events` stream and a
+`visitor_presence` table. The release's migration step applies it like any
+other; nothing is backfilled, because nothing can be. Every figure that depends
+on the new columns or on events says on the dashboard since which day it has
+data, and is reported as "not recorded" — never as 0 — before that day.
+Registrations, completions, diagnostics and the like are counted from their own
+tables and reach back as far as the records do.
+
+What is stored: a hashed first-party visitor cookie, a random session id, the
+referrer's host, three words from the User-Agent (device, browser, OS family),
+a route with its ids folded out, an event name from a fixed list and a few
+short scalar properties. Not stored: IP addresses, user-agent strings, query
+strings, search text, answers, scores, messages. Staff accounts' own browsing
+is flagged and left out of every figure by default.
+
+The management panel is `/admin` (sign-in at `/admin/login`); its Analytics
+screens are for administrators and moderators. A tester keeps her own browsing
+out of the figures with `localStorage.setItem("womanup.analytics", "off")` in
+the browser console.
+
+No new environment variables. The in-process throttles on `/analytics/*` and
+the one-minute answer cache are per worker, like the sign-in throttles; move
+them to Redis when the API runs more than one worker.

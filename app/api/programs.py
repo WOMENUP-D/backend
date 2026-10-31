@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 
-from app.api.deps import ContentDep, CurrentUserDep, DbSession, OptionalUserDep
+from app.api.deps import ContentDep, CurrentUserDep, DbSession, OptionalUserDep, TrackerDep
 from app.core.constants import (
     EnrollmentStatus,
     Language,
@@ -29,7 +29,7 @@ from app.schemas.program import (
     ProgramUpdate,
     ProgressUpdate,
 )
-from app.services import learning, skills
+from app.services import learning, skills, telemetry
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -297,7 +297,9 @@ async def update_program(
     response_model=EnrollmentRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def enroll(program_id: uuid.UUID, user: CurrentUserDep, session: DbSession) -> Enrollment:
+async def enroll(
+    program_id: uuid.UUID, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+) -> Enrollment:
     """Put her on a course. Enrolling twice returns the enrollment she has.
 
     The catalogue stays open: a course that happens to sit inside a learning
@@ -307,7 +309,45 @@ async def enroll(program_id: uuid.UUID, user: CurrentUserDep, session: DbSession
     enrollment = await learning.enroll(session, user_id=uuid.UUID(user.id), program_id=program_id)
     if enrollment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    # Enrolling twice returns the same row, and the same row is the same key.
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business(
+            "program_enrolled", key=enrollment.id, entity_type="program", entity_id=program_id
+        ),
+    )
     return enrollment
+
+
+async def _after_progress(
+    session, actor, enrollment: Enrollment, *, unit: str, unit_id: uuid.UUID, completed: bool
+) -> None:
+    """The events a tick leaves behind: the unit, and the course if it is done."""
+    if not completed:
+        return
+    await telemetry.record_event(
+        session,
+        actor=actor,
+        **telemetry.business(
+            "lesson_completed",
+            key=f"{enrollment.id}:{unit_id}",
+            entity_type="program",
+            entity_id=enrollment.program_id,
+            properties={"unit": unit},
+        ),
+    )
+    if enrollment.status == EnrollmentStatus.COMPLETED and enrollment.completed_at is not None:
+        await telemetry.record_event(
+            session,
+            actor=actor,
+            **telemetry.business(
+                "program_completed",
+                key=enrollment.id,
+                entity_type="program",
+                entity_id=enrollment.program_id,
+            ),
+        )
 
 
 @router.post("/enrollments/{enrollment_id}/progress", response_model=EnrollmentRead)
@@ -316,6 +356,7 @@ async def update_progress(
     payload: ProgressUpdate,
     user: CurrentUserDep,
     session: DbSession,
+    actor: TrackerDep,
 ) -> Enrollment:
     """Mark a module done and recompute progress.
 
@@ -331,12 +372,21 @@ async def update_progress(
             detail="Module does not belong to this programme",
         )
 
-    return await learning.mark_module(
+    enrollment = await learning.mark_module(
         session,
         enrollment=enrollment,
         module_id=payload.module_id,
         completed=payload.completed,
     )
+    await _after_progress(
+        session,
+        actor,
+        enrollment,
+        unit="module",
+        unit_id=payload.module_id,
+        completed=payload.completed,
+    )
+    return enrollment
 
 
 @router.post("/enrollments/{enrollment_id}/lessons", response_model=EnrollmentRead)
@@ -345,6 +395,7 @@ async def complete_lesson(
     payload: LessonProgressUpdate,
     user: CurrentUserDep,
     session: DbSession,
+    actor: TrackerDep,
 ) -> Enrollment:
     """Mark a lesson done, and recompute what that means for the course.
 
@@ -361,12 +412,16 @@ async def complete_lesson(
             detail="Lesson does not belong to this programme",
         )
 
-    return await learning.mark_lesson(
+    enrollment = await learning.mark_lesson(
         session,
         enrollment=enrollment,
         lesson_id=lesson.id,
         completed=payload.completed,
     )
+    await _after_progress(
+        session, actor, enrollment, unit="lesson", unit_id=lesson.id, completed=payload.completed
+    )
+    return enrollment
 
 
 async def _own_enrollment(session, enrollment_id: uuid.UUID, user) -> Enrollment:

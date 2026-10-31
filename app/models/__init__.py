@@ -1,6 +1,6 @@
 """SQLAlchemy models. Importing this package registers every table on Base.metadata."""
 
-from app.models.analytics import PageView
+from app.models.analytics import AnalyticsEvent, PageView, VisitorPresence
 from app.models.assessment import (
     Assessment,
     AssessmentAnswer,
@@ -38,6 +38,7 @@ from app.models.user import OtpChallenge, User, UserRole
 
 __all__ = [
     "AiInteraction",
+    "AnalyticsEvent",
     "Application",
     "Assessment",
     "AssessmentAnswer",
@@ -88,5 +89,6 @@ __all__ = [
     "UserLearningPath",
     "UserRole",
     "UserSkill",
+    "VisitorPresence",
     "WorkExperience",
 ]

@@ -173,7 +173,7 @@ async def answer(
     # express numeric bounds, so clamp here rather than trust the value.
     try:
         confidence = min(1.0, max(0.0, float(payload.get("confidence", 0.0))))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         confidence = 0.0
     needs_human = bool(payload.get("needs_human")) or response.refused
     text = payload.get("answer") or UNCERTAIN_TEXT[lang]

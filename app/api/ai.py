@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import ContentDep, CurrentUserDep, DbSession, StaffDep
+from app.api.deps import ContentDep, CurrentUserDep, DbSession, StaffDep, TrackerDep
 from app.models.assessment import DevelopmentScore
 from app.models.audit import RiskFlag
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
@@ -24,7 +24,7 @@ from app.schemas.ai import (
 from app.schemas.common import Message
 from app.schemas.recommendation import RecommendationsRead
 from app.schemas.week import WeekRead
-from app.services import rag
+from app.services import rag, telemetry
 from app.services.ai_navigator import answer as navigator_answer
 from app.services.recommendation import recommendations_for
 from app.services.week import week_for
@@ -34,20 +34,24 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 @router.post("/navigator", response_model=NavigatorAnswer)
 async def ask_navigator(
-    payload: NavigatorQuery, user: CurrentUserDep, session: DbSession
+    payload: NavigatorQuery, user: CurrentUserDep, session: DbSession, actor: TrackerDep
 ) -> NavigatorAnswer:
     """Ask the WomanUP Navigator.
 
     Answers come only from approved sources. High-risk topics are routed to a
     human without reaching the model.
     """
-    return await navigator_answer(
+    answer = await navigator_answer(
         session,
         question=payload.message,
         user_id=uuid.UUID(user.id),
         language=payload.language or user.language.value,
         conversation_id=payload.conversation_id,
     )
+    await telemetry.record_event(
+        session, name="ai_assistant_used", actor=actor, properties={"section": "navigator"}
+    )
+    return answer
 
 
 @router.get("/next-step", response_model=NextStepCard)

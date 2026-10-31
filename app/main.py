@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator
@@ -17,10 +18,48 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, request_id_ctx, user_id_ctx
-from app.db import engine
+from app.db import SessionLocal, engine
 from app.schemas.common import ErrorResponse
+from app.services import telemetry
 
 logger = logging.getLogger(__name__)
+
+# Fire-and-forget recorders for failed requests. Held here so the event loop
+# does not collect them before they finish; removed as they complete.
+_background: set[asyncio.Task] = set()
+
+
+async def record_api_error(request: Request, status_code: int) -> None:
+    """One `api_error` row for a request the API could not serve.
+
+    The route template, never the path with ids in it; the status and the
+    method; the visitor cookie so affected people can be counted. Its own
+    session, because the request's is gone, and every failure swallowed: the
+    error is already on its way to the client and the log.
+    """
+    route = request.scope.get("route")
+    template = getattr(route, "path", None) or "unmatched"
+    try:
+        async with SessionLocal() as session:
+            await telemetry.record_event(
+                session,
+                name="api_error",
+                actor=telemetry.actor_of(request, None),
+                properties={
+                    "route": template[:120],
+                    "status": status_code,
+                    "method": request.method,
+                },
+            )
+            await session.commit()
+    except Exception:  # noqa: BLE001 — never a second failure on top of the first
+        logger.debug("could not record api_error for %s", template, exc_info=True)
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _background.add(task)
+    task.add_done_callback(_background.discard)
 
 
 @asynccontextmanager
@@ -63,6 +102,8 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
+            if response.status_code >= 500:
+                _spawn(record_api_error(request, response.status_code))
             return response
         finally:
             request_id_ctx.reset(token)

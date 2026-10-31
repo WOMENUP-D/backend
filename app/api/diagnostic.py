@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import CurrentUserDep, DbSession
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep
 from app.models.assessment import Assessment, DevelopmentScore
 from app.schemas.diagnostic import (
     DiagnosticAttemptIn,
@@ -24,7 +24,7 @@ from app.schemas.diagnostic import (
     DimensionResult,
     PriorityRead,
 )
-from app.services import diagnostic
+from app.services import diagnostic, telemetry
 
 router = APIRouter(prefix="/diagnostic", tags=["diagnostic"])
 
@@ -58,7 +58,11 @@ async def questions(user: CurrentUserDep, session: DbSession) -> DiagnosticQuest
 
 @router.post("/attempt", response_model=DiagnosticResult, status_code=status.HTTP_201_CREATED)
 async def submit_attempt(
-    payload: DiagnosticAttemptIn, user: CurrentUserDep, session: DbSession, response: Response
+    payload: DiagnosticAttemptIn,
+    user: CurrentUserDep,
+    session: DbSession,
+    response: Response,
+    actor: TrackerDep,
 ) -> DiagnosticResult:
     """Score a completed run on the server and store it as a new attempt.
 
@@ -79,6 +83,18 @@ async def submit_attempt(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": error.code, "message": error.detail, "items": error.items},
         ) from None
+    if created:
+        await telemetry.record_event(
+            session,
+            actor=actor,
+            **telemetry.business(
+                "development_test_completed",
+                key=attempt.id,
+                entity_type="assessment",
+                entity_id=attempt.id,
+                properties={"version": attempt.version},
+            ),
+        )
     try:
         await session.commit()
     except IntegrityError:
