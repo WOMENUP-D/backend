@@ -19,7 +19,7 @@ Foydalanuvchi yo'li — bitta uzluksiz sikl:
 
 ```
 WomanUP ID → Diagnostika → Development Score → AI reja → Dasturlar
-     → Imkoniyatlar (Edu-Job / Invest HUB / Tijorat markazi) → Natija → KPI
+     → Imkoniyatlar (hh.uz vakansiyalari / Wbip.uz / Tijoratmarkazi.uz) → Natija → KPI
 ```
 
 | Blok | Holati |
@@ -88,7 +88,7 @@ u holda diagnostikadan boshlab butun yo'lni o'tasiz.
 |---|---|
 | SMS yuborilmaydi, kod ekranda | Provayder shartnomasi yo'q |
 | AI matn generatsiya qilmaydi | `ANTHROPIC_API_KEY` sozlanmagan. Navigator tasdiqlangan manbadan **to'g'ridan-to'g'ri parcha** keltiradi, hech narsa o'ylab topilmaydi. Reja qoidalar asosida tuziladi |
-| Hamkor platformalar mock | Edu-Job, Invest HUB va Tijorat markazining sandbox URL/kalitlari yo'q. Arizalar outbox'ga yoziladi va yetkazishga urinadi |
+| Hamkor platformalar mock | Wbip.uz va Tijoratmarkazi.uz bilan API kontrakti yo'q — hozircha saytlariga havola. Vakansiyalar bo'limi (`/vakansiyalar`, API `/api/v1/vacancies`) hh.uz API'sidan jonli o'qiydi — `VACANCY_PROVIDER=headhunter` + `HH_CLIENT_ID`/`HH_CLIENT_SECRET` yoki `HH_ACCESS_TOKEN` (dev.hh.ru); keyinchalik Tijorat Markazi "Mehnat bozori" provayderi shu interfeysga ulanadi. Ariza manba saytida beriladi, WomanUP u yerga hech narsa yubormaydi |
 | Statistika shartli | 128 foydalanuvchi generatsiya qilingan, real ma'lumot emas |
 
 `ANTHROPIC_API_KEY` ni `.env` ga qo'shsangiz, AI reja va navigator to'liq
@@ -207,7 +207,7 @@ Modellar PostgreSQL'ga xos tiplardan (JSONB, ARRAY, INET, pgvector) foydalanadi.
 1. **SMS/email provayderi** — `notification_service.LoggingAdapter` o'rniga real adapter (pilotgacha majburiy).
 2. **Embedding provayderi** — `llm_gateway.embed()` hozir `NotImplementedError`; data-residency yuridik tekshiruvidan keyin ulanadi.
 3. **Bilim bazasi** — navigator javob berishi uchun tasdiqlangan kontent yuklanishi kerak (`POST /ai/knowledge` → `POST /ai/knowledge/{id}/approve`).
-4. **Hamkor API kontraktlari** — Edu-Job, Invest HUB, Tijorat markazi bilan sandbox URL va OAuth2 client credentials.
+4. **Hamkor API kontraktlari** — Wbip.uz va Tijoratmarkazi.uz bilan sandbox URL va OAuth2 client credentials; hh.uz uchun dev.hh.ru ilovasi ro'yxatdan o'tkaziladi.
 5. **Diagnostika savollari** — `assessment_questions` jadvali bo'sh; metodologiya bilan to'ldirilishi kerak.
 6. **Frontend** — 23 ta MVP ekrani, design system.
 7. **Xavfsizlik qattiqlashtirish** — JWT revocation denylist (Redis), rate limiting, pentest.
