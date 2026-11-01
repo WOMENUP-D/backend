@@ -16,6 +16,9 @@ from app.services.uzbek import has_old_digraphs, to_new_alphabet, to_old_alphabe
         ("Oʻzbekiston Respublikasi", "Özbekiston Respublikasi"),
         ("maʼlumot va taʼlim", "maʼlumot va taʼlim"),  # the glottal stop stays
         ("O‘rganish", "Örganiş"),  # a typographic quote standing in for ʻ
+        ("to'g'ridan-to'g'ri", "töğridan-töğri"),  # the plain apostrophe, as typed
+        ("To’g’ri yo’l", "Töğri yöl"),  # the right quote, as word processors make it
+        ("ta'lim va ma'no", "ta'lim va ma'no"),  # not after o or g: the glottal stop stays
         ("YaTT yoki MChJ", "YaTT yoki MÇJ"),  # an abbreviation the heuristic would protect
         ("Öz işingiz", "Öz işingiz"),  # already reformed: untouched
         ("", ""),
