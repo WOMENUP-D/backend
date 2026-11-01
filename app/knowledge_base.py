@@ -15,7 +15,7 @@ product as it is — the assistant repeats what is written.
 from __future__ import annotations
 
 KNOWLEDGE_TRANSLATIONS: dict[str, dict[str, tuple[str, str]]] = {
-    "WomanUP portali nima va u qanday ishlaydi": {
+    "WomanUP portali nima va u qanday işlaydi": {
         "ru": (
             "Что такое портал WomanUP и как он работает",
             """
@@ -87,7 +87,7 @@ means there is more room to grow in it.
 """,
         ),
     },
-    "Shaxsiy maʼlumotlaringiz qanday himoyalanadi": {
+    "Şaxsiy maʼlumotlaringiz qanday himoyalanadi": {
         "ru": (
             "Как защищены ваши персональные данные",
             """
@@ -147,7 +147,7 @@ Courses without one still count towards your development plan.
 """,
         ),
     },
-    "Ishga joylashish uchun nima qilishim kerak": {
+    "Işga joylaşiş uçun nima qilişim kerak": {
         "ru": (
             "Что нужно сделать, чтобы найти работу",
             """
@@ -183,7 +183,7 @@ or rejected.
 """,
         ),
     },
-    "Biznes ochish uchun qanday yordam bor": {
+    "Biznes oçiş uçun qanday yordam bor": {
         "ru": (
             "Какая поддержка есть для открытия бизнеса",
             """
@@ -219,7 +219,7 @@ share data.
 """,
         ),
     },
-    "Dasturga qanday yozilish va sertifikat olish mumkin": {
+    "Dasturga qanday yoziliş va sertifikat oliş mumkin": {
         "ru": (
             "Как записаться на программу и получить сертификат",
             """
@@ -249,7 +249,7 @@ separately. Programmes without one still count towards your plan.
 """,
         ),
     },
-    "Individual rivojlanish rejasi qanday tuziladi": {
+    "Individual rivojlaniş rejasi qanday tuziladi": {
         "ru": (
             "Как составляется индивидуальный план развития",
             """
@@ -281,7 +281,7 @@ your goal changes. The old plan is kept in your history.
 """,
         ),
     },
-    "Mening maʼlumotlarim kimga va qachon uzatiladi": {
+    "Mening maʼlumotlarim kimga va qaçon uzatiladi": {
         "ru": (
             "Кому и когда передаются мои данные",
             """
@@ -312,7 +312,7 @@ After withdrawal, no further transfers are made.
 """,
         ),
     },
-    "Imkoniyatga ariza berish tartibi": {
+    "Imkoniyatga ariza beriş tartibi": {
         "ru": (
             "Как подать заявку на возможность",
             """
@@ -343,7 +343,7 @@ rejected. When the partner responds, you receive a notification.
 """,
         ),
     },
-    "Mentor bilan qanday ishlash kerak": {
+    "Mentor bilan qanday işlaş kerak": {
         "ru": (
             "Как работать с ментором",
             """
@@ -371,7 +371,7 @@ mentor — that is normal.
 """,
         ),
     },
-    "Mehnat huquqlari: dekret, taʼtil va shartnoma": {
+    "Mehnat huquqlari: dekret, taʼtil va şartnoma": {
         "ru": (
             "Трудовые права: декрет, отпуск и договор",
             """
@@ -434,7 +434,7 @@ where you can. Do not open suspicious links.
 """,
         ),
     },
-    "Diagnostikadan qayta oʻtish va natijani yaxshilash": {
+    "Diagnostikadan qayta ötiş va natijani yaxşilaş": {
         "ru": (
             "Повторная диагностика и улучшение результата",
             """
@@ -465,7 +465,7 @@ for opportunities. Every completed step shows up in the dimension it belongs to.
 """,
         ),
     },
-    "AI yordamchi qanday ishlaydi va nimani bilmaydi": {
+    "AI yordamçi qanday işlaydi va nimani bilmaydi": {
         "ru": (
             "Как работает AI-помощник и чего он не знает",
             """
@@ -509,253 +509,253 @@ answer shows the source it rests on.
 
 KNOWLEDGE = [
     (
-        "WomanUP portali nima va u qanday ishlaydi",
+        "WomanUP portali nima va u qanday işlaydi",
         "faq",
         """
-WomanUP — ayol-qizlar uchun milliy raqamli rivojlanish platformasi. Portal sizni
-roʻyxatdan oʻtkazadi, ehtiyojlaringizni aniqlaydi, individual rivojlanish rejasini
+WomanUP — ayol-qizlar uçun milliy raqamli rivojlaniş platformasi. Portal sizni
+röyxatdan ötkazadi, ehtiyojlaringizni aniqlaydi, individual rivojlaniş rejasini
 tuzadi va sizni real imkoniyatlarga ulaydi.
 
-Portaldagi yoʻl beshta bosqichdan iborat. Birinchidan, siz elektron pochta va parol bilan
-(yoki Google hisobingiz orqali) roʻyxatdan oʻtasiz va WomanUP ID olasiz. Ikkinchidan, 10-15 daqiqalik diagnostikadan
-oʻtasiz. Uchinchidan, tizim sizga Development Score va individual reja taklif qiladi.
-Toʻrtinchidan, siz dasturlarga yozilasiz va oʻqishni boshlaysiz. Beshinchidan, mos
+Portaldagi yöl beşta bosqiçdan iborat. Birinçidan, siz elektron poçta va parol bilan
+(yoki Google hisobingiz orqali) röyxatdan ötasiz va WomanUP ID olasiz. Ikkinçidan, 10-15 daqiqalik diagnostikadan
+ötasiz. Uçinçidan, tizim sizga Development Score va individual reja taklif qiladi.
+Törtinçidan, siz dasturlarga yozilasiz va öqişni boşlaysiz. Beşinçidan, mos
 imkoniyatlar - vakansiya, grant yoki savdo - sizga tavsiya qilinadi.
 
-Portaldan foydalanish bepul. Asosiy xizmatlar barcha foydalanuvchilar uchun ochiq.
+Portaldan foydalaniş bepul. Asosiy xizmatlar barça foydalanuvçilar uçun oçiq.
 """,
     ),
     (
         "Development Score qanday hisoblanadi",
         "guideline",
         """
-WomanUP Development Score - bu 0 dan 100 gacha boʻlgan kompozit koʻrsatkich. U
-sakkizta oʻlchov boʻyicha hisoblanadi: taʼlim va koʻnikmalar, karyera va bandlik,
-tadbirkorlik, moliyaviy savodxonlik, raqamli koʻnikmalar, salomatlik va muvozanat,
-oila va munosabatlar, yetakchilik va global imkoniyatlar. Diagnostika 25 savoldan
+WomanUP Development Score - bu 0 dan 100 gaça bölgan kompozit körsatkiç. U
+sakkizta ölçov böyiça hisoblanadi: taʼlim va könikmalar, karyera va bandlik,
+tadbirkorlik, moliyaviy savodxonlik, raqamli könikmalar, salomatlik va muvozanat,
+oila va munosabatlar, yetakçilik va global imkoniyatlar. Diagnostika 25 savoldan
 iborat va 10-15 daqiqa oladi.
 
-Har bir oʻlchov uchun uchta qiymat saqlanadi: baseline - birinchi diagnostikadagi
+Har bir ölçov uçun uçta qiymat saqlanadi: baseline - birinçi diagnostikadagi
 natijangiz, current - hozirgi natijangiz, target - maqsadli qiymat. Progress
-mutlaq idealga emas, aynan sizning boshlangʻich nuqtangizga nisbatan oʻlchanadi.
+mutlaq idealga emas, aynan sizning boşlanğiç nuqtangizga nisbatan ölçanadi.
 
-Ball past boʻlishi muammo emas. U shunchaki qayerdan boshlashni koʻrsatadi.
-Diagnostikani istalgan vaqtda qayta topshirishingiz mumkin.
+Ball past bölişi muammo emas. U şunçaki qayerdan boşlaşni körsatadi.
+Diagnostikani istalgan vaqtda qayta topşirişingiz mumkin.
 """,
     ),
     (
-        "Shaxsiy maʼlumotlaringiz qanday himoyalanadi",
+        "Şaxsiy maʼlumotlaringiz qanday himoyalanadi",
         "legal",
         """
-WomanUP shaxsiy maʼlumotlarni minimal hajmda yigʻadi va faqat sizning roziligingiz
-asosida ishlatadi.
+WomanUP şaxsiy maʼlumotlarni minimal hajmda yiğadi va faqat sizning roziligingiz
+asosida işlatadi.
 
 Hamkor platformalarga - Edu-Job, Invest HUB va Tijorat markaziga - maʼlumot
-yuborilishidan oldin sizdan alohida rozilik soʻraladi. Rozilik bermasangiz, hech
-qanday maʼlumot yuborilmaydi. Roziligingizni istalgan vaqtda qaytarib olishingiz
+yuborilişidan oldin sizdan alohida rozilik söraladi. Rozilik bermasangiz, heç
+qanday maʼlumot yuborilmaydi. Roziligingizni istalgan vaqtda qaytarib olişingiz
 mumkin.
 
-Hamkorlarga telefon raqamingiz, elektron pochtangiz, familiya-ismingiz, oilaviy
+Hamkorlarga telefon raqamingiz, elektron poçtangiz, familiya-ismingiz, oilaviy
 holatingiz va farzandlaringiz soni yuborilmaydi. Faqat psevdonim identifikator va
-kasbiy maʼlumotlar - taʼlim, kasb, koʻnikmalar - almashiladi.
+kasbiy maʼlumotlar - taʼlim, kasb, könikmalar - almaşiladi.
 
-Har bir maʼlumot almashish hodisasi audit jurnaliga yoziladi. Hisobingizni
-oʻchirishingiz mumkin: identifikatorlar tozalanadi, faoliyat tarixi anonim qoladi.
+Har bir maʼlumot almaşiş hodisasi audit jurnaliga yoziladi. Hisobingizni
+öçirişingiz mumkin: identifikatorlar tozalanadi, faoliyat tarixi anonim qoladi.
 """,
     ),
     (
         "Kursga qanday yozilaman va sertifikat olamanmi",
         "faq",
         """
-Dasturlar katalogidan kursni tanlang va "Yozilish" tugmasini bosing. Kurs shaxsiy
-kabinetingizdagi "Mening kurslarim" boʻlimida paydo boʻladi.
+Dasturlar katalogidan kursni tanlang va "Yoziliş" tugmasini bosing. Kurs şaxsiy
+kabinetingizdagi "Mening kurslarim" bölimida paydo böladi.
 
 Har bir kurs modullardan iborat. Modulni tugatganingizda progress avtomatik
-yangilanadi. Barcha modullar tugaganda kurs "yakunlangan" holatiga oʻtadi.
+yangilanadi. Barça modullar tugaganda kurs "yakunlangan" holatiga ötadi.
 
-Agar kursda sertifikat koʻzda tutilgan boʻlsa, u yakunlanganda avtomatik beriladi.
-Har bir sertifikatda noyob raqam va tekshirish kodi boʻladi - ish beruvchi bu kod
-orqali sertifikatning haqiqiyligini hisobsiz ham tekshira oladi.
+Agar kursda sertifikat közda tutilgan bölsa, u yakunlanganda avtomatik beriladi.
+Har bir sertifikatda noyob raqam va tekşiriş kodi böladi - iş beruvçi bu kod
+orqali sertifikatning haqiqiyligini hisobsiz ham tekşira oladi.
 """,
     ),
     (
-        "Ishga joylashish uchun nima qilishim kerak",
+        "Işga joylaşiş uçun nima qilişim kerak",
         "guideline",
         """
-Portal taʼlimdan ishga oʻtish mexanizmini Edu-Job platformasi bilan integratsiya
+Portal taʼlimdan işga ötiş mexanizmini Edu-Job platformasi bilan integratsiya
 orqali taʼminlaydi.
 
-Avval profilingizni toʻldiring va koʻnikmalaringizni kiriting - tavsiyalar aynan
-shu maʼlumotga tayanadi. Keyin "Imkoniyatlar" boʻlimiga oʻting. Har bir vakansiya
-uchun tizim sizning koʻnikmalaringiz bilan talab qilinganlarini solishtiradi va
-qaysi koʻnikma yetishmayotganini koʻrsatadi.
+Avval profilingizni töldiring va könikmalaringizni kiriting - tavsiyalar aynan
+şu maʼlumotga tayanadi. Keyin "Imkoniyatlar" bölimiga öting. Har bir vakansiya
+uçun tizim sizning könikmalaringiz bilan talab qilinganlarini soliştiradi va
+qaysi könikma yetişmayotganini körsatadi.
 
-Yetishmayotgan koʻnikma boʻlsa, tizim uni beradigan kursni tavsiya qiladi. Bu
-"skill-gap tahlili" deb ataladi. Kursni tugatib, arizani qayta yuborishingiz mumkin.
+Yetişmayotgan könikma bölsa, tizim uni beradigan kursni tavsiya qiladi. Bu
+"skill-gap tahlili" deb ataladi. Kursni tugatib, arizani qayta yuborişingiz mumkin.
 
-Ariza yuborish uchun Edu-Job bilan maʼlumot almashishga rozilik berishingiz kerak.
-Ariza holati shaxsiy kabinetingizda kuzatiladi.
+Ariza yuboriş uçun Edu-Job bilan maʼlumot almaşişga rozilik berişingiz kerak.
+Ariza holati şaxsiy kabinetingizda kuzatiladi.
 """,
     ),
     (
-        "Biznes ochish uchun qanday yordam bor",
+        "Biznes oçiş uçun qanday yordam bor",
         "guideline",
         """
-Invest HUB integratsiyasi tadbirkorlik yoʻlidagi ayollar uchun moʻljallangan.
+Invest HUB integratsiyasi tadbirkorlik yölidagi ayollar uçun möljallangan.
 
-Portalda tadbirkorlik yoʻnalishidagi dasturlarni tugatganingizdan soʻng sizga
+Portalda tadbirkorlik yönalişidagi dasturlarni tugatganingizdan söng sizga
 grant, imtiyozli kredit, akselerator va mentor imkoniyatlari tavsiya qilinadi.
 
-Biznes-reja va moliyaviy modelni tayyorlashda "Tadbirkorlik asoslari" kursi yordam
-beradi. Ariza yuborilgandan keyin uning holati kabinetingizda koʻrinadi.
+Biznes-reja va moliyaviy modelni tayyorlaşda "Tadbirkorlik asoslari" kursi yordam
+beradi. Ariza yuborilgandan keyin uning holati kabinetingizda körinadi.
 
-Agar mahsulot yoki xizmat sotmoqchi boʻlsangiz, Tijorat markazi orqali sotuvchi
-profilini ochishingiz va raqamli vitrina yaratishingiz mumkin.
+Agar mahsulot yoki xizmat sotmoqçi bölsangiz, Tijorat markazi orqali sotuvçi
+profilini oçişingiz va raqamli vitrina yaratişingiz mumkin.
 """,
     ),
     (
-        "Dasturga qanday yozilish va sertifikat olish mumkin",
+        "Dasturga qanday yoziliş va sertifikat oliş mumkin",
         "faq",
         """
-Dasturga yozilish uchun katalogdan mos dasturni tanlang va "Yozilish" tugmasini
+Dasturga yoziliş uçun katalogdan mos dasturni tanlang va "Yoziliş" tugmasini
 bosing. Yozilgandan keyin dastur sizning kabinetingizda "Mening dasturlarim"
-boʻlimida paydo boʻladi va siz istalgan vaqtda davom ettirishingiz mumkin.
+bölimida paydo böladi va siz istalgan vaqtda davom ettirişingiz mumkin.
 
 Har bir dastur modullardan iborat. Modulni tugatganingizda progress avtomatik
 saqlanadi. Dastur 100 foizga yetganda sertifikat avtomatik beriladi. Sertifikat kabinetdan yuklab olinadi.
 
-Barcha dasturlarda sertifikat boʻlavermaydi - dastur kartochkasida bu alohida
-koʻrsatilgan. Sertifikatsiz dasturlar ham rejangizda hisobga olinadi.
+Barça dasturlarda sertifikat bölavermaydi - dastur kartoçkasida bu alohida
+körsatilgan. Sertifikatsiz dasturlar ham rejangizda hisobga olinadi.
 """,
     ),
     (
-        "Individual rivojlanish rejasi qanday tuziladi",
+        "Individual rivojlaniş rejasi qanday tuziladi",
         "guideline",
         """
-Reja diagnostika natijalari asosida tuziladi. Tizim eng past ball toʻplangan
-oʻlchovlarni aniqlaydi va shu yoʻnalishlar boʻyicha aniq qadamlar taklif qiladi.
-Har bir qadam dastur yoki imkoniyat bilan bogʻlanishi mumkin.
+Reja diagnostika natijalari asosida tuziladi. Tizim eng past ball töplangan
+ölçovlarni aniqlaydi va şu yönalişlar böyiça aniq qadamlar taklif qiladi.
+Har bir qadam dastur yoki imkoniyat bilan boğlanişi mumkin.
 
-Muhim qoida: reja avtomatik kuchga kirmaydi. Tizim faqat taklif qiladi, qaror
-sizniki. Rejani koʻrib chiqasiz va "Qabul qilish" tugmasi orqali tasdiqlaysiz.
+Muhim qoida: reja avtomatik kuçga kirmaydi. Tizim faqat taklif qiladi, qaror
+sizniki. Rejani körib çiqasiz va "Qabul qiliş" tugmasi orqali tasdiqlaysiz.
 Tasdiqlanmagan reja faol hisoblanmaydi.
 
-Rejani istalgan vaqtda qayta yaratish mumkin - masalan, yangi diagnostikadan
-keyin yoki maqsadingiz oʻzgarganda. Eski reja tarixda saqlanib qoladi.
+Rejani istalgan vaqtda qayta yaratiş mumkin - masalan, yangi diagnostikadan
+keyin yoki maqsadingiz özgarganda. Eski reja tarixda saqlanib qoladi.
 """,
     ),
     (
-        "Mening maʼlumotlarim kimga va qachon uzatiladi",
+        "Mening maʼlumotlarim kimga va qaçon uzatiladi",
         "policy",
         """
-Sizning maʼlumotlaringiz hech qachon sizning roziligingizsiz portaldan tashqariga
-chiqmaydi. Har bir hamkor tizim - Edu-Job, Invest HUB, Tijorat Markazi - uchun
-alohida rozilik soʻraladi.
+Sizning maʼlumotlaringiz heç qaçon sizning roziligingizsiz portaldan taşqariga
+çiqmaydi. Har bir hamkor tizim - Edu-Job, Invest HUB, Tijorat Markazi - uçun
+alohida rozilik söraladi.
 
 Rozilik berganingizda ham hamkorga faqat minimal maʼlumot uzatiladi: pseudonim
-identifikator, viloyat, kasbiy koʻnikmalar va taʼlim darajasi. Telefon raqami,
-toʻliq ism, oilaviy holat va farzandlar soni hech qachon uzatilmaydi.
+identifikator, viloyat, kasbiy könikmalar va taʼlim darajasi. Telefon raqami,
+töliq ism, oilaviy holat va farzandlar soni heç qaçon uzatilmaydi.
 
-Roziligingizni istalgan vaqtda qaytarib olishingiz mumkin - kabinetdagi
-"Rozilik" boʻlimidan. Qaytarib olingandan keyin yangi uzatishlar toʻxtaydi.
+Roziligingizni istalgan vaqtda qaytarib olişingiz mumkin - kabinetdagi
+"Rozilik" bölimidan. Qaytarib olingandan keyin yangi uzatişlar töxtaydi.
 """,
     ),
     (
-        "Imkoniyatga ariza berish tartibi",
+        "Imkoniyatga ariza beriş tartibi",
         "faq",
         """
-Imkoniyatlar boʻlimida sizga mos vakansiya, grant yoki savdo maydoni tavsiya
-qilinadi. Moslik sizning koʻnikmalaringiz, viloyatingiz va rivojlanish
+Imkoniyatlar bölimida sizga mos vakansiya, grant yoki savdo maydoni tavsiya
+qilinadi. Moslik sizning könikmalaringiz, viloyatingiz va rivojlaniş
 rejangiz asosida hisoblanadi.
 
-Ariza berish uchun avval tegishli hamkor tizimga maʼlumot uzatishga rozilik
-berishingiz kerak. Rozilik boʻlmasa, tizim arizani qabul qilmaydi - bu himoya
-choralari.
+Ariza beriş uçun avval tegişli hamkor tizimga maʼlumot uzatişga rozilik
+berişingiz kerak. Rozilik bölmasa, tizim arizani qabul qilmaydi - bu himoya
+çoralari.
 
-Ariza holati kabinetda kuzatiladi: yuborilgan, koʻrib chiqilmoqda, qabul
-qilingan yoki rad etilgan. Hamkor tizimdan javob kelganda sizga bildirishnoma
+Ariza holati kabinetda kuzatiladi: yuborilgan, körib çiqilmoqda, qabul
+qilingan yoki rad etilgan. Hamkor tizimdan javob kelganda sizga bildirişnoma
 yuboriladi.
 """,
     ),
     (
-        "Mentor bilan qanday ishlash kerak",
+        "Mentor bilan qanday işlaş kerak",
         "guideline",
         """
-Mentor - bu sizga oʻz tajribasini ulashadigan amaliyotchi. Mentor sizning
-oʻrningizga qaror qabul qilmaydi va ish topib bermaydi; u yoʻlni koʻrsatadi.
+Mentor - bu sizga öz tajribasini ulaşadigan amaliyotçi. Mentor sizning
+örningizga qaror qabul qilmaydi va iş topib bermaydi; u yölni körsatadi.
 
-Birinchi uchrashuvga tayyorlaning: qaysi savolga javob olmoqchisiz va qanday
-natijani kutayotganingizni yozib qoʻying. Uchrashuv odatda 45-60 daqiqa davom
+Birinçi uçraşuvga tayyorlaning: qaysi savolga javob olmoqçisiz va qanday
+natijani kutayotganingizni yozib qöying. Uçraşuv odatda 45-60 daqiqa davom
 etadi.
 
-Mentorlik bepul va ixtiyoriy. Agar mos kelmasa, boshqa mentorni tanlashingiz
+Mentorlik bepul va ixtiyoriy. Agar mos kelmasa, boşqa mentorni tanlaşingiz
 mumkin - bu normal holat.
 """,
     ),
     (
-        "Mehnat huquqlari: dekret, taʼtil va shartnoma",
+        "Mehnat huquqlari: dekret, taʼtil va şartnoma",
         "guideline",
         """
-Mehnat shartnomasi yozma shaklda tuzilishi shart. Shartnomada lavozim, ish haqi,
-ish vaqti va taʼtil muddati koʻrsatiladi. Ogʻzaki kelishuv sizni himoya qilmaydi.
+Mehnat şartnomasi yozma şaklda tuzilişi şart. Şartnomada lavozim, iş haqi,
+iş vaqti va taʼtil muddati körsatiladi. Oğzaki kelişuv sizni himoya qilmaydi.
 
-Yillik haq toʻlanadigan taʼtil kamida 15 ish kunini tashkil qiladi. Homiladorlik
-va tugʻish taʼtili qonunda alohida belgilangan va uni bekor qilib boʻlmaydi.
+Yillik haq tölanadigan taʼtil kamida 15 iş kunini taşkil qiladi. Homiladorlik
+va tuğiş taʼtili qonunda alohida belgilangan va uni bekor qilib bölmaydi.
 
-Ish beruvchi homiladorlik sababli ishga qabul qilishni rad eta olmaydi va
-shartnomani bekor qila olmaydi. Huquqingiz buzilsa, mehnat inspeksiyasiga
-murojaat qilishingiz mumkin.
+Iş beruvçi homiladorlik sababli işga qabul qilişni rad eta olmaydi va
+şartnomani bekor qila olmaydi. Huquqingiz buzilsa, mehnat inspeksiyasiga
+murojaat qilişingiz mumkin.
 
-Bu umumiy maʼlumot. Aniq holat boʻyicha yurist bilan maslahatlashing.
+Bu umumiy maʼlumot. Aniq holat böyiça yurist bilan maslahatlaşing.
 """,
     ),
     (
         "Raqamli xavfsizlik: firibgarlikdan himoya",
         "guideline",
         """
-Hech kimga SMS orqali kelgan kodni aytmang. Bank, portal yoki davlat idorasi
-hech qachon kodni soʻramaydi. Kodni soʻrayotgan har qanday odam - firibgar.
+Heç kimga SMS orqali kelgan kodni aytmang. Bank, portal yoki davlat idorasi
+heç qaçon kodni söramaydi. Kodni sörayotgan har qanday odam - firibgar.
 
-Ish taklifi uchun oldindan pul soʻralsa, bu firibgarlik. Haqiqiy ish beruvchi
-nomzoddan toʻlov talab qilmaydi.
+Iş taklifi uçun oldindan pul söralsa, bu firibgarlik. Haqiqiy iş beruvçi
+nomzoddan tölov talab qilmaydi.
 
-Parolni har bir xizmat uchun alohida qiling va imkon boʻlsa ikki bosqichli
-tasdiqlashni yoqing. Shubhali havolalarni ochmang.
+Parolni har bir xizmat uçun alohida qiling va imkon bölsa ikki bosqiçli
+tasdiqlaşni yoqing. Şubhali havolalarni oçmang.
 """,
     ),
     (
-        "Diagnostikadan qayta oʻtish va natijani yaxshilash",
+        "Diagnostikadan qayta ötiş va natijani yaxşilaş",
         "faq",
         """
-Diagnostikadan qayta oʻtish mumkin va bu tavsiya etiladi - odatda uch oyda bir
-marta. Birinchi natija bazaviy koʻrsatkich sifatida saqlanadi, keyingi natijalar
-u bilan solishtiriladi.
+Diagnostikadan qayta ötiş mumkin va bu tavsiya etiladi - odatda uç oyda bir
+marta. Birinçi natija bazaviy körsatkiç sifatida saqlanadi, keyingi natijalar
+u bilan soliştiriladi.
 
-Ballni sunʼiy oshirishga urinmang. Diagnostika sizni baholash uchun emas, sizga
-mos yoʻnalishni topish uchun kerak. Haqiqiy javob aniqroq reja beradi.
+Ballni sunʼiy oşirişga urinmang. Diagnostika sizni baholaş uçun emas, sizga
+mos yönalişni topiş uçun kerak. Haqiqiy javob aniqroq reja beradi.
 
-Ball oʻsishi uchun rejadagi qadamlarni bajaring: dasturni tugating, koʻnikma
-qoʻshing, imkoniyatga ariza bering. Har bir bajarilgan qadam tegishli oʻlchovda
+Ball ösişi uçun rejadagi qadamlarni bajaring: dasturni tugating, könikma
+qöşing, imkoniyatga ariza bering. Har bir bajarilgan qadam tegişli ölçovda
 aks etadi.
 """,
     ),
     (
-        "AI yordamchi qanday ishlaydi va nimani bilmaydi",
+        "AI yordamçi qanday işlaydi va nimani bilmaydi",
         "faq",
         """
-WomanUP AI yordamchisi uchta turdagi savolga javob beradi: portal haqida (qanday
-roʻyxatdan oʻtish, Development Score nima, kurslar va imkoniyatlar qanday ishlaydi),
-taʼlim va kasb tanlash boʻyicha hamda umumiy salomatlik mavzularida yoshga mos
+WomanUP AI yordamçisi uçta turdagi savolga javob beradi: portal haqida (qanday
+röyxatdan ötiş, Development Score nima, kurslar va imkoniyatlar qanday işlaydi),
+taʼlim va kasb tanlaş böyiça hamda umumiy salomatlik mavzularida yoşga mos
 maʼlumot. Portal haqidagi javoblar faqat tasdiqlangan hujjatlardan olinadi;
-yordamchi bilmagan narsasini oʻylab topmaydi va "bilmayman" deyishdan tortinmaydi.
+yordamçi bilmagan narsasini öylab topmaydi va "bilmayman" deyişdan tortinmaydi.
 
-Yordamchi tashxis qoʻymaydi, davolash yoki huquqiy xulosa bermaydi — bunday
-savollarda u mutaxassisga murojaat qilishni maslahat beradi. Zoʻravonlik, xavf yoki
-firibgarlik haqidagi murojaat darhol koordinatorga yoʻnaltiriladi.
+Yordamçi taşxis qöymaydi, davolaş yoki huquqiy xulosa bermaydi — bunday
+savollarda u mutaxassisga murojaat qilişni maslahat beradi. Zöravonlik, xavf yoki
+firibgarlik haqidagi murojaat darhol koordinatorga yönaltiriladi.
 
-Akkauntsiz uchta savol berish mumkin; roʻyxatdan oʻtgach, cheklov yoʻq, va
-yordamchi sizning diagnostika natijangiz, kurslaringiz va rejangizga tayanib javob
-beradi. Har bir javob qaysi manbaga asoslangani koʻrsatiladi.
+Akkauntsiz uçta savol beriş mumkin; röyxatdan ötgaç, çeklov yöq, va
+yordamçi sizning diagnostika natijangiz, kurslaringiz va rejangizga tayanib javob
+beradi. Har bir javob qaysi manbaga asoslangani körsatiladi.
 """,
     ),
 ]

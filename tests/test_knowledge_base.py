@@ -2,6 +2,7 @@
 and true of the product as it is."""
 
 from app.knowledge_base import KNOWLEDGE, KNOWLEDGE_TRANSLATIONS
+from app.services.uzbek import has_old_digraphs
 
 
 def test_every_document_has_russian_and_english_editions():
@@ -23,11 +24,19 @@ def test_the_documents_describe_the_product_as_it_is():
     assert "telefon raqami orqali" not in everything
     assert "по номеру\nтелефона" not in everything and "phone number and" not in everything
     # Diagnostic v2: digital skills exists, social activity does not.
-    assert "raqamli koʻnikmalar" in everything and "ijtimoiy faollik" not in everything
+    assert "raqamli könikmalar" in everything and "ijtimoiy faollik" not in everything
     # Certificates follow completion; there is no final test in the product.
     assert "yakuniy test" not in everything and "итоговый тест" not in everything
 
 
 def test_the_assistant_describes_its_own_limits():
     titles = [title for title, _, _ in KNOWLEDGE]
-    assert any("AI yordamchi" in title for title in titles)
+    assert any("AI yordamçi" in title for title in titles)
+
+
+def test_the_uzbek_editions_use_the_reformed_alphabet():
+    """Every Uzbek word on the platform is written with ö ğ ş ç; the documents
+    the assistant quotes must read the same way as the page around them."""
+    for title, _, body in KNOWLEDGE:
+        assert not has_old_digraphs(title), title
+        assert not has_old_digraphs(body), title
