@@ -26,6 +26,8 @@ async def test_protected_route_rejects_a_malformed_token(app_client):
     assert response.status_code == 401
 
 
-async def test_admin_route_rejects_a_plain_user(app_client, auth_headers):
-    response = await app_client.get("/api/v1/admin/audit", headers=auth_headers)
+async def test_admin_route_rejects_a_plain_user(client, auth_headers):
+    # Every token is checked against the database (revocation, status, roles),
+    # so even a refusal needs the schema: the database-backed client.
+    response = await client.get("/api/v1/admin/audit", headers=auth_headers)
     assert response.status_code == 403
