@@ -71,7 +71,9 @@ async def test_first_sign_in_opens_an_account(client, session, google_says):
     # Google supplies no age and no region, so she still has to finish
     # onboarding before the cabinet means anything.
     assert body["onboarding_completed"] is False
-    assert body["access_token"] and body["refresh_token"]
+    assert body["access_token"]
+    assert body["refresh_token"] is None
+    assert response.cookies.get("wu_refresh")
 
     user = await session.scalar(select(User).where(User.firebase_uid == DILNOZA.subject))
     assert user is not None

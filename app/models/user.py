@@ -45,6 +45,12 @@ class User(UUIDMixin, TimestampMixin, Base):
     # its owner, the uid cannot, so matching on the uid is what stops one
     # person ending up with two WomanUP IDs.
     firebase_uid: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    #: Bumped by "sign out everywhere" and by a replayed refresh token. Every
+    #: token carries the generation it was issued under; a token from an
+    #: earlier generation is refused. Exact, whatever the clock says.
+    session_generation: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     # How the account was opened: "otp" (phone or e-mail code), "google", or
     # "password" for a desk account. Recorded for support and analytics; it is
     # not what authorisation is decided on.

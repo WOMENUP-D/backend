@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
+import uuid
 from collections import defaultdict
 
 import jwt
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, client_ip
+from app.core import security_log
 from app.core.config import settings
 from app.core.constants import ConsentScope
 from app.core.security import decode_token
+from app.models.user import User
 from app.schemas.auth import (
     GoogleAuthRequest,
     GoogleTokenPair,
+    LogoutRequest,
     OtpRequest,
     OtpVerify,
     PasswordLogin,
@@ -24,7 +31,14 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.common import Message
-from app.services import auth_service, firebase_auth, mailer, rate_limit, telemetry
+from app.services import (
+    auth_service,
+    firebase_auth,
+    mailer,
+    rate_limit,
+    telemetry,
+    token_revocation,
+)
 from app.services.audit_service import record_consent
 from app.services.auth_service import AuthError, EmailTaken, OtpThrottled, StaffOtpBlocked
 from app.services.firebase_auth import (
@@ -37,6 +51,80 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 OTP_OFF = "sign in with your e-mail address and password"
+#: A client that cannot hold cookies (a native app, a script, a test) asks for
+#: the refresh token in the body with this header. Browsers never send it.
+BODY_TRANSPORT = "body"
+
+
+def _cookie_path() -> str:
+    return f"{settings.api_v1_prefix}/auth"
+
+
+def _cookie_secure() -> bool:
+    if settings.auth_cookie_secure is not None:
+        return settings.auth_cookie_secure
+    return settings.environment != "local"
+
+
+def _set_session_cookie(response: Response, refresh_token: str) -> None:
+    """The refresh token, where a script in the page cannot read it.
+
+    HttpOnly, sent only to the auth endpoints (the only ones that take it),
+    Secure outside local development, SameSite so a cross-site page cannot
+    make the browser present it.
+    """
+    response.set_cookie(
+        settings.auth_cookie_name,
+        refresh_token,
+        max_age=settings.refresh_token_ttl_days * 86400,
+        path=_cookie_path(),
+        domain=settings.auth_cookie_domain,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite=settings.auth_cookie_samesite,
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.auth_cookie_name,
+        path=_cookie_path(),
+        domain=settings.auth_cookie_domain,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite=settings.auth_cookie_samesite,
+    )
+
+
+def _deliver(tokens: TokenPair, request: Request, response: Response) -> TokenPair:
+    """Hand a session to the client: the refresh token as a cookie, and in
+    the body only for a client that said it cannot take cookies."""
+    assert tokens.refresh_token is not None
+    _set_session_cookie(response, tokens.refresh_token)
+    if request.headers.get("x-refresh-transport", "").lower() == BODY_TRANSPORT:
+        return tokens
+    return tokens.model_copy(update={"refresh_token": None})
+
+
+def _presented_refresh(
+    request: Request, payload: RefreshRequest | LogoutRequest | None
+) -> str | None:
+    """The refresh token this request carries: in the body, else the cookie."""
+    if payload is not None and payload.refresh_token:
+        return payload.refresh_token
+    return request.cookies.get(settings.auth_cookie_name)
+
+
+async def _refuse_if_held(session: DbSession, limit: rate_limit.Limit, identifier: str) -> None:
+    """A held account answers the same 401 as a wrong password, so the hold
+    itself does not confirm that the account exists."""
+    if await rate_limit.exhausted(session, limit, identifier):
+        security_log.event("auth.account_held", identifier=security_log.masked(identifier))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid email or password"
+        )
+
+
 PHONE_OTP_OFF = "phone sign-in is not available yet — sign in with your e-mail address"
 TOO_MANY_CODES = "too many code requests, please try again later"
 
@@ -164,7 +252,9 @@ def _client_ip(request: Request) -> str:
 
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, request: Request, session: DbSession) -> TokenPair:
+async def register(
+    payload: RegisterRequest, request: Request, response: Response, session: DbSession
+) -> TokenPair:
     """Open an account with an address and a password.
 
     She is signed in immediately: sending her back to a sign-in form to retype
@@ -173,6 +263,7 @@ async def register(payload: RegisterRequest, request: Request, session: DbSessio
     """
     ip = _client_ip(request)
     if not _register_throttle.allowed(ip):
+        security_log.event("auth.throttled", endpoint="register", ip=ip)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many attempts, please wait",
@@ -209,23 +300,36 @@ async def register(payload: RegisterRequest, request: Request, session: DbSessio
 
     tokens = auth_service.issue_tokens(user)
     await session.commit()
-    return tokens
+    return _deliver(tokens, request, response)
 
 
 @router.post("/login", response_model=TokenPair)
-async def login(payload: PasswordLogin, request: Request, session: DbSession) -> TokenPair:
+async def login(
+    payload: PasswordLogin, request: Request, response: Response, session: DbSession
+) -> TokenPair:
     """Sign in with an address and a password."""
     ip = _client_ip(request)
     if not _login_throttle.allowed(ip):
+        security_log.event("auth.throttled", endpoint="login", ip=ip)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many attempts, wait a minute",
         )
+    by_account, _ = rate_limit.login_failure_limits()
+    identifier = str(payload.email).strip().lower()
+    await _refuse_if_held(session, by_account, identifier)
 
     try:
         user = await auth_service.authenticate_user(session, str(payload.email), payload.password)
     except AuthError as exc:
         _login_throttle.record_failure(ip)
+        await rate_limit.take(session, by_account, identifier)
+        security_log.event(
+            "auth.login_failed",
+            endpoint="login",
+            ip=ip,
+            identifier=security_log.masked(str(payload.email)),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     await telemetry.record_event(
@@ -236,11 +340,13 @@ async def login(payload: PasswordLogin, request: Request, session: DbSession) ->
     )
     tokens = auth_service.issue_tokens(user)
     await session.commit()
-    return tokens
+    return _deliver(tokens, request, response)
 
 
 @router.post("/staff/login", response_model=TokenPair)
-async def staff_login(payload: StaffLogin, request: Request, session: DbSession) -> TokenPair:
+async def staff_login(
+    payload: StaffLogin, request: Request, response: Response, session: DbSession
+) -> TokenPair:
     """Sign in a staff account with a login and a password.
 
     Separate from the OTP flow on purpose: an office account belongs to a desk,
@@ -250,15 +356,28 @@ async def staff_login(payload: StaffLogin, request: Request, session: DbSession)
     """
     ip = _client_ip(request)
     if not _staff_throttle.allowed(ip):
+        security_log.event("auth.throttled", endpoint="staff_login", ip=ip)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many attempts, wait a minute",
         )
+    _, by_account = rate_limit.login_failure_limits()
+    identifier = payload.login.strip().lower()
+    await _refuse_if_held(session, by_account, identifier)
 
     try:
         user = await auth_service.authenticate_staff(session, payload.login, payload.password)
     except AuthError as exc:
         _staff_throttle.record_failure(ip)
+        await rate_limit.take(session, by_account, identifier)
+        # A wrong password on a desk account is the event most worth an
+        # alert: staff accounts are the ones worth guessing at.
+        security_log.event(
+            "auth.login_failed",
+            endpoint="staff_login",
+            ip=ip,
+            identifier=security_log.masked(payload.login),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     await telemetry.record_event(
@@ -269,12 +388,12 @@ async def staff_login(payload: StaffLogin, request: Request, session: DbSession)
     )
     tokens = auth_service.issue_tokens(user)
     await session.commit()
-    return tokens
+    return _deliver(tokens, request, response)
 
 
 @router.post("/google", response_model=GoogleTokenPair)
 async def google_login(
-    payload: GoogleAuthRequest, request: Request, session: DbSession
+    payload: GoogleAuthRequest, request: Request, response: Response, session: DbSession
 ) -> GoogleTokenPair:
     """Sign in with Google.
 
@@ -301,6 +420,7 @@ async def google_login(
         ) from exc
     except FirebaseAuthError as exc:
         _google_throttle.record_failure(ip)
+        security_log.event("auth.login_failed", endpoint="google", ip=ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     try:
@@ -326,7 +446,7 @@ async def google_login(
     await session.commit()
 
     return GoogleTokenPair(
-        **tokens.model_dump(),
+        **_deliver(tokens, request, response).model_dump(),
         is_new_user=created,
         onboarding_completed=user.onboarding_completed_at is not None,
         email=user.email,
@@ -337,7 +457,9 @@ async def google_login(
 
 
 @router.post("/otp/verify", response_model=TokenPair)
-async def verify_otp(payload: OtpVerify, request: Request, session: DbSession) -> TokenPair:
+async def verify_otp(
+    payload: OtpVerify, request: Request, response: Response, session: DbSession
+) -> TokenPair:
     """Verify the code; creates the account on first successful verification.
 
     Wrong guesses are counted against the code itself (which blocks after
@@ -348,9 +470,10 @@ async def verify_otp(payload: OtpVerify, request: Request, session: DbSession) -
     await _within_limits(session, rate_limit.otp_verify_limits(), request, payload.identifier)
 
     try:
-        return await auth_service.verify_and_login(
+        tokens = await auth_service.verify_and_login(
             session, payload.identifier, payload.code, is_email=payload.email is not None
         )
+        return _deliver(tokens, request, response)
     except StaffOtpBlocked as exc:
         # She proved she holds the mailbox, so this says where to sign in
         # instead. Asking for the code never reveals as much (see above).
@@ -360,25 +483,120 @@ async def verify_otp(payload: OtpVerify, request: Request, session: DbSession) -
 
 
 @router.post("/refresh", response_model=TokenPair)
-async def refresh(payload: RefreshRequest, session: DbSession) -> TokenPair:
+async def refresh(
+    request: Request,
+    response: Response,
+    session: DbSession,
+    payload: RefreshRequest | None = None,
+) -> TokenPair:
+    """Trade a refresh token for a new pair — once.
+
+    Browsers present the token as the HttpOnly cookie; other clients send it
+    in the body. The token presented is spent on the spot: a copy of it, or
+    a replay of it, is refused from then on — and a replay also ends every
+    other session of the account, because a token that is used twice has
+    been in two hands.
+    """
+    presented = _presented_refresh(request, payload)
+    if not presented:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
     try:
-        claims = decode_token(payload.refresh_token, "refresh")
+        claims = decode_token(presented, "refresh")
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         ) from None
+    # A refresh token from before "sign out everywhere" (or before a replay
+    # ended the account's sessions) is refused like any other old token.
+    with contextlib.suppress(ValueError):
+        current = await session.scalar(
+            select(User.session_generation).where(User.id == uuid.UUID(str(claims.get("sub"))))
+        )
+        if not token_revocation.generation_matches(claims, current):
+            _clear_session_cookie(response)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+            )
+    # Spent first, and committed on its own: of two requests racing with the
+    # same token only one inserts the revocation row, and only that one is
+    # answered. A failure after this point costs that client a sign-in, which
+    # is the safe side of the trade.
+    if not await token_revocation.revoke(session, claims, reason="rotated"):
+        security_log.event("auth.refresh_replayed", user_id=str(claims.get("sub")))
+        with contextlib.suppress(ValueError):
+            await token_revocation.revoke_all(
+                session, uuid.UUID(str(claims.get("sub"))), reason="reused"
+            )
+        await session.commit()
+        _clear_session_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
+    await session.commit()
 
     try:
-        return await auth_service.refresh_tokens(session, claims["sub"])
+        tokens = await auth_service.refresh_tokens(session, claims["sub"])
     except AuthError as exc:
+        _clear_session_cookie(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    await session.commit()
+    # The body carries the refresh token only for the client that sent it in
+    # the body; a cookie session stays a cookie session.
+    if payload is not None and payload.refresh_token:
+        _set_session_cookie(response, tokens.refresh_token or "")
+        return tokens
+    return _deliver(tokens, request, response)
+
+
+_bearer = HTTPBearer(auto_error=False)
 
 
 @router.post("/logout", response_model=Message)
-async def logout(user: CurrentUserDep) -> Message:
-    """Client-side token disposal.
+async def logout(
+    user: CurrentUserDep,
+    request: Request,
+    response: Response,
+    session: DbSession,
+    payload: LogoutRequest | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> Message:
+    """Sign out, on the server as well as in the browser.
 
-    Server-side revocation needs a JTI denylist in Redis — deliberately left
-    for the security hardening sprint rather than faked here.
+    The access token that made this call is revoked, and so is the refresh
+    token — the cookie, or the one in the body — when it belongs to the same
+    account. The cookie is cleared. Either token presented again is a 401.
     """
+    if credentials is not None:
+        with contextlib.suppress(jwt.PyJWTError):
+            await token_revocation.revoke(
+                session, decode_token(credentials.credentials, "access"), reason="signed_out"
+            )
+    presented = _presented_refresh(request, payload)
+    if presented:
+        with contextlib.suppress(jwt.PyJWTError):
+            claims = decode_token(presented, "refresh")
+            if str(claims.get("sub")) == user.id:
+                await token_revocation.revoke(session, claims, reason="signed_out")
+    await token_revocation.forget_expired(session)
+    await session.commit()
+    _clear_session_cookie(response)
     return Message(detail="Logged out")
+
+
+@router.post("/logout-all", response_model=Message)
+async def logout_everywhere(
+    user: CurrentUserDep, response: Response, session: DbSession
+) -> Message:
+    """End every session of this account — every device, every tab.
+
+    For the woman who signed in on a shared handset and left, or who suspects
+    a copy of her session is in somebody else's hands. Tokens issued before
+    this moment are refused from now on; she signs in again on this device.
+    """
+    await token_revocation.revoke_all(session, uuid.UUID(user.id), reason="signed_out_all")
+    await session.commit()
+    _clear_session_cookie(response)
+    security_log.event("auth.signed_out_everywhere", user_id=user.id, level=20)
+    return Message(detail="Signed out everywhere")
