@@ -419,36 +419,44 @@ async def test_registration_starts_come_from_events_once_they_exist(client, sess
 async def test_active_users_mean_a_recorded_action_not_a_page_view(client, session):
     headers = await _staff(session)
     now = datetime.now(UTC)
+    today = (now + timedelta(hours=5)).date().isoformat()
+    day_start = at(today, 0)
+
+    def earlier_today(hours: int) -> datetime:
+        # `hours` ago, but never before today's Tashkent midnight: run just
+        # after midnight, the plain subtraction lands on yesterday, and the
+        # period figures below (which filter by local calendar day) miss it.
+        return max(now - timedelta(hours=hours), min(now, day_start + timedelta(minutes=1)))
+
     program = await _program(session)
     doer = await _person(session, created=now - timedelta(days=40))
     reader = await _person(session, created=now - timedelta(days=40))
-    newcomer = await _person(session, created=now - timedelta(hours=2))
+    newcomer = await _person(session, created=earlier_today(2))
     session.add_all(
         [
             Enrollment(
                 user_id=doer,
                 program_id=program.id,
-                started_at=now - timedelta(hours=3),
-                last_activity_at=now - timedelta(hours=3),
+                started_at=earlier_today(3),
+                last_activity_at=earlier_today(3),
             ),
             PageView(
                 visitor_hash="r",
                 path="/kabinet",
                 user_id=reader,
                 is_authenticated=True,
-                occurred_at=now - timedelta(hours=1),
+                occurred_at=earlier_today(1),
             ),
             PageView(
                 visitor_hash="n",
                 path="/kabinet",
                 user_id=newcomer,
                 is_authenticated=True,
-                occurred_at=now - timedelta(hours=1),
+                occurred_at=earlier_today(1),
             ),
         ]
     )
     await session.flush()
-    today = (now + timedelta(hours=5)).date().isoformat()
     body = await _get(client, "engagement", headers, date_from=today, date_to=today)
     active = {f["key"]: f["value"] for f in body["active"]}
     assert active["engaged_1d"] == 1
