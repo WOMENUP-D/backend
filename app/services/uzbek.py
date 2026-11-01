@@ -27,8 +27,11 @@ import re
 
 OKINA = "ʻ"  # ʻ — the letter mark in the old oʻ and gʻ
 TUTUQ = "ʼ"  # ʼ — the glottal stop, unchanged by the reform
-#: Typographic marks people and keyboards substitute for ʻ in oʻ / gʻ.
-OKINA_LIKE = OKINA + "‘"
+#: Marks people, keyboards and models substitute for ʻ in oʻ / gʻ: the left
+#: quote, the right quote and the plain apostrophe. After an o or a g any of
+#: them means the letter; elsewhere a quote or apostrophe is the glottal stop
+#: (taʼlim, maʼlumot) and is left alone.
+OKINA_LIKE = OKINA + "‘’'"
 
 #: A word that cannot be Uzbek: left untouched.
 _FOREIGN = re.compile(r"[wW]|[cC](?![hH])|[pP][hH]|[tT][hH]|[cC][kK]|(?<=[a-z])[A-Z]")

@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 HUMAN_HANDOFF_TEXT = {
     "uz": (
-        "Bu savol bo‘yicha sizga tirik mutaxassis yordam berishi kerak. "
-        "Murojaatingizni koordinatorga yubordim — u siz bilan bog‘lanadi. "
-        "Agar xavf ostida bo‘lsangiz, zudlik bilan 1146 ishonch telefoniga murojaat qiling."
+        "Bu savol böyiça sizga tirik mutaxassis yordam berişi kerak. "
+        "Murojaatingizni koordinatorga yubordim — u siz bilan boğlanadi. "
+        "Agar xavf ostida bölsangiz, zudlik bilan 1146 işonç telefoniga murojaat qiling."
     ),
     "ru": (
         "По этому вопросу вам должен помочь живой специалист. "
@@ -41,8 +41,8 @@ HUMAN_HANDOFF_TEXT = {
 
 EXTRACTIVE_PREFIX = {
     "uz": (
-        "AI generatsiya rejimi yoqilmagan, shuning uchun tasdiqlangan manbadan "
-        "to'g'ridan-to'g'ri parcha keltiraman:"
+        "AI generatsiya rejimi yoqilmagan, şuning uçun tasdiqlangan manbadan "
+        "töğridan-töğri parça keltiraman:"
     ),
     "ru": (
         "Режим генерации ИИ не подключён, поэтому привожу фрагмент из "
