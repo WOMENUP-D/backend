@@ -13,7 +13,7 @@ to notice or correct it.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -108,9 +108,16 @@ async def test_a_stated_age_is_anchored_to_today_not_to_january(
     profile = await _profile(session, user_id)
     today = date.today()
     assert age_from_profile(profile, today=today) == 17
-    # One day before the anniversary she is still seventeen.
-    assert age_from_profile(profile, today=date(today.year + 1, today.month, 1)) == 17
-    assert band_for_profile(profile, today=date(today.year + 1, today.month, 1)) is AgeBand.TEEN
+    # One day before the anniversary she is still seventeen. The eve is computed
+    # from the real anniversary: "the first of this month next year" was the
+    # birthday itself whenever the test ran on the first of a month.
+    try:
+        anniversary = today.replace(year=today.year + 1)
+    except ValueError:  # 29 February
+        anniversary = today.replace(year=today.year + 1, day=28)
+    eve = anniversary - timedelta(days=1)
+    assert age_from_profile(profile, today=eve) == 17
+    assert band_for_profile(profile, today=eve) is AgeBand.TEEN
 
 
 @pytest.mark.parametrize(

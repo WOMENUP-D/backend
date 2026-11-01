@@ -55,6 +55,8 @@ ignore = ["B008"]  # FastAPI dependencies are function calls in defaults by desi
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/versions/*" = ["E501"]
+# Prose for readers, not code: a sentence is wrapped where it reads well.
+"app/knowledge_base.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.14"
