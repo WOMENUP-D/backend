@@ -1,9 +1,16 @@
 """Application settings. Every secret comes from the environment — never from code."""
 
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, PostgresDsn, RedisDsn, ValidationError, field_validator
+from pydantic import (
+    Field,
+    PostgresDsn,
+    RedisDsn,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -41,6 +48,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 30
+    # The refresh token travels in an HttpOnly cookie scoped to the auth
+    # endpoints, so a script running in the page can never read it. `secure`
+    # defaults to on everywhere but local development (plain http there).
+    auth_cookie_name: str = "wu_refresh"
+    auth_cookie_samesite: Literal["lax", "strict"] = "lax"
+    auth_cookie_secure: bool | None = None
+    auth_cookie_domain: str | None = None
 
     # --- Firebase (Google sign-in) -------------------------------------
     # The browser authenticates against Firebase and sends the ID token here;
@@ -95,6 +109,10 @@ class Settings(BaseSettings):
     otp_verify_ip_window_seconds: int = 3600
     otp_verify_identifier_limit: int = 15
     otp_verify_identifier_window_seconds: int = 3600
+    # Wrong passwords one account may receive in an hour before it is held,
+    # whatever addresses the guesses come from. Desk accounts tighter.
+    login_failures_per_hour: int = 20
+    staff_login_failures_per_hour: int = 10
 
     # --- Localisation --------------------------------------------------
     default_language: Literal["uz", "ru", "en"] = "uz"
@@ -185,6 +203,64 @@ class Settings(BaseSettings):
     integration_timeout_seconds: float = 15.0
     integration_max_retries: int = 3
 
+    # --- hh.uz vacancy feed ---------------------------------------------
+    # Read-only: the worker pulls open vacancies for Uzbekistan from the hh
+    # API into `opportunities` under source `hh_uz`. Nothing is ever sent
+    # back; a woman applies on hh.uz through the listing's own link.
+    hh_sync_enabled: bool = False
+    hh_api_base_url: str = "https://api.hh.ru"
+    # The hh site the listings belong to; the API serves several.
+    hh_host: str = "hh.uz"
+    # Uzbekistan in the hh area tree.
+    hh_area_id: int = 97
+    # The API requires an identifying agent in the form `App/version (contact)`.
+    hh_user_agent: str = "WomanUP/1.0 (support@womanup.uz)"
+    # Vacancy search is not open to anonymous callers any more: an application
+    # registered at dev.hh.ru is exchanged for an application token (client
+    # credentials). A token issued by hand can be pasted in directly instead.
+    hh_client_id: str | None = None
+    hh_client_secret: str | None = None
+    hh_access_token: str | None = None
+    hh_sync_interval_hours: int = 6
+    # What is searched for, one query per page of up to 50 results. Russian,
+    # because that is the language most hh.uz listings are written in.
+    hh_search_queries: Annotated[list[str], NoDecode] = [
+        "бухгалтер",
+        "менеджер по продажам",
+        "администратор",
+        "оператор call-центра",
+        "учитель",
+        "воспитатель",
+        "медсестра",
+        "продавец-консультант",
+        "SMM",
+        "маркетолог",
+        "дизайнер",
+        "HR",
+        "офис-менеджер",
+        "кассир",
+        "повар",
+        "швея",
+        "переводчик",
+        "программист",
+        "тестировщик",
+        "стажер",
+    ]
+    hh_sync_pages_per_query: int = 1
+    # At most this many *new* vacancies are read in full per run — each needs
+    # its own request for the skills and the description.
+    hh_sync_max_new: int = 300
+    # A vacancy the searches have not returned for this long is taken down.
+    hh_sync_stale_days: int = 10
+
+    # --- Vacancy marketplace ---------------------------------------------
+    # Which job board `/api/v1/vacancies` reads live. `headhunter` today; a
+    # Tijorat Markazi provider registers its name in `services.vacancies`.
+    vacancy_provider: str = "headhunter"
+    # How long a page of results and one listing are served from cache.
+    vacancy_search_cache_seconds: int = 300
+    vacancy_detail_cache_seconds: int = 900
+
     # --- Object storage -------------------------------------------------
     s3_endpoint_url: str | None = None
     s3_bucket: str = "womanup-media"
@@ -231,12 +307,59 @@ class Settings(BaseSettings):
 
     # --- Security -------------------------------------------------------
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
-    rate_limit_per_minute: int = 120
+    # Host names the API answers for; anything else is refused before routing.
+    # `*` (the default) trusts the proxy to have checked — set it to the
+    # site's hosts in production so a forged Host header buys nothing.
+    allowed_hosts: Annotated[list[str], NoDecode] = ["*"]
+    # Requests per minute one address may make to the API at all, and to the
+    # expensive paths (the live job-board proxy, the model-backed endpoints).
+    # Per worker and in process — the first line, not the only one; see
+    # `core.throttle`. Generous: an office behind one address is not a flood.
+    rate_limit_per_minute: int = 600
+    expensive_rate_limit_per_minute: int = 60
+    # Data kept only as long as it is useful. The assistant's prompt and
+    # answer excerpts are personal text and are blanked after this many days
+    # (the trace — model, prompt version, id — stays); spent one-time codes
+    # and expired throttle rows go after a day.
+    ai_trace_retention_days: int = 180
+    otp_retention_hours: int = 24
+    # The largest request body the API accepts. Nothing here uploads files;
+    # the biggest legitimate body is a partner's listing batch.
+    max_request_body_bytes: int = 2_000_000
+    # How many model-backed answers one account, and one anonymous address,
+    # may ask for in an hour. Counted in the database (`services.ai_limits`),
+    # so the limit holds across workers and restarts — a cap on what an
+    # abusive script can make the portal spend, not a product quota.
+    ai_user_hourly_limit: int = 60
+    ai_guest_ip_hourly_limit: int = 20
+
+    @model_validator(mode="after")
+    def production_is_configured(self) -> Self:
+        """Refuse to serve outside local development with placeholder secrets.
+
+        The signing key's default exists so a developer can start the API with
+        no `.env` at all. In staging or production that same default would let
+        anyone mint an administrator's token, so the process must not start
+        with it — and must not start in debug mode, which prints tracebacks
+        to clients. The values never appear in the message.
+        """
+        if self.environment == "local":
+            return self
+        problems: list[str] = []
+        if self.jwt_secret_key == "change-me-in-env" or len(self.jwt_secret_key) < 32:
+            problems.append("JWT_SECRET_KEY must be set to at least 32 random characters")
+        if self.debug:
+            problems.append("DEBUG must be false")
+        if problems:
+            raise ValueError("; ".join(problems))
+        return self
 
     @field_validator(
         "cors_origins",
         "supported_languages",
         "news_ingest_allowed_domains",
+        "hh_search_queries",
+        "allowed_hosts",
         mode="before",
     )
     @classmethod

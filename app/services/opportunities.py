@@ -309,6 +309,20 @@ def _fit(
     )
 
 
+def applies_externally(opportunity: Opportunity) -> bool:
+    """Whether applying happens on the source site rather than here.
+
+    A vacancy read from hh.uz is hh.uz's: she applies there, through the
+    listing's own link, and WomanUP sends nothing — so no application record,
+    no consent and no partner event exist for it.
+    """
+    return opportunity.source == OpportunitySource.HH_UZ
+
+
+def apply_url(opportunity: Opportunity) -> str | None:
+    return opportunity.external_url if applies_externally(opportunity) else None
+
+
 def brief(org: Organization | None) -> OrganizationBrief | None:
     """An organisation as a listing names it: public fields only, and a link to
     its page only when its owner published one."""
@@ -356,6 +370,7 @@ def _card(
         **OpportunityRead.model_validate(opportunity).model_dump(),
         organization=brief(org),
         is_open=eligibility.is_open(opportunity, now),
+        apply_url=apply_url(opportunity),
         skills=index.refs(opportunity.required_skills or []),
         fit=_fit(reader, index, opportunity, with_programs=with_programs) if reader else None,
         eligibility=_eligibility(opportunity, reader),
@@ -440,6 +455,10 @@ async def discover(
     )
 
     chosen = [row for row in rows if passes(row)]
+    # Newest first before any ranking, so that listings the sorts below cannot
+    # tell apart — a feed's vacancies carry no deadline — come out freshest
+    # first rather than in whatever order the database returned them.
+    chosen.sort(key=lambda row: row.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
     cards = [
         _card(row, index, reader, now=now, org=orgs.get(row.organization_id)) for row in chosen
     ]
@@ -575,6 +594,11 @@ async def apply(
     or given now. Only then is the application written and the partner event
     queued, through the one outbound path, which checks consent once more.
     """
+    if applies_externally(opportunity):
+        # Nothing to write and nothing to send: the application is made on
+        # the source site. The page shows that link instead of this button.
+        raise ApplyError("apply_externally", 409, {"url": opportunity.external_url})
+
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     verdict = eligibility.check(opportunity, age=age_from_profile(profile))
     if not verdict.may_apply:

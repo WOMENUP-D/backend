@@ -76,6 +76,12 @@ class Opportunity(UUIDMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    #: The courses chosen for this listing's requirements, with how they were
+    #: chosen (`services.vacancy_courses`): the mode, the model and prompt
+    #: versions, the trace id and the picks. Cached here because the choice is
+    #: about the listing, not about a reader, and is the same for everyone.
+    course_suggestions: Mapped[dict | None] = mapped_column(JSONB)
+
     #: The WomanUP organisation that published it, for listings posted on the
     #: platform. Partner-feed listings keep only the `organisation` name they
     #: were sent with; nothing links them to an organisation record by guessing.

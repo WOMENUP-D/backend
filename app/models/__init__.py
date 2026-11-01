@@ -9,6 +9,7 @@ from app.models.assessment import (
     ScoreAdjustment,
 )
 from app.models.audit import AiInteraction, AuditLog, RiskFlag
+from app.models.auth_token import RevokedToken
 from app.models.base import Base
 from app.models.career import EducationEntry, WorkExperience
 from app.models.career_path import CareerPath, UserCareerPath
@@ -35,6 +36,7 @@ from app.models.program import (
 from app.models.rate_limit import AuthThrottle
 from app.models.skill import Skill, SkillEvidence, UserSkill
 from app.models.user import OtpChallenge, User, UserRole
+from app.models.vacancy import VacancyCourseSuggestion
 
 __all__ = [
     "AiInteraction",
@@ -79,6 +81,7 @@ __all__ = [
     "Program",
     "ProgramLesson",
     "ProgramModule",
+    "RevokedToken",
     "RiskFlag",
     "SavedOpportunity",
     "Skill",
@@ -88,6 +91,7 @@ __all__ = [
     "UserCareerPath",
     "UserLearningPath",
     "UserRole",
+    "VacancyCourseSuggestion",
     "UserSkill",
     "VisitorPresence",
     "WorkExperience",

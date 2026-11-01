@@ -151,35 +151,41 @@ Courses without one still count towards your development plan.
         "ru": (
             "Что нужно сделать, чтобы найти работу",
             """
-Сначала заполните профиль: образование, профессия, навыки и регион. Чем полнее
-профиль, тем точнее подбор вакансий.
+Вакансии на портале пока берутся с сайта hh.uz и показываются в разделе
+«Возможности». У каждой вакансии указан источник и есть ссылка на исходное
+объявление на hh.uz.
 
-Затем дайте согласие на передачу данных в Edu-Job. Без согласия вакансии
-показываются, но подать заявку нельзя — это защитная мера.
+Сначала заполните профиль: образование, профессия, навыки и регион. Для каждой
+вакансии система сравнивает ваши навыки с требуемыми и показывает, чего именно
+не хватает.
 
-Если навыков не хватает, система покажет, каких именно, и предложит курс,
-который их закрывает. После курса ваш профиль обновляется, и подбор становится
-точнее.
+К каждой вакансии ИИ-помощник подбирает курсы под её требования — блок «Курсы
+под требования вакансии». Это подсказка, а не решение: выбирать курс или нет —
+вам. Если ИИ недоступен, курсы подбираются по совпадению навыков.
 
-Отклик на вакансию отслеживается в кабинете: отправлена, на рассмотрении,
-принята или отклонена.
+Отклик подаётся на самом сайте hh.uz — по кнопке «Откликнуться на hh.uz» на
+странице вакансии. WomanUP ничего не передаёт на hh.uz, поэтому отдельное
+согласие для этого не нужно.
 """,
         ),
         "en": (
             "What to do to find work",
             """
-Start by completing your profile: education, profession, skills and region. The
-fuller the profile, the better the vacancy matching.
+Vacancies on the portal currently come from hh.uz and are shown under
+"Opportunities". Every vacancy names its source and links to the original
+listing on hh.uz.
 
-Then give consent to share your data with Edu-Job. Without it you can still see
-vacancies but cannot apply — that is a safeguard, not an obstacle.
+Start by completing your profile: education, profession, skills and region. For
+every vacancy the system compares your skills with the ones required and shows
+exactly what is missing.
 
-If you are short of a skill, the system names which one and suggests the course
-that closes the gap. After the course your profile updates and the matching
-improves.
+For every vacancy the AI assistant picks courses that match its requirements —
+the "Courses for this vacancy's requirements" block. It is a suggestion, not a
+verdict: whether to take a course is your decision. When the AI is unavailable,
+courses are matched by skill overlap instead.
 
-Every application is tracked in your cabinet: submitted, under review, accepted
-or rejected.
+You apply on hh.uz itself, through the "Apply on hh.uz" button on the vacancy
+page. WomanUP sends nothing to hh.uz, so no separate consent is needed for it.
 """,
         ),
     },
@@ -196,9 +202,12 @@ or rejected.
 Менторство — встречи с предпринимательницей, которая уже прошла этот путь.
 Ментор не принимает решения за вас, а показывает дорогу.
 
-Финансирование идёт через Invest HUB: безвозвратные гранты, льготные микрокредиты
-и долевые инвестиции. Для любой заявки нужны бизнес-план и согласие на передачу
-данных.
+Партнёрская площадка для бизнеса — Wbip.uz (World Business Integration
+Platform), инициатива Ассамблеи экономики Узбекистана: сеть проверенных
+компаний Узбекистана и партнёрских рынков, паспорта компаний, подбор партнёров
+и комнаты сделок. Продавать товары и услуги помогает Tijoratmarkazi.uz —
+национальная торговая платформа. Перед передачей данных любому партнёру у вас
+отдельно спрашивают согласие.
 """,
         ),
         "en": (
@@ -213,9 +222,12 @@ here if the business does not exist yet.
 Mentoring means meeting a woman who has already walked this road. A mentor does
 not decide for you; she shows you the way.
 
-Funding runs through Invest HUB: non-repayable grants, subsidised microloans and
-equity investment. Every application needs a business plan and your consent to
-share data.
+The partner platform for business is Wbip.uz (World Business Integration
+Platform), an initiative of the Economic Assembly of Uzbekistan: a network of
+verified companies in Uzbekistan and partner markets, company passports,
+partner matching and deal rooms. Selling goods and services runs through
+Tijoratmarkazi.uz, the national trade platform. Before any data reaches a
+partner you are asked for consent separately.
 """,
         ),
     },
@@ -286,8 +298,9 @@ your goal changes. The old plan is kept in your history.
             "Кому и когда передаются мои данные",
             """
 Ваши данные никогда не покидают портал без вашего согласия. Для каждой
-партнёрской системы — Edu-Job, Invest HUB, Тижорат Маркази — согласие
-запрашивается отдельно.
+партнёрской системы — Tijoratmarkazi.uz, Wbip.uz — согласие запрашивается
+отдельно. На вакансии с hh.uz вы откликаетесь на самом hh.uz: WomanUP туда
+ничего не передаёт.
 
 Даже когда согласие дано, партнёру передаётся только минимум: псевдонимный
 идентификатор, регион, профессиональные навыки и уровень образования. Номер
@@ -301,7 +314,8 @@ your goal changes. The old plan is kept in your history.
             "Who receives my data, and when",
             """
 Your data never leaves the portal without your consent. Consent is asked
-separately for each partner system — Edu-Job, Invest HUB, Tijorat Markazi.
+separately for each partner system — Tijoratmarkazi.uz, Wbip.uz. For vacancies
+from hh.uz you apply on hh.uz itself: WomanUP sends it nothing.
 
 Even once consent is given, the partner receives only the minimum: a pseudonymous
 identifier, your region, your professional skills and your education level. Your
@@ -550,10 +564,11 @@ Diagnostikani istalgan vaqtda qayta topşirişingiz mumkin.
 WomanUP şaxsiy maʼlumotlarni minimal hajmda yiğadi va faqat sizning roziligingiz
 asosida işlatadi.
 
-Hamkor platformalarga - Edu-Job, Invest HUB va Tijorat markaziga - maʼlumot
-yuborilişidan oldin sizdan alohida rozilik söraladi. Rozilik bermasangiz, heç
-qanday maʼlumot yuborilmaydi. Roziligingizni istalgan vaqtda qaytarib olişingiz
-mumkin.
+Hamkor platformalarga - Tijoratmarkazi.uz va Wbip.uz - maʼlumot yuborilişidan
+oldin sizdan alohida rozilik söraladi. Rozilik bermasangiz, heç qanday maʼlumot
+yuborilmaydi. Roziligingizni istalgan vaqtda qaytarib olişingiz mumkin. hh.uz
+vakansiyalariga ariza hh.uz saytining özida beriladi: WomanUP u yerga heç
+qanday maʼlumot yubormaydi.
 
 Hamkorlarga telefon raqamingiz, elektron poçtangiz, familiya-ismingiz, oilaviy
 holatingiz va farzandlaringiz soni yuborilmaydi. Faqat psevdonim identifikator va
@@ -582,26 +597,33 @@ orqali sertifikatning haqiqiyligini hisobsiz ham tekşira oladi.
         "Işga joylaşiş uçun nima qilişim kerak",
         "guideline",
         """
-Portal taʼlimdan işga ötiş mexanizmini Edu-Job platformasi bilan integratsiya
-orqali taʼminlaydi.
+Portaldagi vakansiyalar hozirça hh.uz saytidan olinadi va "Imkoniyatlar"
+bölimida körsatiladi. Har bir vakansiyada manbasi körsatilgan va hh.uzʼdagi asl
+eʼlonga havola bor.
 
 Avval profilingizni töldiring va könikmalaringizni kiriting - tavsiyalar aynan
-şu maʼlumotga tayanadi. Keyin "Imkoniyatlar" bölimiga öting. Har bir vakansiya
-uçun tizim sizning könikmalaringiz bilan talab qilinganlarini soliştiradi va
-qaysi könikma yetişmayotganini körsatadi.
+şu maʼlumotga tayanadi. Har bir vakansiya uçun tizim sizning könikmalaringiz
+bilan talab qilinganlarini soliştiradi va qaysi könikma yetişmayotganini
+körsatadi.
 
-Yetişmayotgan könikma bölsa, tizim uni beradigan kursni tavsiya qiladi. Bu
-"skill-gap tahlili" deb ataladi. Kursni tugatib, arizani qayta yuborişingiz mumkin.
+Har bir vakansiya uçun AI yordamçi uning talablariga mos kurslarni tanlab beradi
+- "Talablarga mos kurslar" bölimida. Bu tavsiya, qaror emas: kursni tanlaş yoki
+tanlamaslik sizning qaroringiz. AI mavjud bölmasa, kurslar könikmalar mosligi
+böyiça tanlanadi.
 
-Ariza yuboriş uçun Edu-Job bilan maʼlumot almaşişga rozilik berişingiz kerak.
-Ariza holati şaxsiy kabinetingizda kuzatiladi.
+Ariza hh.uz saytining özida beriladi - vakansiya sahifasidagi "hh.uzʼda ariza
+beriş" tugmasi orqali. WomanUP hh.uzʼga heç qanday maʼlumot yubormaydi, şuning
+uçun bunga alohida rozilik kerak emas.
 """,
     ),
     (
         "Biznes oçiş uçun qanday yordam bor",
         "guideline",
         """
-Invest HUB integratsiyasi tadbirkorlik yölidagi ayollar uçun möljallangan.
+Tadbirkorlik yölidagi ayollar uçun hamkor platforma - Wbip.uz (World Business
+Integration Platform), Özbekiston Iqtisodiyot Assambleyasining taşabbusi:
+Özbekiston va hamkor bozorlardagi tekşirilgan kompaniyalar tarmoği, kompaniya
+pasportlari, hamkor tanlaş va bitim xonalari.
 
 Portalda tadbirkorlik yönalişidagi dasturlarni tugatganingizdan söng sizga
 grant, imtiyozli kredit, akselerator va mentor imkoniyatlari tavsiya qilinadi.
@@ -609,8 +631,10 @@ grant, imtiyozli kredit, akselerator va mentor imkoniyatlari tavsiya qilinadi.
 Biznes-reja va moliyaviy modelni tayyorlaşda "Tadbirkorlik asoslari" kursi yordam
 beradi. Ariza yuborilgandan keyin uning holati kabinetingizda körinadi.
 
-Agar mahsulot yoki xizmat sotmoqçi bölsangiz, Tijorat markazi orqali sotuvçi
-profilini oçişingiz va raqamli vitrina yaratişingiz mumkin.
+Agar mahsulot yoki xizmat sotmoqçi bölsangiz, Tijoratmarkazi.uz - milliy savdo
+platformasi - orqali sotuvçi profilini oçişingiz va raqamli vitrina
+yaratişingiz mumkin. Har qanday hamkorga maʼlumot uzatilişidan oldin sizdan
+alohida rozilik söraladi.
 """,
     ),
     (
@@ -649,8 +673,9 @@ keyin yoki maqsadingiz özgarganda. Eski reja tarixda saqlanib qoladi.
         "policy",
         """
 Sizning maʼlumotlaringiz heç qaçon sizning roziligingizsiz portaldan taşqariga
-çiqmaydi. Har bir hamkor tizim - Edu-Job, Invest HUB, Tijorat Markazi - uçun
-alohida rozilik söraladi.
+çiqmaydi. Har bir hamkor tizim - Tijoratmarkazi.uz, Wbip.uz - uçun alohida
+rozilik söraladi. hh.uzʼdan olingan vakansiyalarga ariza hh.uz saytida beriladi
+va WomanUP u yerga maʼlumot yubormaydi.
 
 Rozilik berganingizda ham hamkorga faqat minimal maʼlumot uzatiladi: pseudonim
 identifikator, viloyat, kasbiy könikmalar va taʼlim darajasi. Telefon raqami,

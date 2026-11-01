@@ -185,6 +185,10 @@ class OpportunityCard(OpportunityRead):
 
     organization: OrganizationBrief | None = None
     is_open: bool = True
+    #: Where she applies when applying happens off the platform — a vacancy
+    #: read from hh.uz is applied to on hh.uz. Null for every listing the
+    #: platform takes applications for itself.
+    apply_url: str | None = None
     skills: list[SkillRef] = []
     #: Absent for a visitor.
     fit: OpportunityFit | None = None
@@ -295,3 +299,48 @@ class BusinessRead(BaseModel):
     total_open: int = 0
     #: What the page could read about her, so it can say what would help.
     signals: dict[str, bool] = {}
+
+
+# ---------------------------------------------------------------------------
+# Courses for a listing's requirements
+# ---------------------------------------------------------------------------
+
+
+class ProgramBrief(BaseModel):
+    """A course as a suggestion names it: enough to recognise it and open it."""
+
+    id: uuid.UUID
+    slug: str
+    title_i18n: dict
+    provider: str | None = None
+    external_url: str | None = None
+    category: str
+    format: str
+    level: str | None = None
+    duration_hours: float | None = None
+    has_certificate: bool = False
+    skills_taught: list[str] = []
+
+
+class SuggestedCourse(BaseModel):
+    """One course chosen for a listing, with what it covers and why.
+
+    `covers` are the listing's own words — the skills or requirements this
+    course teaches. `reason_i18n` is a sentence in each language when the
+    model chose; empty when the rules did, and the page says so.
+    """
+
+    program: ProgramBrief
+    covers: list[str] = []
+    reason_i18n: dict = {}
+
+
+class CourseSuggestionsRead(BaseModel):
+    """The courses for a listing's requirements. `mode` is how they were
+    chosen: `ai` (the model, over the catalogue) or `rules` (skill and word
+    overlap). Every suggestion is a proposal; she decides."""
+
+    opportunity_id: uuid.UUID
+    mode: str
+    generated_at: datetime | None = None
+    items: list[SuggestedCourse] = []
