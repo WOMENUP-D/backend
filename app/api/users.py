@@ -8,9 +8,10 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip, coordinator_region
 from app.core.constants import SUBJECT_SCOPES, ConsentScope, DataClassification, Role
 from app.models.career import EducationEntry, WorkExperience
+from app.models.mentor import MentorProfile, MentorSession
 from app.models.profile import Goal, Profile
 from app.models.user import User
 from app.schemas.admin import ConsentRead, ConsentUpdate
@@ -33,7 +34,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from app.services import activity, score_progress, skills, telemetry
+from app.services import activity, retention, score_progress, skills, telemetry
 from app.services.audit_service import current_consents, record_audit, record_consent
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -99,6 +100,10 @@ async def update_profile(
         session.add(profile)
 
     changes = payload.model_dump(exclude_unset=True)
+    # The age band is derived by the server from the date of birth and feeds
+    # the health content gate; a value sent by the client is ignored, so the
+    # gate cannot be moved by clearing the date and naming a band.
+    changes.pop("age_group", None)
     for field, value in changes.items():
         setattr(profile, field, value)
     profile.completeness_percent = _completeness(profile)
@@ -132,16 +137,55 @@ async def update_profile(
 
 @router.get("/{user_id}/profile", response_model=ProfileRead)
 async def read_other_profile(
-    user_id: uuid.UUID, user: CurrentUserDep, session: DbSession
+    user_id: uuid.UUID, user: CurrentUserDep, session: DbSession, request: Request
 ) -> Profile:
-    """Staff view. Returns the non-sensitive block only — the sensitive fields
-    are simply not in `ProfileRead`, so they cannot leak through this route."""
-    if not user.has_role(Role.ADMIN, Role.REGIONAL_COORDINATOR, Role.MENTOR):
+    """Staff view of one woman's profile — the non-sensitive block only (the
+    sensitive fields are simply not in `ProfileRead`).
+
+    Who may open it is decided by relationship, not by role alone: an
+    administrator or moderator anyone; a regional coordinator the women of her
+    region; a mentor the women she has a session with. Anyone else, and any
+    woman outside that relationship, is a 404 — the same answer as for an id
+    that does not exist. Every read is written to the audit log as access to
+    personal data.
+    """
+    if not user.has_role(Role.ADMIN, Role.MODERATOR, Role.REGIONAL_COORDINATOR, Role.MENTOR):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+
+    if not user.has_role(Role.ADMIN, Role.MODERATOR):
+        allowed = False
+        if user.has_role(Role.REGIONAL_COORDINATOR):
+            region = await coordinator_region(session, user)
+            target = await session.scalar(select(User.region).where(User.id == user_id))
+            allowed = region is not None and target == region
+        if not allowed and user.has_role(Role.MENTOR):
+            linked = await session.scalar(
+                select(MentorSession.id)
+                .join(MentorProfile, MentorProfile.id == MentorSession.mentor_id)
+                .where(
+                    MentorProfile.user_id == uuid.UUID(user.id),
+                    MentorSession.user_id == user_id,
+                )
+                .limit(1)
+            )
+            allowed = linked is not None
+        if not allowed:
+            raise not_found
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     if profile is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+        raise not_found
+    await record_audit(
+        session,
+        action="user.profile_view",
+        entity_type="profile",
+        entity_id=str(user_id),
+        actor_id=uuid.UUID(user.id),
+        actor_role=user.role.value,
+        classification=DataClassification.PERSONAL,
+        ip_address=client_ip(request),
+    )
     return profile
 
 
@@ -414,9 +458,14 @@ async def delete_account(user: CurrentUserDep, session: DbSession, request: Requ
 
     from app.core.constants import UserStatus
 
+    # Her assistant conversations and any codes sent to her go with the
+    # identifiers — read before they are cleared.
+    await retention.erase_user(session, record.id, [record.email, record.phone])
+
     record.phone = None
     record.email = None
     record.password_hash = None
+    record.firebase_uid = None
     record.status = UserStatus.DELETED
     record.anonymised_at = datetime.now(UTC)
 

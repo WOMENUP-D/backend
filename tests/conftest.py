@@ -19,11 +19,12 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.constants import Role
+from app.core.constants import Language, Role, UserStatus
 from app.core.security import create_token
 from app.db import get_session
 from app.main import create_app
 from app.models import Base
+from app.models.user import User, UserRole
 from app.services.llm_gateway import llm_gateway
 
 TEST_DB_URL = os.getenv(
@@ -47,6 +48,23 @@ def no_error_telemetry(monkeypatch):
         return None
 
     monkeypatch.setattr(main, "record_api_error", quiet)
+
+
+@pytest.fixture(autouse=True)
+def fresh_request_throttles():
+    """Every test starts with an empty per-address ceiling.
+
+    The ceilings live in the API process and key on the connecting address,
+    which under the test client is the same for every test; a suite of a
+    thousand requests would otherwise be refused halfway through.
+    """
+    import app.main as main
+
+    main.general_throttle.reset()
+    main.expensive_throttle.reset()
+    yield
+    main.general_throttle.reset()
+    main.expensive_throttle.reset()
 
 
 @pytest.fixture(autouse=True)
@@ -133,7 +151,25 @@ def auth_headers(user_id: uuid.UUID) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.fixture
-def admin_headers() -> dict[str, str]:
-    token = create_token(uuid.uuid4(), Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
+@pytest_asyncio.fixture
+async def admin_headers(session: AsyncSession) -> dict[str, str]:
+    """An administrator who exists.
+
+    Staff authority is re-read from `user_roles` on every request, so a token
+    that merely *claims* the admin role is worth a participant's. The fixture
+    therefore opens a real desk account and grants the role in the database.
+    """
+    admin_id = uuid.uuid4()
+    session.add(
+        User(
+            id=admin_id,
+            email=f"admin-{admin_id.hex[:8]}@example.uz",
+            language=Language.UZ,
+            status=UserStatus.ACTIVE,
+        )
+    )
+    await session.flush()
+    session.add(UserRole(user_id=admin_id, role=Role.ADMIN))
+    await session.flush()
+    token = create_token(admin_id, Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
     return {"Authorization": f"Bearer {token}"}

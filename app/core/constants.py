@@ -330,6 +330,11 @@ class OpportunitySource(StrEnum):
     # profile with that organisation, inside the platform, under a consent
     # scoped to it — nothing is sent to an outside system.
     ORGANIZATION = "organization"
+    # A vacancy read from the public hh.uz feed (`services.hh_jobs`). She
+    # applies on hh.uz itself, through the listing's own link, so no partner
+    # system and no consent scope stand behind this source: WomanUP sends it
+    # nothing. Kept apart from INTERNAL so the page can say where it came from.
+    HH_UZ = "hh_uz"
 
 
 class OpportunityType(StrEnum):

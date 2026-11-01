@@ -255,9 +255,13 @@ async def test_a_coordinator_sees_her_region_whatever_she_asks_for(client, sessi
     assert body["scope"]["region"] == "samarkand"
     assert body["participants"] == 2
 
-    # With no scope on the role, the region on her account is the scope.
+    # The region on her own account is *not* a scope: she can set that field
+    # herself, so a coordinator whose role carries no region is refused even
+    # when her account names one.
     fallback = await _staff(session, Role.REGIONAL_COORDINATOR, region=Region.BUKHARA)
-    assert (await _get(client, "overview", fallback))["participants"] == 3
+    response = await client.get(f"{API}/overview", headers=fallback)
+    assert response.status_code == 403
+    assert response.json()["detail"]["reason"] == "no_region_scope"
 
     # A coordinator nobody gave a region is refused, not shown the country.
     nowhere = await _staff(session, Role.REGIONAL_COORDINATOR, region=None)

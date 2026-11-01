@@ -67,7 +67,10 @@ async def test_registering_opens_an_account_and_signs_her_straight_in(client, se
 
     assert response.status_code == 201
     body = response.json()
-    assert body["access_token"] and body["refresh_token"]
+    assert body["access_token"]
+    # The refresh token is a cookie the page cannot read, not part of the body.
+    assert body["refresh_token"] is None
+    assert response.cookies.get("wu_refresh")
 
     user = await session.scalar(select(User).where(User.email == EMAIL))
     assert user is not None

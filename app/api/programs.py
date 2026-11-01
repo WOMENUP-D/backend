@@ -35,6 +35,21 @@ from app.services.uzbek import to_new_alphabet, to_old_alphabet
 router = APIRouter(prefix="/programs", tags=["programs"])
 
 
+def _may_edit(user, author_id) -> None:
+    """Content is edited by the person who wrote it, or by national staff.
+
+    Trainers share one role, not one desk: a course, a task or an article is
+    its author's until an administrator or a moderator steps in.
+    """
+    if user.has_role(Role.ADMIN, Role.MODERATOR):
+        return
+    if author_id is not None and str(author_id) == user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Only the author or a moderator may edit this"
+    )
+
+
 @router.get("", response_model=Page[ProgramRead])
 async def list_programs(
     session: DbSession,
@@ -291,6 +306,7 @@ async def update_program(
     program = await session.get(Program, program_id)
     if program is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    _may_edit(user, program.author_id)
 
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("is_published") and program.published_at is None:

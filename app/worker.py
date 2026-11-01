@@ -1,4 +1,4 @@
-"""Background worker: notification delivery, outbox drain, risk flags, news.
+"""Background worker: notifications, outbox drain, risk flags, news, hh.uz.
 
 Run alongside the API (`python -m app.worker`). Kept as a simple polling loop
 rather than a broker-backed queue — at pilot volume this is enough, and it has
@@ -9,6 +9,9 @@ that costs money and publishes to readers. That changes two things about how
 it is scheduled: its last run is persisted in the audit log rather than held in
 memory, so a restart does not fire it, and it runs under a Postgres advisory
 lock, so two workers cannot search and publish at the same time.
+
+The hh.uz vacancy sync is scheduled the same way, for the same reasons: it
+calls a third party's API on a quota and it changes what the jobs page shows.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from app.core.logging import configure_logging
 from app.db import SessionLocal
 from app.models.audit import AuditLog, RiskFlag
 from app.models.user import User
+from app.services import hh_jobs, retention
 from app.services.audit_service import record_audit
 from app.services.integration_gateway import drain_outbox
 from app.services.news_ingest import AUDIT_ACTION, IngestResult, ingest_news
@@ -44,6 +48,7 @@ INACTIVITY_DAYS = 21
 # between processes; the interval beside it is an operator dial and comes from
 # `settings.news_ingest_interval_hours` instead.
 NEWS_INGEST_LOCK = 728_401
+HH_SYNC_LOCK = 728_402
 
 
 async def scan_inactivity() -> int:
@@ -120,11 +125,11 @@ def next_due(
     return now_mono + max(0.0, interval_seconds - elapsed)
 
 
-async def last_ingest_at() -> datetime | None:
-    """When the ingest last ran, read back from the audit log.
+async def last_run_at(action: str) -> datetime | None:
+    """When a scheduled job last ran, read back from the audit log.
 
     Persisted rather than held in memory, and deliberately not in a new table:
-    every run already writes an insert-only `news.ingest` audit row, so the
+    every run already writes an insert-only audit row under its action, so the
     latest one *is* the schedule state.
 
     Reading a maximum is not an update: the insert-only contract on `AuditLog`
@@ -132,7 +137,26 @@ async def last_ingest_at() -> datetime | None:
     """
     async with SessionLocal() as session:
         return await session.scalar(
-            select(func.max(AuditLog.created_at)).where(AuditLog.action == AUDIT_ACTION)
+            select(func.max(AuditLog.created_at)).where(AuditLog.action == action)
+        )
+
+
+async def last_ingest_at() -> datetime | None:
+    """When the news ingest last ran."""
+    return await last_run_at(AUDIT_ACTION)
+
+
+async def mark_attempt(action: str, entity_type: str) -> None:
+    """Record — and commit — that a run of `action` is about to happen."""
+    async with SessionLocal() as session, session.begin():
+        await record_audit(
+            session,
+            action=action,
+            entity_type=entity_type,
+            actor_id=None,
+            actor_role="system",
+            classification=DataClassification.INTERNAL,
+            changes={"phase": "started"},
         )
 
 
@@ -153,16 +177,7 @@ async def mark_ingest_attempt() -> None:
     killed container, an unparsable reply — leaves the marker in place and
     waits for the next interval.
     """
-    async with SessionLocal() as session, session.begin():
-        await record_audit(
-            session,
-            action=AUDIT_ACTION,
-            entity_type="news_post",
-            actor_id=None,
-            actor_role="system",
-            classification=DataClassification.INTERNAL,
-            changes={"phase": "started"},
-        )
+    await mark_attempt(AUDIT_ACTION, "news_post")
 
 
 async def run_news_ingest() -> IngestResult:
@@ -206,6 +221,40 @@ async def run_news_ingest() -> IngestResult:
         return IngestResult(reason="error")
 
 
+async def run_hh_sync(*, force: bool = False) -> hh_jobs.SyncResult:
+    """One hh.uz sync, under its own advisory lock, isolated from the loop.
+
+    `force` is the operator's `python -m app.hh_sync`: it runs whether or not
+    the scheduled sync is switched on. Returns a result rather than raising,
+    so a feed that is down can never stop notification delivery.
+    """
+    if not force and not settings.hh_sync_enabled:
+        return hh_jobs.SyncResult(reason="disabled")
+    try:
+        await mark_attempt(hh_jobs.AUDIT_ACTION, "opportunity")
+
+        async with SessionLocal() as session, session.begin():
+            locked = await session.scalar(select(func.pg_try_advisory_xact_lock(HH_SYNC_LOCK)))
+            if not locked:
+                logger.info("hh.uz sync already running elsewhere; skipping")
+                return hh_jobs.SyncResult(reason="locked")
+
+            result = await hh_jobs.sync_from_settings(session)
+            await record_audit(
+                session,
+                action=hh_jobs.AUDIT_ACTION,
+                entity_type="opportunity",
+                actor_id=None,
+                actor_role="system",
+                classification=DataClassification.INTERNAL,
+                changes={**asdict(result), "phase": "finished"},
+            )
+            return result
+    except Exception:
+        logger.exception("hh.uz sync failed; the catalogue is unchanged")
+        return hh_jobs.SyncResult(reason="error")
+
+
 async def run() -> None:
     configure_logging()
     logger.info("worker started (poll=%ss)", POLL_SECONDS)
@@ -215,6 +264,7 @@ async def run() -> None:
     # worker that starts before Postgres does would die instead of retrying —
     # which is exactly what `run()` survives today.
     news_due_at: float | None = None
+    hh_due_at: float | None = None
 
     while True:
         try:
@@ -244,6 +294,12 @@ async def run() -> None:
                 last_risk_scan = now
                 if raised:
                     logger.info("raised %s inactivity flags", raised)
+                # The same hourly tick retires what has outlived its purpose:
+                # old assistant excerpts, spent codes, expired bookkeeping.
+                async with SessionLocal() as session:
+                    purged = await retention.purge(session)
+                    await session.commit()
+                logger.info("retention sweep", extra={"extra_fields": asdict(purged)})
 
             # Read from `settings` here rather than at import so the switch can
             # be flipped with a worker restart and nothing else.
@@ -264,6 +320,20 @@ async def run() -> None:
                     news_due_at = now + interval
                     result = await run_news_ingest()
                     logger.info("news ingest", extra={"extra_fields": asdict(result)})
+
+            if settings.hh_sync_enabled:
+                interval = max(1, settings.hh_sync_interval_hours) * 3600
+                if hh_due_at is None:
+                    hh_due_at = next_due(
+                        await last_run_at(hh_jobs.AUDIT_ACTION),
+                        interval_seconds=interval,
+                        now_mono=now,
+                        now=datetime.now(UTC),
+                    )
+                if now >= hh_due_at:
+                    hh_due_at = now + interval
+                    synced = await run_hh_sync()
+                    logger.info("hh.uz sync", extra={"extra_fields": asdict(synced)})
 
         except Exception:
             logger.exception("worker tick failed; continuing")

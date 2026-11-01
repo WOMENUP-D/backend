@@ -31,6 +31,7 @@ from app.schemas.opportunity import (
     ApplicationRead,
     ApplyIn,
     BusinessRead,
+    CourseSuggestionsRead,
     OpportunityCard,
     OpportunityDetail,
     OpportunityDiscover,
@@ -41,7 +42,7 @@ from app.schemas.opportunity import (
     SkillGap,
 )
 from app.services import opportunities as discovery
-from app.services import skills
+from app.services import skills, vacancy_courses
 from app.services.audit_service import has_consent
 from app.services.integration_gateway import ConsentMissingError
 from app.services.recommendation import analyse_skill_gap, match_opportunities
@@ -214,12 +215,29 @@ async def skill_gap(
     opportunity_id: uuid.UUID, user: CurrentUserDep, session: DbSession
 ) -> SkillGap:
     """What the user is missing for this role, and which courses close it."""
+    if await discovery.visible(session, opportunity_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
     gap = await analyse_skill_gap(
         session, user_id=uuid.UUID(user.id), opportunity_id=opportunity_id
     )
     if gap is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
     return gap
+
+
+@router.get("/{opportunity_id}/courses", response_model=CourseSuggestionsRead)
+async def courses_for(opportunity_id: uuid.UUID, session: DbSession) -> CourseSuggestionsRead:
+    """The courses on WomanUP that teach what this listing asks for.
+
+    Open to visitors: the choice is about the listing, not about the reader,
+    and it is the same for everyone. Chosen by the model from the catalogue
+    when the AI layer is on, by skill and word overlap when it is not; the
+    answer says which (`mode`), and every pick is a proposal — she decides.
+    """
+    opportunity = await discovery.visible(session, opportunity_id)
+    if opportunity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
+    return await vacancy_courses.suggestions_for(session, opportunity)
 
 
 @router.post("/apply", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)

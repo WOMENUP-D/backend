@@ -29,6 +29,8 @@ from app.core.constants import (
     OpportunitySource,
     OpportunityType,
     ProficiencyLevel,
+    ProgramCategory,
+    ProgramFormat,
     Region,
     Role,
     SkillCategory,
@@ -45,6 +47,7 @@ from app.models.opportunity import Application, Opportunity
 from app.models.organization import Organization
 from app.models.practice import PracticalTask, TaskAttempt
 from app.models.profile import Profile
+from app.models.program import Program
 from app.models.skill import Skill, UserSkill
 from app.models.user import User, UserRole
 from app.services import ai_coach, employer
@@ -743,6 +746,28 @@ async def test_a_partner_verifies_only_for_a_verified_organisation(client, sessi
     assert (await client.post(url, json=VERDICT, headers=unverified_headers)).status_code == 403
 
     org_id, _, verified_headers, _ = await _org(client, session, verified=True, name="Ishonchli")
+    # A verified organisation signs the work of its *own* programmes. The task
+    # belongs to no programme yet, so even a verified partner is not shown it.
+    assert (await client.post(url, json=VERDICT, headers=verified_headers)).status_code == 404
+    assert (
+        await client.get(f"{API}/practical-tasks/review", headers=verified_headers)
+    ).json() == []
+
+    programme = Program(
+        slug=f"org-course-{uuid.uuid4().hex[:6]}",
+        title_i18n={"uz": "Buxgalteriya amaliyoti"},
+        category=ProgramCategory.VOCATIONAL_SKILLS,
+        format=ProgramFormat.VIDEO,
+        language=Language.UZ,
+        organization_id=org_id,
+        is_published=True,
+    )
+    session.add(programme)
+    await session.flush()
+    task = await session.get(PracticalTask, attempt.task_id)
+    task.program_id = programme.id
+    await session.flush()
+
     response = await client.post(url, json=VERDICT, headers=verified_headers)
     assert response.status_code == 200, response.text
 

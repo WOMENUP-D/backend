@@ -270,7 +270,10 @@ def issue_tokens(user: User) -> TokenPair:
 
 def _tokens_for(user: User) -> TokenPair:
     role = user.primary_role
-    claims = {"roles": [r.value for r in user.role_set]}
+    claims = {
+        "roles": [r.value for r in user.role_set],
+        "gen": int(getattr(user, "session_generation", 0) or 0),
+    }
     return TokenPair(
         access_token=create_token(user.id, role, "access", claims),
         refresh_token=create_token(user.id, role, "refresh", claims),

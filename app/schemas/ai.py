@@ -64,7 +64,7 @@ class RiskFlagRead(ORMModel):
 class KnowledgeDocumentCreate(BaseModel):
     title: str = Field(max_length=300)
     source_type: str = Field(pattern="^(program|guideline|faq|legal|classifier|partner_catalog)$")
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=200_000)
     source_url: str | None = None
     language: str = "uz"
     tags: list[str] = []

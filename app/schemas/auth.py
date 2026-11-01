@@ -56,14 +56,74 @@ class OtpVerify(BaseModel):
         return self.phone or str(self.email)
 
 
+#: The passwords every list of leaked passwords opens with. A password on
+#: this list is the first guess an attacker makes, so it is not a password.
+COMMON_PASSWORDS = frozenset(
+    {
+        "password",
+        "password1",
+        "password123",
+        "passw0rd",
+        "12345678",
+        "123456789",
+        "1234567890",
+        "qwerty123",
+        "qwertyuiop",
+        "11111111",
+        "00000000",
+        "iloveyou",
+        "sunshine",
+        "princess",
+        "football",
+        "baseball",
+        "welcome1",
+        "admin123",
+        "letmein1",
+        "monkey123",
+        "dragon123",
+        "abc12345",
+        "abcd1234",
+        "1q2w3e4r",
+        "1q2w3e4r5t",
+        "qazwsx123",
+        "123123123",
+        "987654321",
+        "superman",
+        "trustno1",
+        "whatever",
+        "computer",
+        "internet",
+        "samsung1",
+        "changeme",
+        "p@ssw0rd",
+        "womanup1",
+        "womanup123",
+        "womanup2026",
+        "tashkent",
+        "toshkent",
+        "uzbekistan",
+    }
+)
+
+
 class RegisterRequest(BaseModel):
     """Opening an account with an address and a password."""
 
     email: EmailStr
     # Eight characters is the floor, not the goal. No composition rules: they
     # push people towards "Parol1!" and away from anything memorable, and the
-    # length is what actually costs an attacker.
+    # length is what actually costs an attacker. What is refused is the
+    # handful of passwords an attacker tries first, and her own address.
     password: str = Field(min_length=8, max_length=200)
+
+    @model_validator(mode="after")
+    def password_is_not_a_guess(self) -> Self:
+        candidate = self.password.strip().lower()
+        local = str(self.email).split("@", 1)[0].lower()
+        if candidate in COMMON_PASSWORDS or (len(local) >= 4 and candidate == local):
+            raise ValueError("this password is too common to protect an account")
+        return self
+
     # Agreeing to the privacy policy is part of opening an account, not a
     # setting to be found later: the account cannot exist without a lawful basis
     # for holding her data. `Literal[True]` rather than `bool` so a client that
@@ -81,8 +141,16 @@ class PasswordLogin(BaseModel):
 
 
 class TokenPair(BaseModel):
+    """The session as it is handed to a client.
+
+    The refresh token is set as an HttpOnly cookie on the response and left
+    out of the body, so a script in the page cannot read it. A client that
+    cannot hold cookies asks for it in the body with `X-Refresh-Transport:
+    body`.
+    """
+
     access_token: str
-    refresh_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
 
@@ -110,7 +178,16 @@ class GoogleTokenPair(TokenPair):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    """The token in the body is optional: browsers present it as a cookie."""
+
+    refresh_token: str | None = Field(default=None, max_length=4096)
+
+
+class LogoutRequest(BaseModel):
+    """Signing out. The refresh token, when the client still has it, is
+    revoked too, so the session cannot be resumed from a copy of it."""
+
+    refresh_token: str | None = Field(default=None, max_length=4096)
 
 
 class CurrentUser(BaseModel):

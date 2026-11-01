@@ -31,6 +31,45 @@ Production mode, database credentials, JWT/Firebase/provider secrets, worker
 heartbeat and migration sequencing are supplied by infra. Do not run demo seeds
 in production. See infra's README for prod configuration, bootstrap and recovery.
 
+## Security configuration the API insists on
+
+Outside `ENVIRONMENT=local` the process refuses to start unless
+`JWT_SECRET_KEY` is set to at least 32 random characters and `DEBUG` is off;
+the error names the setting and never its value.
+
+Sessions: the refresh token is an HttpOnly cookie (`AUTH_COOKIE_NAME`, default
+`wu_refresh`) scoped to `/api/v1/auth`, Secure outside local development,
+SameSite Lax — a script in the page can never read it, and the page keeps the
+thirty-minute access token in memory only. The site and the API must share an
+origin for this (they do, behind Caddy; in development Next proxies `/api`).
+Every refresh token is spent on use (`revoked_tokens`, revision 0036); a replay
+ends every session of the account by bumping `users.session_generation`
+(revision 0037), as does `POST /auth/logout-all`. Staff authority is re-read
+from `user_roles` on every request: revoking a role or suspending an account
+takes effect at once, not when the token expires. A password door holds an
+account after `LOGIN_FAILURES_PER_HOUR` wrong guesses (`STAFF_LOGIN_FAILURES_PER_HOUR`
+for desks) whatever addresses they come from. Set `ALLOWED_HOSTS` to the
+site's host names so a forged `Host` header is refused before routing.
+
+Partner callbacks (`/integrations/{system}/…`) carry `X-Client-Id` and, when
+`*_CLIENT_SECRET` is configured for the system, `X-Signature: sha256=<hex
+HMAC-SHA256 of the raw body under that secret>`. A partner may only decide
+applications to its own listings and report outcomes for women it knows
+through an application or a consent.
+
+Model-backed answers are capped per account (`AI_USER_HOURLY_LIMIT`) and per
+anonymous address (`AI_GUEST_IP_HOURLY_LIMIT`); every address is held to
+`RATE_LIMIT_PER_MINUTE` requests a minute and `EXPENSIVE_RATE_LIMIT_PER_MINUTE`
+on the job-board and model paths (per worker — the edge's own rate limiting
+stands in front); request bodies above `MAX_REQUEST_BODY_BYTES` are refused.
+The worker blanks assistant excerpts after `AI_TRACE_RETENTION_DAYS` and drops
+spent codes after `OTP_RETENTION_HOURS`. Security events go to the `security`
+logger; the alert rules, the incident plan and the pre-launch checklist are in
+`SECURITY.md`. Every response carries `nosniff`,
+`X-Frame-Options: DENY`, a `no-referrer` policy and `Cache-Control: no-store`
+on API paths; HSTS is added in production. The OpenAPI schema and the docs
+are served only outside production.
+
 ## The first administrator
 
 A fresh installation has a working `/admin` and nobody who can open it: the

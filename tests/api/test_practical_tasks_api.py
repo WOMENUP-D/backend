@@ -12,7 +12,7 @@ under a provider outage, and worth having as the default the tests see.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -31,10 +31,11 @@ from app.core.constants import (
     TaskSubmissionKind,
 )
 from app.core.security import create_token
+from app.models.mentor import MentorProfile, MentorSession
 from app.models.practice import PracticalTask, TaskAttempt
 from app.models.program import Program
 from app.models.skill import Skill, SkillEvidence, UserSkill
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services import practice, skills
 
 TASKS = "/api/v1/practical-tasks"
@@ -52,9 +53,15 @@ def _headers(user_id: uuid.UUID, *roles: Role) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _account(session, user_id: uuid.UUID) -> None:
+async def _account(session, user_id: uuid.UUID, *roles: Role) -> None:
+    """An account — and, for a desk, the roles it holds. Staff authority is
+    read from `user_roles` on every request, so a token alone grants nothing."""
     session.add(User(id=user_id, phone=_phone(), language=Language.UZ))
     await session.flush()
+    for role in roles:
+        session.add(UserRole(user_id=user_id, role=role))
+    if roles:
+        await session.flush()
 
 
 async def _skill(session, slug: str, label: str) -> Skill:
@@ -379,7 +386,7 @@ async def test_only_an_authorized_role_may_evaluate(client, session, user_id):
 @pytest.mark.asyncio
 async def test_a_woman_cannot_mark_her_own_work_however_senior_she_is(client, session, user_id):
     """A trainer taking a course is a learner on that course."""
-    await _account(session, user_id)
+    await _account(session, user_id, Role.ADMIN, Role.TRAINER, Role.MENTOR)
     await _skill(session, "excel", "Excel")
     _, attempt = await _submitted(session, client, user_id, slug="ish")
 
@@ -404,7 +411,7 @@ async def test_nothing_may_be_evaluated_before_it_is_submitted(client, session, 
     )
 
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     response = await client.post(
         f"{TASKS}/attempts/{attempt.id}/evaluate",
         json={"passed": True, "feedback": "x"},
@@ -419,7 +426,7 @@ async def test_a_pass_and_a_needs_improvement_both_persist(client, session, user
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
 
     _, failed = await _submitted(session, client, user_id, slug="birinchi")
     response = await client.post(
@@ -474,7 +481,7 @@ async def test_a_passed_task_makes_a_skill_assessed_and_never_verified(client, s
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, attempt = await _submitted(session, client, user_id, slug="ish")
 
     await client.post(
@@ -501,7 +508,21 @@ async def test_a_mentor_signing_the_same_work_verifies_it(client, session, user_
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     mentor = uuid.uuid4()
-    await _account(session, mentor)
+    await _account(session, mentor, Role.MENTOR)
+    # A mentor signs the work of the women she mentors: the relationship is a
+    # session between them, and without one she is not shown the work at all.
+    mentoring = MentorProfile(user_id=mentor, expertise=["excel"], languages=["uz"])
+    session.add(mentoring)
+    await session.flush()
+    session.add(
+        MentorSession(
+            mentor_id=mentoring.id,
+            user_id=user_id,
+            topic="excel",
+            scheduled_at=datetime.now(UTC) + timedelta(days=1),
+        )
+    )
+    await session.flush()
     _, attempt = await _submitted(session, client, user_id, slug="ish")
 
     await client.post(
@@ -535,7 +556,7 @@ async def test_a_failed_task_never_costs_her_a_verified_skill(client, session, u
     await session.flush()
 
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, attempt = await _submitted(session, client, user_id, slug="ish")
     await client.post(
         f"{TASKS}/attempts/{attempt.id}/evaluate",
@@ -559,7 +580,7 @@ async def test_re_evaluating_one_attempt_does_not_stack_evidence(client, session
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, attempt = await _submitted(session, client, user_id, slug="ish")
 
     for _ in range(3):
@@ -577,7 +598,7 @@ async def test_re_evaluating_one_attempt_does_not_stack_evidence(client, session
 async def test_a_task_that_practises_nothing_writes_no_evidence(client, session, user_id):
     await _account(session, user_id)
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, attempt = await _submitted(session, client, user_id, slug="ish", skills_practised=[])
 
     await client.post(
@@ -597,7 +618,7 @@ async def test_a_retry_is_a_new_attempt_and_keeps_the_first(client, session, use
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, first = await _submitted(session, client, user_id, slug="ish")
     await client.post(
         f"{TASKS}/attempts/{first.id}/evaluate",
@@ -625,7 +646,7 @@ async def test_a_passed_task_cannot_be_attempted_again(client, session, user_id)
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     _, attempt = await _submitted(session, client, user_id, slug="ish")
     await client.post(
         f"{TASKS}/attempts/{attempt.id}/evaluate",
@@ -831,7 +852,7 @@ async def test_an_evaluator_sees_the_work_and_the_brief_but_not_her_name(client,
     )
 
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     response = await client.get(f"{TASKS}/review", headers=_headers(trainer, Role.TRAINER))
 
     assert response.status_code == 200
@@ -848,7 +869,7 @@ async def test_my_tasks_puts_what_needs_her_first(client, session, user_id):
     await _account(session, user_id)
     await _skill(session, "excel", "Excel")
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
 
     _, passed = await _submitted(session, client, user_id, slug="tugagan")
     await client.post(
@@ -887,7 +908,7 @@ async def test_only_content_roles_may_author_a_task(client, session, user_id):
 
     refused = await client.post(TASKS, json=payload, headers=_headers(user_id))
     trainer = uuid.uuid4()
-    await _account(session, trainer)
+    await _account(session, trainer, Role.TRAINER)
     allowed = await client.post(TASKS, json=payload, headers=_headers(trainer, Role.TRAINER))
 
     assert refused.status_code == 403

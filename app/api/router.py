@@ -27,6 +27,7 @@ from app.api import (
     results,
     skills,
     users,
+    vacancies,
 )
 
 api_router = APIRouter()
@@ -43,6 +44,7 @@ api_router.include_router(practical_tasks.router)
 api_router.include_router(portfolio.router)
 api_router.include_router(skills.router)
 api_router.include_router(opportunities.router)
+api_router.include_router(vacancies.router)
 api_router.include_router(events.router)
 api_router.include_router(organizations.router)
 api_router.include_router(organizations.admin_router)

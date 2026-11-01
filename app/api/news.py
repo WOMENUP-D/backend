@@ -90,6 +90,21 @@ def _chosen_interests(profile: Profile | None) -> list[NewsTopic]:
     return topics
 
 
+def _may_edit(user, author_id) -> None:
+    """Content is edited by the person who wrote it, or by national staff.
+
+    Trainers share one role, not one desk: a course, a task or an article is
+    its author's until an administrator or a moderator steps in.
+    """
+    if user.has_role(Role.ADMIN, Role.MODERATOR):
+        return
+    if author_id is not None and str(author_id) == user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Only the author or a moderator may edit this"
+    )
+
+
 @router.get("", response_model=Page[NewsRead])
 async def list_news(
     session: DbSession,
@@ -319,6 +334,7 @@ async def update_news(
     post = await session.get(NewsPost, post_id)
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    _may_edit(user, post.author_id)
 
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("is_published") and post.published_at is None:

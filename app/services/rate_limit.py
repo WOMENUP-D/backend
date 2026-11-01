@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -72,6 +72,32 @@ async def take(session: AsyncSession, limit: Limit, key: str) -> bool:
         await session.execute(delete(AuthThrottle).where(AuthThrottle.expires_at < now))
     await session.commit()
     return hits <= limit.limit
+
+
+async def exhausted(session: AsyncSession, limit: Limit, key: str) -> bool:
+    """Whether `key` has already used up this window's allowance — read
+    without counting, so a check before an attempt does not itself cost one."""
+    now = datetime.now(UTC)
+    window_start = int(now.timestamp()) // limit.window_seconds * limit.window_seconds
+    hits = await session.scalar(
+        select(AuthThrottle.hits).where(
+            AuthThrottle.bucket == _bucket(limit.scope, key, window_start)
+        )
+    )
+    return int(hits or 0) >= limit.limit
+
+
+def login_failure_limits() -> tuple[Limit, Limit]:
+    """Failed password attempts per account, for the two password doors.
+
+    Per *identifier* and counted in the database, so an attacker spreading
+    guesses over many addresses still runs into the same ceiling on one
+    account — a desk account above all.
+    """
+    return (
+        Limit("login_failures", settings.login_failures_per_hour, 3600),
+        Limit("staff_login_failures", settings.staff_login_failures_per_hour, 3600),
+    )
 
 
 def otp_request_limits() -> tuple[Limit, Limit]:

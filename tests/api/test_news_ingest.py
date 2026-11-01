@@ -29,7 +29,7 @@ from app.core.constants import Role
 from app.core.security import create_token
 from app.models.audit import AiInteraction, AuditLog
 from app.models.news import NewsPost
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services.llm_gateway import LlmUnavailableError
 from app.services.news_ingest import ingest_news
 
@@ -167,6 +167,10 @@ async def _make_user(session: AsyncSession, user_id: uuid.UUID) -> User:
 async def editor_headers(session: AsyncSession) -> dict[str, str]:
     editor_id = uuid.uuid4()
     await _make_user(session, editor_id)
+    # Staff authority is read from `user_roles` on every request: the token
+    # alone is a claim, the row is the grant.
+    session.add(UserRole(user_id=editor_id, role=Role.ADMIN))
+    await session.flush()
     token = create_token(editor_id, Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
     return {"Authorization": f"Bearer {token}"}
 

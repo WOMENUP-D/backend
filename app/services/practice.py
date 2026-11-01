@@ -619,13 +619,30 @@ async def record_evaluation(
 # ---------------------------------------------------------------------------
 
 
-async def review_queue(session: AsyncSession, *, limit: int = REVIEW_LIMIT) -> list[TaskAttempt]:
-    """Submissions waiting for a person, oldest first."""
+async def review_queue(
+    session: AsyncSession,
+    *,
+    limit: int = REVIEW_LIMIT,
+    user_ids: set[uuid.UUID] | None = None,
+    task_ids: set[uuid.UUID] | None = None,
+) -> list[TaskAttempt]:
+    """Submissions waiting for a person, oldest first.
+
+    `user_ids` narrows the queue to particular women's work (a mentor's
+    mentees), `task_ids` to particular tasks (an organisation's own); None
+    on either axis means no restriction there, an empty set means nothing.
+    """
+    if user_ids is not None and not user_ids:
+        return []
+    if task_ids is not None and not task_ids:
+        return []
+    stmt = select(TaskAttempt).where(TaskAttempt.status == TaskStatus.SUBMITTED)
+    if user_ids is not None:
+        stmt = stmt.where(TaskAttempt.user_id.in_(list(user_ids)))
+    if task_ids is not None:
+        stmt = stmt.where(TaskAttempt.task_id.in_(list(task_ids)))
     rows = await session.execute(
-        select(TaskAttempt)
-        .where(TaskAttempt.status == TaskStatus.SUBMITTED)
-        .order_by(TaskAttempt.submitted_at.asc().nullslast())
-        .limit(limit)
+        stmt.order_by(TaskAttempt.submitted_at.asc().nullslast()).limit(limit)
     )
     return list(rows.scalars())
 

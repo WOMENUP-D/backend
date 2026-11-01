@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentUserDep, DbSession, StaffDep
+from app.api.deps import CurrentUserDep, DbSession, NationalStaffDep
 from app.models.mentor import MentorProfile, MentorSession
 from app.schemas.common import Message
 
@@ -147,7 +147,9 @@ async def leave_feedback(
 
 
 @router.post("/{mentor_id}/verify", response_model=Message)
-async def verify_mentor(mentor_id: uuid.UUID, user: StaffDep, session: DbSession) -> Message:
+async def verify_mentor(
+    mentor_id: uuid.UUID, user: NationalStaffDep, session: DbSession
+) -> Message:
     mentor = await session.get(MentorProfile, mentor_id)
     if mentor is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mentor not found")
