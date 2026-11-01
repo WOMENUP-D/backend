@@ -67,6 +67,7 @@ from app.services.prompts import (
     NEWS_DRAFT_SYSTEM,
     NEWS_SCOUT_SYSTEM,
 )
+from app.services.uzbek import to_new_alphabet
 
 logger = logging.getLogger(__name__)
 
@@ -454,10 +455,12 @@ def _tri(payload: dict[str, Any], key: str) -> dict[str, str] | None:
     raw = payload.get(key)
     if not isinstance(raw, dict):
         return None
-    uz = str(raw.get("uz") or "").strip()
+    uz = to_new_alphabet(str(raw.get("uz") or "").strip())
     if not uz:
         return None
-    return {lang: str(raw.get(lang) or "").strip() or uz for lang in ("uz", "ru", "en")}
+    out = {lang: str(raw.get(lang) or "").strip() or uz for lang in ("uz", "ru", "en")}
+    out["uz"] = uz
+    return out
 
 
 def _tags(payload: dict[str, Any]) -> list[str]:

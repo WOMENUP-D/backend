@@ -37,7 +37,7 @@ def test_the_message_carries_the_code_and_says_how_long_it_lasts():
 
 @pytest.mark.parametrize(
     ("language", "probe"),
-    [("uz", "kirish kodi"), ("ru", "код для входа"), ("en", "sign-in code")],
+    [("uz", "kiriş kodi"), ("ru", "код для входа"), ("en", "sign-in code")],
 )
 def test_she_is_written_to_in_the_language_she_was_reading(language, probe):
     assert probe in mailer._compose("a@b.uz", "111111", language)["Subject"]

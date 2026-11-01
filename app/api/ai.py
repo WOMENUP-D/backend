@@ -27,6 +27,7 @@ from app.schemas.week import WeekRead
 from app.services import rag, telemetry
 from app.services.ai_navigator import answer as navigator_answer
 from app.services.recommendation import recommendations_for
+from app.services.uzbek import convert_if_uzbek
 from app.services.week import week_for
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -51,6 +52,7 @@ async def ask_navigator(
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "navigator"}
     )
+    answer.answer = convert_if_uzbek(answer.answer, payload.language or user.language.value)
     return answer
 
 

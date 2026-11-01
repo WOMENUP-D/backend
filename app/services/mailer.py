@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # The three languages the portal speaks. The subject and body follow whatever
 # she was reading when she asked for the code.
 SUBJECTS = {
-    "uz": "WomanUP — kirish kodi",
+    "uz": "WomanUP — kiriş kodi",
     "ru": "WomanUP — код для входа",
     "en": "WomanUP — your sign-in code",
 }
@@ -33,9 +33,9 @@ SUBJECTS = {
 BODIES = {
     "uz": (
         "Assalomu alaykum!\n\n"
-        "WomanUP portaliga kirish kodingiz: {code}\n\n"
-        "Kod {minutes} daqiqa amal qiladi. Agar bu siz boʻlmasangiz, "
-        "bu xatni eʼtiborsiz qoldiring — hisobingizga hech kim kirmaydi.\n\n"
+        "WomanUP portaliga kiriş kodingiz: {code}\n\n"
+        "Kod {minutes} daqiqa amal qiladi. Agar bu siz bölmasangiz, "
+        "bu xatni eʼtiborsiz qoldiring — hisobingizga heç kim kirmaydi.\n\n"
         "WomanUP"
     ),
     "ru": (
