@@ -38,6 +38,7 @@ from app.services.llm_gateway import (
 )
 from app.services.prompts import ROADMAP_SCHEMA, ROADMAP_SYSTEM
 from app.services.scoring import weakest_dimensions
+from app.services.uzbek import to_new_alphabet
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,8 @@ async def generate_plan(
     payload = response.parsed
     if not payload:
         return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
+    if lang == "uz":
+        payload = _reformed(payload)
 
     plan = DevelopmentPlan(
         user_id=user_id,
@@ -508,3 +511,14 @@ async def close_plan_items_for_program(
     if items:
         await session.flush()
     return items
+
+
+def _reformed(value):
+    """Every string the model wrote for an Uzbek plan, in the reformed alphabet."""
+    if isinstance(value, str):
+        return to_new_alphabet(value)
+    if isinstance(value, list):
+        return [_reformed(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _reformed(item) for key, item in value.items()}
+    return value

@@ -83,7 +83,7 @@ CAREERS: list[dict] = [
         ),
         "description": (
             "Bu yoʻl sizga ijtimoiy tarmoqlarda ishlashga tayyorlanishda yordam beradi: "
-            "kontent reja tuzish, Canva'da dizayn qilish, sunʼiy intellekt vositalaridan "
+            "kontent reja tuzish, Canvaʼda dizayn qilish, sunʼiy intellekt vositalaridan "
             "foydalanish va marketing asoslari. Koʻpincha masofadan ham ishlash mumkin "
             "boʻlgan kasb.",
             "Этот путь поможет подготовиться к работе в соцсетях: составлять "

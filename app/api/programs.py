@@ -30,6 +30,7 @@ from app.schemas.program import (
     ProgressUpdate,
 )
 from app.services import learning, skills, telemetry
+from app.services.uzbek import to_new_alphabet, to_old_alphabet
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -75,8 +76,16 @@ async def list_programs(
         # not the name of a course, and a title-only search left her with
         # nothing.
         pattern = f"%{search.lower()}%"
+        # Records written before the alphabet reform spell "shahar"; the
+        # keyboard may type "şahar" or the other way round. Match both.
+        other = f"%{to_old_alphabet(to_new_alphabet(search)).lower()}%"
+        reformed = f"%{to_new_alphabet(search).lower()}%"
         stmt = stmt.where(
             or_(
+                func.lower(Program.title_i18n.op("->>")("uz")).like(other),
+                func.lower(Program.title_i18n.op("->>")("uz")).like(reformed),
+                func.lower(Program.goal_i18n.op("->>")("uz")).like(other),
+                func.lower(Program.description_i18n.op("->>")("uz")).like(other),
                 func.lower(Program.title_i18n.op("->>")("uz")).like(pattern),
                 func.lower(Program.title_i18n.op("->>")("ru")).like(pattern),
                 func.lower(Program.title_i18n.op("->>")("en")).like(pattern),

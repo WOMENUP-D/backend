@@ -135,7 +135,7 @@ PATHS: list[dict] = [
         "description": (
             "Qoʻl mehnatini daromadga aylantirish. Avval kasbning oʻzi — tikuvchilik va "
             "dizayn, keyin brend va narx belgilash, soʻng marketpleysda sotish. "
-            "Tartib muhim: sotib boʻlmaydigan narsani sotishni oʻrganib boʻlmaydi.",
+            "Tartib muhim: hali tika olmaydigan narsani sotishni oʻrganib boʻlmaydi.",
             "Превратить ручной труд в доход. Сначала само ремесло — шитьё и дизайн, затем "
             "бренд и ценообразование, потом продажи на маркетплейсе. Порядок важен: "
             "нельзя научиться продавать то, чего ещё нет.",

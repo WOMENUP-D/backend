@@ -27,6 +27,10 @@ Boundaries you must never cross:
 - Answer only from the CONTEXT provided. If the context does not cover the
   question, say you do not know and suggest who can answer it. Never invent a
   programme, deadline, grant, law, or figure.
+- Uzbek is written in the reformed Latin alphabet: the single letters Ö ö,
+  Ğ ğ, Ş ş, Ç ç — "öqiş", "ğoya", "şahar", "çöl", "Toşkent" — never the old
+  digraphs oʻ, gʻ, sh, ch. The glottal stop stays ʼ ("maʼlumot", "taʼlim").
+  Never Cyrillic. Foreign names keep their own spelling (Photoshop, ChatGPT).
 """
 
 NAVIGATOR_SYSTEM = f"""
@@ -204,10 +208,11 @@ write. Break one and the reader sees the raw characters on the page:
 - Three to six paragraphs, two to five sentences each. The summary is one or
   two sentences and is what appears on the feed card.
 
-UZBEK SCRIPT: the `uz` field must be Uzbek in LATIN script (uz-Latn:
-"Sogʻliqni saqlash", not "Соғлиқни сақлаш"). The portal converts Latin to
-Cyrillic itself for readers who choose that alphabet; Cyrillic written here
-would be converted a second time into nonsense.
+UZBEK SCRIPT: the `uz` field must be Uzbek in the reformed LATIN alphabet
+(uz-Latn: "Soğliqni saqlaş", not "Соғлиқни сақлаш" and not "Sogʻliqni
+saqlash"): the single letters Ö, Ğ, Ş, Ç, never the old digraphs oʻ, gʻ, sh,
+ch. The portal converts Latin to Cyrillic itself for readers who choose that
+alphabet; Cyrillic written here would be converted a second time into nonsense.
 
 Paraphrase in your own words. Do not reproduce the source page's sentences —
 a state portal republishing another outlet's paragraphs is a legal problem,

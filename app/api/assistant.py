@@ -38,6 +38,7 @@ from app.services import ai_assistant, ai_coach, telemetry
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
+from app.services.uzbek import convert_if_uzbek
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -112,9 +113,12 @@ def _guest_left(key: str) -> int:
     return max(0, ai_assistant.guest_allowance() - len(hits))
 
 
-def _reply(answer: AssistantAnswer, guest_left: int | None) -> AssistantReply:
+def _reply(
+    answer: AssistantAnswer, guest_left: int | None, language: str | None = None
+) -> AssistantReply:
+    # Uzbek leaves in the reformed alphabet, whichever one the model wrote.
     return AssistantReply(
-        answer=answer.answer,
+        answer=convert_if_uzbek(answer.answer, language),
         section=answer.section,
         kind=answer.kind,
         trace_id=answer.trace_id,
@@ -159,7 +163,7 @@ async def ask(
         session, name="ai_assistant_used", actor=actor, properties={"section": "ask"}
     )
     await session.commit()
-    return _reply(answer, guest_left)
+    return _reply(answer, guest_left, payload.language)
 
 
 # --- the coach -------------------------------------------------------------
@@ -207,6 +211,7 @@ async def coach_ask(
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "coach"}
     )
+    reply.message = convert_if_uzbek(reply.message, payload.language)
     await session.commit()
     return reply
 
@@ -232,7 +237,7 @@ async def education(
         session, name="ai_assistant_used", actor=actor, properties={"section": "education"}
     )
     await session.commit()
-    return _reply(answer, guest_left)
+    return _reply(answer, guest_left, payload.language)
 
 
 @router.post("/education/detail", response_model=AssistantReply)
@@ -255,7 +260,7 @@ async def education_detail(
         language=payload.language,
     )
     await session.commit()
-    return _reply(answer, None)
+    return _reply(answer, None, payload.language)
 
 
 @router.post("/health", response_model=AssistantReply)
@@ -279,7 +284,7 @@ async def health(
         session, name="ai_assistant_used", actor=actor, properties={"section": "health"}
     )
     await session.commit()
-    return _reply(answer, guest_left)
+    return _reply(answer, guest_left, payload.language)
 
 
 @router.get("/daily", response_model=AssistantReply)
@@ -291,7 +296,7 @@ async def daily(
         session, user_id=uuid.UUID(user.id), language=language
     )
     await session.commit()
-    return _reply(answer, None)
+    return _reply(answer, None, language)
 
 
 @router.get("/guest-allowance", response_model=dict)

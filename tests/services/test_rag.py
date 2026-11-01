@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.rag import build_context, chunk_text, needs_human_escalation
+from app.services.rag import _or_query, build_context, chunk_text, needs_human_escalation
 
 
 @pytest.mark.parametrize(
@@ -70,3 +70,27 @@ def test_oversized_paragraph_is_split_rather_than_dropped():
 
 def test_empty_context_is_explicit():
     assert "empty" in build_context([])
+
+
+@pytest.mark.parametrize(
+    "disclosure",
+    [
+        # The reformed alphabet (ö ğ ş ç) must reach the same keywords as the
+        # old spelling: the safety gate cannot depend on her keyboard.
+        "Yaşagim kelmayapti",
+        "Erim meni urayapti va qörqityapti",
+        "Özimni öldirmoqçiman",
+    ],
+)
+def test_reformed_alphabet_does_not_defeat_the_filter(disclosure):
+    assert needs_human_escalation(disclosure)
+
+
+def test_keyword_fallback_searches_both_spellings():
+    """Documents are stored in the reformed alphabet; a question typed in
+    either spelling has to find them."""
+    reformed = _or_query("rivojlaniş rejasi")
+    assert "rivojlaniş" in reformed and "rivojlanish" in reformed
+    old = _or_query("rivojlanish rejasi")
+    assert "rivojlaniş" in old and "rivojlanish" in old
+    assert _or_query("план развития") == "план | развития"

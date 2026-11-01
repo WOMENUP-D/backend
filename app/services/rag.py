@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.services.uzbek import to_new_alphabet, to_old_alphabet
 
 
 # Safety topics that bypass the model entirely and go straight to a human.
@@ -22,8 +23,16 @@ from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 # entirely. Matching is done on a form with all of them stripped, so a single
 # spelling below covers every variant a user might type.
 def _fold(text: str) -> str:
-    """Lowercase and remove apostrophes, so o'zimni / oʻzimni / ozimni agree."""
+    """Lowercase, fold the reformed letters back to their base form and remove
+    apostrophes, so o'zimni / oʻzimni / ozimni / özimni all agree.
+
+    The keyword list below is written in the old spelling without apostrophes;
+    a disclosure typed in the reformed alphabet (ö ğ ş ç) must reach the same
+    words, or the safety gate would depend on which keyboard she has.
+    """
     lowered = text.lower()
+    for new, old in (("ö", "o"), ("ğ", "g"), ("ş", "sh"), ("ç", "ch")):
+        lowered = lowered.replace(new, old)
     for mark in ("\u02bb", "\u02bc", "\u2018", "\u2019", "\u0027", "`"):
         lowered = lowered.replace(mark, "")
     return lowered
@@ -195,7 +204,15 @@ def _or_query(query: str) -> str:
     words = [
         re.sub(r"[^\w\u0400-\u04ff\u02bb\u2018\u2019-]", "", word) for word in query.lower().split()
     ]
-    terms = [word for word in words if len(word) > 2]
+    terms: list[str] = []
+    for word in words:
+        if len(word) <= 2:
+            continue
+        # Uzbek is stored in the reformed alphabet but typed in either; a term
+        # is searched in both spellings so neither keyboard loses recall.
+        for spelling in (word, to_new_alphabet(word), to_old_alphabet(word)):
+            if spelling and spelling not in terms:
+                terms.append(spelling)
     return " | ".join(terms) if terms else "''"
 
 
