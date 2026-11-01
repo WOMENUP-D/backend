@@ -25,7 +25,7 @@ from app.core.constants import NewsCategory, Role
 from app.core.security import create_token
 from app.models.news import NewsPost
 from app.models.profile import Profile
-from app.models.user import User
+from app.models.user import User, UserRole
 
 
 async def _make_user(session: AsyncSession, user_id: uuid.UUID) -> User:
@@ -42,6 +42,10 @@ async def editor_headers(session: AsyncSession) -> dict[str, str]:
     """An editor whose row exists — `author_id` on a created post points at it."""
     editor_id = uuid.uuid4()
     await _make_user(session, editor_id)
+    # Staff authority is read from `user_roles` on every request: the token
+    # alone is a claim, the row is the grant.
+    session.add(UserRole(user_id=editor_id, role=Role.ADMIN))
+    await session.flush()
     token = create_token(editor_id, Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
     return {"Authorization": f"Bearer {token}"}
 

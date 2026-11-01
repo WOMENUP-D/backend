@@ -27,6 +27,7 @@ from sqlalchemy import select
 
 from app.api.deps import ContentDep, CurrentUserDep, DbSession, OptionalUserDep
 from app.core.constants import EvaluatorKind, ProficiencyLevel, Role, TaskStatus, normalise_language
+from app.models.mentor import MentorProfile, MentorSession
 from app.models.practice import PracticalTask, TaskAttempt
 from app.models.program import Program
 from app.schemas.practice import (
@@ -46,6 +47,21 @@ router = APIRouter(prefix="/practical-tasks", tags=["practical-tasks"])
 # ---------------------------------------------------------------------------
 # Discovery
 # ---------------------------------------------------------------------------
+
+
+def _may_edit(user, author_id) -> None:
+    """Content is edited by the person who wrote it, or by national staff.
+
+    Trainers share one role, not one desk: a course, a task or an article is
+    its author's until an administrator or a moderator steps in.
+    """
+    if user.has_role(Role.ADMIN, Role.MODERATOR):
+        return
+    if author_id is not None and str(author_id) == user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Only the author or a moderator may edit this"
+    )
 
 
 @router.get("", response_model=list[PracticalTaskRead])
@@ -144,9 +160,10 @@ async def review_queue(user: CurrentUserDep, session: DbSession) -> list[ReviewI
     answers — not the woman who wrote it. Assessing a budget does not need her
     name, so her name is not sent.
     """
-    await _evaluator(user, session)
+    kind, org_id = await _evaluator(user, session)
+    user_ids, task_ids = await _reviewable(session, user, kind, org_id)
 
-    attempts = await practice.review_queue(session)
+    attempts = await practice.review_queue(session, user_ids=user_ids, task_ids=task_ids)
     if not attempts:
         return []
 
@@ -285,6 +302,14 @@ async def evaluate_attempt(
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
+    user_ids, task_ids = await _reviewable(session, user, kind, org_id)
+    if (user_ids is not None and attempt.user_id not in user_ids) or (
+        task_ids is not None and task.id not in task_ids
+    ):
+        # The same answer as for an attempt that does not exist: a reviewer
+        # outside the relationship is not told what she may not read.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+
     await practice.record_evaluation(
         session,
         attempt=attempt,
@@ -344,6 +369,7 @@ async def update_task(
     task = await session.get(PracticalTask, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    _may_edit(user, task.author_id)
 
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("criteria") is not None:
@@ -404,6 +430,36 @@ async def _evaluator(user, session: DbSession) -> tuple[EvaluatorKind, uuid.UUID
             status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised to assess submissions"
         )
     return kind, None
+
+
+async def _reviewable(
+    session: DbSession, user, kind: EvaluatorKind, org_id: uuid.UUID | None
+) -> tuple[set[uuid.UUID] | None, set[uuid.UUID] | None]:
+    """Whose work, and which tasks, this evaluator may assess.
+
+    A role says what a verdict is worth; a relationship says whose work it may
+    be signed on. A mentor assesses the women she has sessions with; a partner
+    organisation assesses the tasks of its own programmes; trainers,
+    moderators and administrators assess nationally. Returned as two optional
+    sets — None is "no restriction on that axis", an empty set is "nothing".
+    """
+    if user.has_role(Role.ADMIN, Role.MODERATOR, Role.TRAINER):
+        return None, None
+    if kind == EvaluatorKind.MENTOR:
+        mentees = await session.scalars(
+            select(MentorSession.user_id)
+            .join(MentorProfile, MentorProfile.id == MentorSession.mentor_id)
+            .where(MentorProfile.user_id == uuid.UUID(user.id))
+        )
+        return set(mentees.all()), None
+    if kind == EvaluatorKind.PARTNER and org_id is not None:
+        tasks = await session.scalars(
+            select(PracticalTask.id)
+            .join(Program, Program.id == PracticalTask.program_id)
+            .where(Program.organization_id == org_id)
+        )
+        return None, set(tasks.all())
+    return set(), None
 
 
 async def _programs_for(session: DbSession, tasks) -> dict[uuid.UUID, Program]:

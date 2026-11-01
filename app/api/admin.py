@@ -10,7 +10,8 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from app.api.deps import AdminDep, DbSession, StaffDep, coordinator_region
+from app.api.deps import AdminDep, DbSession, NationalStaffDep, StaffDep, coordinator_region
+from app.core import security_log
 from app.core.constants import DataClassification, Region, Role, UserStatus
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
@@ -174,6 +175,13 @@ async def assign_role(
             "scope_region": payload.scope_region.value if payload.scope_region else None,
         },
     )
+    security_log.event(
+        "admin.role_changed",
+        action="assign",
+        role=payload.role.value,
+        target=str(user_id),
+        actor=user.id,
+    )
     return Message(detail=f"Role '{payload.role.value}' assigned")
 
 
@@ -198,6 +206,9 @@ async def revoke_role(
         actor_id=uuid.UUID(user.id),
         actor_role=user.role.value,
         changes={"role": role.value},
+    )
+    security_log.event(
+        "admin.role_changed", action="revoke", role=role.value, target=str(user_id), actor=user.id
     )
     return Message(detail=f"Role '{role.value}' revoked")
 
@@ -235,7 +246,7 @@ async def read_audit_log(
 
 
 @router.get("/traffic", response_model=TrafficReport)
-async def site_traffic(user: StaffDep, session: DbSession, days: int = 30) -> TrafficReport:
+async def site_traffic(user: NationalStaffDep, session: DbSession, days: int = 30) -> TrafficReport:
     """Visits, not achievements: how many people opened the site at all.
 
     Counted from `page_views`, which includes visitors with no account — most
@@ -247,7 +258,7 @@ async def site_traffic(user: StaffDep, session: DbSession, days: int = 30) -> Tr
 
 
 @router.get("/stats/regions", response_model=list[dict])
-async def region_stats(user: StaffDep, session: DbSession) -> list[dict]:
+async def region_stats(user: NationalStaffDep, session: DbSession) -> list[dict]:
     rows = await session.execute(
         select(User.region, func.count(User.id))
         .where(User.region.is_not(None))

@@ -5,14 +5,23 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.api.deps import ContentDep, CurrentUserDep, DbSession, StaffDep, TrackerDep
+from app.api.deps import (
+    ContentDep,
+    CurrentUserDep,
+    DbSession,
+    NationalStaffDep,
+    StaffDep,
+    TrackerDep,
+    coordinator_region,
+)
 from app.models.assessment import DevelopmentScore
 from app.models.audit import RiskFlag
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.models.plan import DevelopmentPlan
+from app.models.user import User
 from app.schemas.ai import (
     KnowledgeDocumentCreate,
     KnowledgeDocumentRead,
@@ -24,7 +33,7 @@ from app.schemas.ai import (
 from app.schemas.common import Message
 from app.schemas.recommendation import RecommendationsRead
 from app.schemas.week import WeekRead
-from app.services import rag, telemetry
+from app.services import ai_limits, rag, telemetry
 from app.services.ai_navigator import answer as navigator_answer
 from app.services.recommendation import recommendations_for
 from app.services.uzbek import convert_if_uzbek
@@ -35,13 +44,18 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 @router.post("/navigator", response_model=NavigatorAnswer)
 async def ask_navigator(
-    payload: NavigatorQuery, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+    payload: NavigatorQuery,
+    user: CurrentUserDep,
+    session: DbSession,
+    actor: TrackerDep,
+    request: Request,
 ) -> NavigatorAnswer:
     """Ask the WomanUP Navigator.
 
     Answers come only from approved sources. High-risk topics are routed to a
     human without reaching the model.
     """
+    await ai_limits.take(session, request, uuid.UUID(user.id))
     answer = await navigator_answer(
         session,
         question=payload.message,
@@ -158,7 +172,7 @@ async def add_knowledge_document(
 
 @router.post("/knowledge/{document_id}/approve", response_model=KnowledgeDocumentRead)
 async def approve_document(
-    document_id: uuid.UUID, user: StaffDep, session: DbSession
+    document_id: uuid.UUID, user: NationalStaffDep, session: DbSession
 ) -> KnowledgeDocument:
     """Approve a document, making its chunks retrievable by the navigator."""
     document = await session.get(KnowledgeDocument, document_id)
@@ -182,7 +196,9 @@ async def list_knowledge(
 
 
 @router.delete("/knowledge/{document_id}", response_model=Message)
-async def delete_knowledge(document_id: uuid.UUID, user: StaffDep, session: DbSession) -> Message:
+async def delete_knowledge(
+    document_id: uuid.UUID, user: NationalStaffDep, session: DbSession
+) -> Message:
     document = await session.get(KnowledgeDocument, document_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -194,10 +210,14 @@ async def delete_knowledge(document_id: uuid.UUID, user: StaffDep, session: DbSe
 async def list_risk_flags(
     user: StaffDep, session: DbSession, unresolved_only: bool = True
 ) -> list[RiskFlag]:
-    """Risk signals for coordinators. Advisory only — never an automatic sanction."""
+    """Risk signals for coordinators. Advisory only — never an automatic
+    sanction. A coordinator sees the women of her region and nobody else."""
     stmt = select(RiskFlag).order_by(RiskFlag.created_at.desc())
     if unresolved_only:
         stmt = stmt.where(RiskFlag.resolved_at.is_(None))
+    region = await coordinator_region(session, user)
+    if region is not None:
+        stmt = stmt.join(User, User.id == RiskFlag.user_id).where(User.region == region)
     return list((await session.execute(stmt.limit(200))).scalars())
 
 
@@ -208,7 +228,12 @@ async def resolve_risk_flag(
     flag = await session.get(RiskFlag, flag_id)
     if flag is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+    region = await coordinator_region(session, user)
+    if region is not None:
+        flagged = await session.scalar(select(User.region).where(User.id == flag.user_id))
+        if flagged != region:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
     flag.resolved_at = datetime.now(UTC)
-    flag.resolution_note = note
+    flag.resolution_note = (note or "")[:1000] or None
     await session.flush()
     return flag

@@ -20,7 +20,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DbSession, TrackerDep
+from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip
+from app.api.deps import _verified as deps_verified
 from app.core.constants import ConsentScope, GoalHorizon, Region, ScoreDimension
 from app.core.security import decode_token
 from app.models.consent import ConsentLog
@@ -34,7 +35,7 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
-from app.services import ai_assistant, ai_coach, telemetry
+from app.services import ai_assistant, ai_coach, ai_limits, telemetry
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
@@ -47,6 +48,7 @@ _optional_bearer = HTTPBearer(auto_error=False)
 
 async def optional_user_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_optional_bearer)],
+    session: DbSession,
 ) -> uuid.UUID | None:
     """The caller's id when signed in, `None` when browsing anonymously.
 
@@ -70,16 +72,20 @@ async def optional_user_id(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from None
-    return uuid.UUID(payload["sub"])
+    # The same checks every other endpoint makes: a signed-out or suspended
+    # account does not get a personalised assistant either.
+    return uuid.UUID((await deps_verified(session, payload)).id)
 
 
 OptionalUserDep = Annotated[uuid.UUID | None, Depends(optional_user_id)]
 
 
 # --- guest allowance -------------------------------------------------------
-# In-process and best-effort: it resets on restart and is per-worker. That is
-# adequate for the pilot and is not a security control — the real boundary is
-# that a guest gets no persona. Move to Redis when the API runs multi-worker.
+# The three trial questions a visitor sees counted down. In-process and
+# best-effort, keyed on the browser's own id so the countdown is hers: it is
+# a product quota, not a security control. The control is `ai_limits`: a
+# database-backed cap per connecting address (and per account once signed
+# in) that no header can reset. Both are applied before the model is called.
 _GUEST_WINDOW_SECONDS = 24 * 60 * 60
 _guest_hits: dict[str, list[float]] = {}
 
@@ -87,8 +93,7 @@ _guest_hits: dict[str, list[float]] = {}
 def _guest_key(request: Request, guest_id: str | None) -> str:
     if guest_id:
         return f"g:{guest_id[:64]}"
-    client = request.client.host if request.client else "unknown"
-    return f"ip:{client}"
+    return f"ip:{client_ip(request) or 'unknown'}"
 
 
 def _guest_take(key: str) -> int:
@@ -148,6 +153,7 @@ async def ask(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """The one door. Portal documentation, career advice or health — routed."""
+    await ai_limits.take(session, request, user_id)
     guest_left = None
     if user_id is None:
         guest_left = _guest_take(_guest_key(request, x_guest_id))
@@ -193,7 +199,11 @@ async def coach_context(
 
 @router.post("/coach", response_model=CoachReply)
 async def coach_ask(
-    payload: CoachAsk, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+    payload: CoachAsk,
+    user: CurrentUserDep,
+    session: DbSession,
+    actor: TrackerDep,
+    request: Request,
 ) -> CoachReply:
     """Ask the Coach. Signed in only — there is nothing to coach without a record.
 
@@ -201,6 +211,7 @@ async def coach_ask(
     the model is called and resolved again afterwards, so a reference that
     reaches the browser is one the database holds.
     """
+    await ai_limits.take(session, request, uuid.UUID(user.id))
     reply = await ai_coach.answer(
         session,
         user_id=uuid.UUID(user.id),
@@ -226,6 +237,7 @@ async def education(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Choosing a profession, learning one, or picking up a craft."""
+    await ai_limits.take(session, request, user_id)
     guest_left = None
     if user_id is None:
         guest_left = _guest_take(_guest_key(request, x_guest_id))
@@ -243,6 +255,7 @@ async def education(
 @router.post("/education/detail", response_model=AssistantReply)
 async def education_detail(
     payload: DetailAsk,
+    request: Request,
     session: DbSession,
     user_id: OptionalUserDep,
 ) -> AssistantReply:
@@ -251,6 +264,7 @@ async def education_detail(
     A second call rather than a bigger first one: the cards are most of the
     output tokens, and folding them in made the visible reply four times slower.
     """
+    await ai_limits.take(session, request, user_id)
     answer = await ai_assistant.education_detail(
         session,
         user_id=user_id,
@@ -273,6 +287,7 @@ async def health(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Age-appropriate health information. Never a diagnosis."""
+    await ai_limits.take(session, request, user_id)
     guest_left = None
     if user_id is None:
         guest_left = _guest_take(_guest_key(request, x_guest_id))

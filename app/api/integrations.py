@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import uuid
 from datetime import UTC, datetime
@@ -9,7 +10,8 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.api.deps import AdminDep, CurrentUserDep, DbSession, StaffDep
+from app.api.deps import AdminDep, CurrentUserDep, DbSession, NationalStaffDep, client_ip
+from app.core import security_log
 from app.core.constants import (
     EVENT_TYPES,
     ApplicationStatus,
@@ -30,8 +32,9 @@ from app.schemas.opportunity import (
     OutcomeRead,
 )
 from app.services import events
-from app.services.audit_service import record_audit
+from app.services.audit_service import has_consent, record_audit
 from app.services.integration_gateway import (
+    CONSENT_FOR_SYSTEM,
     ConsentMissingError,
     config_for,
     drain_outbox,
@@ -110,12 +113,17 @@ def _listing_fields(item: dict) -> dict | None:
     }
 
 
-def _verify_partner(system: IntegrationSystem, client_id: str | None) -> None:
+async def _verify_partner(
+    system: IntegrationSystem, request: Request, client_id: str | None, signature: str | None
+) -> None:
     """Authenticate an inbound callback.
 
-    A shared client id compared in constant time is the minimum bar; before
-    production this should become OAuth2 client credentials or a signed
-    webhook, per section 05.
+    The client id names the partner; it is the same value WomanUP sends the
+    partner on every outbound call, so on its own it proves nothing. When a
+    client secret is configured for the system the callback must also carry
+    `X-Signature: sha256=<hex HMAC-SHA256 of the raw body under that secret>`,
+    compared in constant time. Without a secret only the id is checked — the
+    state the integrations are in before a partner contract exists.
     """
     config = config_for(system)
     if not config.client_id:
@@ -123,10 +131,28 @@ def _verify_partner(system: IntegrationSystem, client_id: str | None) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Integration with {system.value} is not configured",
         )
+    refused = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid partner credentials"
+    )
     if not client_id or not hmac.compare_digest(client_id, config.client_id):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid partner credentials"
+        security_log.event("integration.auth_failed", system=system.value, ip=client_ip(request))
+        raise refused
+    if config.client_secret:
+        body = await request.body()
+        expected = (
+            "sha256=" + hmac.new(config.client_secret.encode(), body, hashlib.sha256).hexdigest()
         )
+        if not signature or not hmac.compare_digest(signature.strip(), expected):
+            security_log.event(
+                "integration.auth_failed",
+                system=system.value,
+                ip=client_ip(request),
+                reason="signature",
+            )
+            raise refused
+
+
+_FINAL = (ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN)
 
 
 @router.post("/{system}/applications/{application_id}/status", response_model=Message)
@@ -137,13 +163,26 @@ async def receive_application_status(
     session: DbSession,
     request: Request,
     x_client_id: str | None = Header(default=None),
+    x_signature: str | None = Header(default=None),
 ) -> Message:
-    """A partner reports an application's new status back into the cabinet."""
-    _verify_partner(system, x_client_id)
+    """A partner reports an application's new status back into the cabinet.
+
+    Only for applications that went to *this* partner: a listing from another
+    system, or one published on WomanUP, is not the partner's to decide, and
+    an application already decided or withdrawn is not reopened.
+    """
+    await _verify_partner(system, request, x_client_id, x_signature)
 
     application = await session.get(Application, application_id)
     if application is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    listing = await session.get(Opportunity, application.opportunity_id)
+    if listing is None or listing.source != SYSTEM_TO_SOURCE[system]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if application.status in _FINAL:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Application is already decided"
+        )
 
     now = datetime.now(UTC)
     application.status = payload.status
@@ -173,17 +212,41 @@ async def receive_outcome(
     payload: OutcomeCreate,
     user_id: uuid.UUID,
     session: DbSession,
+    request: Request,
     x_client_id: str | None = Header(default=None),
+    x_signature: str | None = Header(default=None),
 ) -> OutcomeRecord:
     """A partner confirms a real result — hired, funded, first sale.
 
     This is what closes the loop: the result returns to the cabinet and feeds
-    the North Star metric.
+    the North Star metric — so it is accepted only for a woman the partner
+    actually knows: through an application of hers to one of its listings, or
+    through a profile she consented to share with it. Nobody else's record
+    can be written to by a partner naming an id.
     """
-    _verify_partner(system, x_client_id)
+    await _verify_partner(system, request, x_client_id, x_signature)
 
     if await session.get(User, user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if payload.application_id is not None:
+        application = await session.get(Application, payload.application_id)
+        listing = (
+            await session.get(Opportunity, application.opportunity_id) if application else None
+        )
+        if (
+            application is None
+            or application.user_id != user_id
+            or listing is None
+            or listing.source != SYSTEM_TO_SOURCE[system]
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+            )
+    elif not await has_consent(session, user_id, CONSENT_FOR_SYSTEM[system]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": "no_link", "message": "no application or consent for this partner"},
+        )
 
     outcome = OutcomeRecord(
         user_id=user_id,
@@ -213,14 +276,21 @@ async def sync_opportunities(
     system: IntegrationSystem,
     items: list[dict],
     session: DbSession,
+    request: Request,
     x_client_id: str | None = Header(default=None),
+    x_signature: str | None = Header(default=None),
 ) -> Message:
     """Upsert an opportunity batch from a partner.
 
     Keyed on (source, external_id), so a partner re-sending the same batch
     updates rather than duplicates.
     """
-    _verify_partner(system, x_client_id)
+    await _verify_partner(system, request, x_client_id, x_signature)
+    if len(items) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="at most 500 items per batch",
+        )
     source = SYSTEM_TO_SOURCE[system]
 
     created = updated = skipped = 0
@@ -287,7 +357,7 @@ async def drain(user: AdminDep, session: DbSession, limit: int = 50) -> Message:
 
 
 @router.get("/outbox/failed", response_model=list[dict])
-async def failed_events(user: StaffDep, session: DbSession) -> list[dict]:
+async def failed_events(user: NationalStaffDep, session: DbSession) -> list[dict]:
     """Dead-lettered events awaiting manual intervention."""
     from app.core.constants import IntegrationEventStatus
 

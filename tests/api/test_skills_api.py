@@ -24,7 +24,7 @@ from app.models.audit import AuditLog
 from app.models.profile import Profile
 from app.models.program import Enrollment, Program, ProgramModule
 from app.models.skill import Skill
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services import skills as skill_service
 
 CATALOGUE = "/api/v1/skills"
@@ -44,6 +44,8 @@ async def _editor(session) -> dict[str, str]:
     """
     admin = User(phone=_phone())
     session.add(admin)
+    await session.flush()
+    session.add(UserRole(user_id=admin.id, role=Role.ADMIN))
     await session.flush()
     token = create_token(admin.id, Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
     return {"Authorization": f"Bearer {token}"}
