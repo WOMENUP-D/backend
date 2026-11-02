@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import worker
 from app.models.program import Program
+from app.models.skill import Skill
 
 COURSE = {
     "source": "coursera",
@@ -67,3 +68,14 @@ def test_the_default_file_is_the_one_shipped_beside_the_code():
     # once the package is installed, which is how the first release missed it.
     assert Path("data/partner_courses.json") == worker.CATALOGUE_FILE
     assert worker.CATALOGUE_FILE.exists()
+
+
+@pytest.mark.asyncio
+async def test_the_taxonomy_ships_with_the_code(worker_sessions):
+    count = await worker.run_taxonomy_load()
+    assert count > 80
+    async with worker_sessions() as session:
+        sql = await session.scalar(select(Skill).where(Skill.slug == "sql"))
+    assert sql is not None and "sql" in sql.aliases and sql.name_i18n["ru"] == "SQL"
+    # Running again changes nothing and raises nothing.
+    assert await worker.run_taxonomy_load() == count

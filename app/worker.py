@@ -26,7 +26,7 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from app import import_courses
+from app import import_courses, seed_skills
 from app.core.config import settings
 from app.core.constants import DataClassification, RiskFlagType
 from app.core.logging import configure_logging
@@ -266,6 +266,19 @@ async def run_hh_sync(*, force: bool = False) -> hh_jobs.SyncResult:
 CATALOGUE_FILE = Path(os.getenv("CATALOGUE_FILE", "data/partner_courses.json"))
 
 
+async def run_taxonomy_load() -> int:
+    """Upsert the skill catalogue shipped with the code (`app.seed_skills`).
+
+    Vocabulary, not data: a release that teaches the taxonomy a new tag is
+    enough for the catalogue's subject row to name it in three languages and
+    file it under a direction. Idempotent, so it runs on every start."""
+    async with SessionLocal() as session:
+        count = await seed_skills.load_skills(session)
+        await session.commit()
+    logger.info("taxonomy loaded", extra={"extra_fields": {"skills": count}})
+    return count
+
+
 async def run_catalogue_import() -> tuple[int, int] | None:
     """Upsert the shipped partner courses. Returns (added, updated), or None
     when there is no file or it is not one the importer accepts — that is
@@ -312,6 +325,7 @@ async def run() -> None:
                 await session.commit()
 
             if not catalogue_loaded:
+                await run_taxonomy_load()
                 await run_catalogue_import()
                 catalogue_loaded = True
 

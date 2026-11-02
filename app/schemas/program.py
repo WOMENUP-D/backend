@@ -14,6 +14,7 @@ from app.core.constants import (
     ProficiencyLevel,
     ProgramCategory,
     ProgramFormat,
+    SkillCategory,
 )
 from app.schemas.common import ORMModel
 from app.schemas.skill import SkillRef
@@ -109,6 +110,8 @@ class ProgramUpdate(BaseModel):
 
 class ProgramRead(ProgramBase, ORMModel):
     id: uuid.UUID
+    # The language it is taught in; the catalogue filters and the card show it.
+    language: Language | None = None
     cover_url: str | None = None
     is_published: bool
     published_at: datetime | None = None
@@ -121,6 +124,33 @@ class ProgramDetail(ProgramRead):
     # card can name them in the reader's language. The raw column stays as the
     # author wrote it.
     skills: list[SkillRef] = []
+
+
+class ProgramTopicRead(BaseModel):
+    """One subject the catalogue teaches, as the courses are tagged.
+
+    `label` is the tag as written on the courses (lower-cased), which is what
+    the `skill` filter takes back. `title_i18n` is how to show it: the
+    taxonomy's name when the tag *is* that skill, the tag itself otherwise —
+    "python" is an alias of the broader "programming" skill, and a Python
+    chip must not read "Programming". `direction` is the taxonomy's category
+    when the tag is known there."""
+
+    label: str
+    title_i18n: dict[str, str]
+    slug: str | None = None
+    direction: SkillCategory | None = None
+    count: int
+
+
+class ProgramSuggestion(BaseModel):
+    """A course title offered while she types: enough to open the course."""
+
+    id: uuid.UUID
+    slug: str
+    title_i18n: dict[str, str]
+    provider: str | None = None
+    external_url: str | None = None
 
 
 class ProgramFilter(BaseModel):
