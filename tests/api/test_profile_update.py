@@ -69,3 +69,17 @@ async def test_saving_twice_still_works(
     )
     assert second.status_code == 200, second.text
     assert second.json()["profession"] == "Moliyaviy tahlilchi"
+
+
+@pytest.mark.asyncio
+async def test_a_name_typed_in_lower_case_is_saved_as_a_name(
+    client: AsyncClient, auth_headers: dict[str, str], signed_in: uuid.UUID
+) -> None:
+    response = await client.put(
+        "/api/v1/users/me/profile", json={"full_name": "durdona kim"}, headers=auth_headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["full_name"] == "Durdona Kim"
+    # Read back, not just echoed.
+    again = await client.get("/api/v1/users/me/profile", headers=auth_headers)
+    assert again.json()["full_name"] == "Durdona Kim"
