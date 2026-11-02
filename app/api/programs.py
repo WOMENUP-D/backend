@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.sql import operators
 
 from app.api.deps import ContentDep, CurrentUserDep, DbSession, OptionalUserDep, TrackerDep
 from app.core.constants import (
     EnrollmentStatus,
     Language,
+    ProficiencyLevel,
     ProgramCategory,
     ProgramFormat,
     Role,
+    SkillCategory,
 )
 from app.models.program import Certificate, Enrollment, Program, ProgramLesson, ProgramModule
 from app.schemas.common import Page, PaginationParams
@@ -26,6 +30,8 @@ from app.schemas.program import (
     ProgramDetail,
     ProgramLessonDetail,
     ProgramRead,
+    ProgramSuggestion,
+    ProgramTopicRead,
     ProgramUpdate,
     ProgressUpdate,
 )
@@ -60,6 +66,9 @@ async def list_programs(
     region: str | None = None,
     search: str | None = Query(default=None, max_length=100),
     has_certificate: bool | None = None,
+    skill: str | None = Query(default=None, max_length=80),
+    level: ProficiencyLevel | None = None,
+    duration: Literal["short", "medium", "long"] | None = None,
 ) -> Page[ProgramRead]:
     """Catalogue with the filters the programme screen offers.
 
@@ -77,6 +86,27 @@ async def list_programs(
         stmt = stmt.where(Program.language == language)
     if has_certificate is not None:
         stmt = stmt.where(Program.has_certificate.is_(has_certificate))
+    if skill:
+        # The subject row: a tag matched whole and case-blind, so "Python" and
+        # "python" are one topic and "sql" does not catch "nosql"; every
+        # spelling of the same skill counts, so "english" finds the courses
+        # tagged "ingliz tili" and "английский язык" too.
+        index = await skills.SkillIndex.load(session, [skill])
+        stmt = stmt.where(
+            or_(
+                *[
+                    Program.skills_taught.any(_exact(spelling), operator=operators.ilike_op)
+                    for spelling in _spellings(skill, index)
+                ]
+            )
+        )
+    if level:
+        stmt = stmt.where(Program.level == level)
+    if duration:
+        low, high = DURATION_HOURS[duration]
+        stmt = stmt.where(Program.duration_hours.is_not(None), Program.duration_hours >= low)
+        if high is not None:
+            stmt = stmt.where(Program.duration_hours <= high)
     if region:
         # An empty target_regions list means "available everywhere".
         stmt = stmt.where(
@@ -131,6 +161,146 @@ async def list_programs(
         page=pagination.page,
         size=pagination.size,
     )
+
+
+#: Hours behind the three duration chips. Only a course that states its hours
+#: can match one; a course that states none is left out of a duration filter
+#: rather than guessed at.
+DURATION_HOURS: dict[str, tuple[int, int | None]] = {
+    "short": (0, 12),
+    "medium": (13, 40),
+    "long": (41, None),
+}
+
+
+def _exact(label: str) -> str:
+    """A tag as an ILIKE pattern that matches only itself."""
+    return label.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+#: Short Latin tags that are acronyms, not words: "html" reads HTML, not Html.
+#: "git" is a word and stays one.
+_LOWERCASE_BRANDS = {"git", "node", "bash", "vim", "java"}
+
+
+def _pretty(label: str) -> dict[str, str]:
+    bare = label.strip()
+    if len(bare) <= 4 and bare.isascii() and bare.isalnum() and bare not in _LOWERCASE_BRANDS:
+        shown = bare.upper()
+    else:
+        shown = bare[:1].upper() + bare[1:]
+    return {"uz": shown, "ru": shown, "en": shown}
+
+
+def _is_name_of(label: str, skill) -> bool:
+    """Whether the tag *is* the skill — its slug or one of its names — rather
+    than an alias of a broader skill ("python" is an alias of "programming")."""
+    key = skills.normalise(label)
+    names = {skills.normalise(str(name)) for name in skill.name_i18n.values()}
+    return key == skills.normalise(skill.slug) or key in names
+
+
+def _shown(
+    label: str, index: skills.SkillIndex
+) -> tuple[dict[str, str], str | None, SkillCategory | None]:
+    """How a tag is displayed, and what the taxonomy knows about it.
+
+    The taxonomy's name is used only when the tag *is* that skill. An alias of
+    a broader skill keeps its own wording, so a Python chip reads "Python"
+    and not "Programming".
+    """
+    skill = index.get(label)
+    if skill is None:
+        return _pretty(label), None, None
+    if _is_name_of(label, skill):
+        return dict(skill.name_i18n), skill.slug, skill.category
+    return _pretty(label), skill.slug, skill.category
+
+
+def _spellings(label: str, index: skills.SkillIndex) -> list[str]:
+    """Every tag that names the same skill as `label` — "ingliz tili",
+    "английский язык" and "english" are one subject — or just the tag itself
+    when it is an alias of a broader skill or unknown to the taxonomy."""
+    skill = index.get(label)
+    if skill is None or not _is_name_of(label, skill):
+        return [label.strip()]
+    return sorted(
+        {label.strip(), skill.slug, *(str(n) for n in skill.name_i18n.values())}, key=str.lower
+    )
+
+
+@router.get("/topics", response_model=list[ProgramTopicRead])
+async def program_topics(
+    session: DbSession,
+    category: ProgramCategory | None = None,
+    limit: int = Query(default=40, ge=1, le=120),
+) -> list[ProgramTopicRead]:
+    """The subjects the published courses are tagged with, most taught first.
+
+    Open to visitors like the catalogue. Within a category the row narrows
+    to that category's subjects, so "finance" offers taxes and investing, not
+    Python. Case and surrounding spaces are folded; nothing else is invented.
+    """
+    tag = func.lower(func.trim(func.unnest(Program.skills_taught))).label("tag")
+    inner = select(tag).where(Program.is_published.is_(True))
+    if category:
+        inner = inner.where(Program.category == category)
+    sub = inner.subquery()
+    rows = await session.execute(
+        select(sub.c.tag, func.count().label("n"))
+        .where(sub.c.tag != "")
+        .group_by(sub.c.tag)
+        .order_by(func.count().desc(), sub.c.tag)
+        .limit(limit)
+    )
+    counted = [(label, int(n)) for label, n in rows.all()]
+    index = await skills.SkillIndex.load(session, [label for label, _ in counted])
+    # Spellings of one skill fold into one chip — "ingliz tili" and "английский
+    # язык" are both names of English — under the first spelling seen, which
+    # is the most-tagged one; the filter expands it back to every spelling.
+    merged: dict[str, ProgramTopicRead] = {}
+    for label, n in counted:
+        title, slug, direction = _shown(label, index)
+        skill = index.get(label)
+        key = (
+            f"skill:{slug}" if skill is not None and _is_name_of(label, skill) else f"label:{label}"
+        )
+        if key in merged:
+            merged[key].count += n
+            continue
+        merged[key] = ProgramTopicRead(
+            label=label, title_i18n=title, slug=slug, direction=direction, count=n
+        )
+    return sorted(merged.values(), key=lambda t: (-t.count, t.label))[:limit]
+
+
+@router.get("/suggest", response_model=list[ProgramSuggestion])
+async def suggest_programs(
+    session: DbSession,
+    q: str = Query(min_length=2, max_length=80),
+    limit: int = Query(default=8, ge=1, le=20),
+) -> list[ProgramSuggestion]:
+    """Course titles that contain what she has typed so far, for the search
+    field's suggestions. Published courses only; titles in every locale."""
+    pattern = f"%{q.lower()}%"
+    reformed = f"%{to_new_alphabet(q).lower()}%"
+    old = f"%{to_old_alphabet(to_new_alphabet(q)).lower()}%"
+    rows = await session.execute(
+        select(Program)
+        .where(
+            Program.is_published.is_(True),
+            or_(
+                *[
+                    func.lower(Program.title_i18n.op("->>")(lang)).like(form)
+                    for lang in ("uz", "ru", "en")
+                    for form in {pattern, reformed, old}
+                ]
+            ),
+        )
+        .order_by(Program.published_at.desc().nullslast())
+        .limit(limit)
+    )
+    return [ProgramSuggestion.model_validate(p, from_attributes=True) for p in rows.scalars()]
 
 
 @router.get("/me/enrollments", response_model=list[EnrollmentDetail])
@@ -214,6 +384,54 @@ async def read_program_by_slug(
     """
     program = await session.scalar(select(Program).where(Program.slug == slug))
     return await _program_detail(session, program, user)
+
+
+@router.get("/{program_id}/related", response_model=list[ProgramRead])
+async def related_programs(
+    program_id: uuid.UUID, session: DbSession, limit: int = Query(default=6, ge=1, le=12)
+) -> list[ProgramRead]:
+    """Courses genuinely near this one: first those sharing a subject tag
+    (resolved through the taxonomy, so "python" and "programming" count as
+    neighbours), then the rest of its category. Never itself, never a draft,
+    never a random fill — fewer than `limit` is an honest answer."""
+    program = await session.get(Program, program_id)
+    if program is None or not program.is_published:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    tags = [t.strip().lower() for t in (program.skills_taught or []) if t and t.strip()]
+    candidates = (
+        await session.execute(
+            select(Program)
+            .where(
+                Program.is_published.is_(True),
+                Program.id != program.id,
+                or_(
+                    Program.category == program.category,
+                    *(
+                        [
+                            Program.skills_taught.any(_exact(tag), operator=operators.ilike_op)
+                            for tag in tags
+                        ]
+                        if tags
+                        else []
+                    ),
+                ),
+            )
+            .order_by(Program.published_at.desc().nullslast())
+            .limit(200)
+        )
+    ).scalars()
+    candidates = list(candidates)
+    index = await skills.SkillIndex.load(
+        session, tags + [t for c in candidates for t in (c.skills_taught or [])]
+    )
+    mine = {index.key(tag) for tag in tags}
+
+    def score(candidate: Program) -> tuple[int, int]:
+        theirs = {index.key(t) for t in (candidate.skills_taught or []) if t and t.strip()}
+        return (len(mine & theirs), 1 if candidate.category == program.category else 0)
+
+    ranked = sorted(candidates, key=score, reverse=True)
+    return [ProgramRead.model_validate(p) for p in ranked[:limit]]
 
 
 @router.get("/{program_id}", response_model=ProgramDetail)
