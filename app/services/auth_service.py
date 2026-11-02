@@ -19,6 +19,7 @@ from app.core.security import (
     verify_otp,
     verify_password,
 )
+from app.core.text import tidy_name
 from app.models.profile import Profile
 from app.models.user import OtpChallenge, User, UserRole
 from app.schemas.auth import TokenPair
@@ -404,6 +405,6 @@ async def _fill_profile_from_google(
         session.add(profile)
 
     if not profile.full_name and identity.full_name:
-        profile.full_name = identity.full_name
+        profile.full_name = tidy_name(identity.full_name)
     if not profile.avatar_url and identity.picture:
         profile.avatar_url = identity.picture

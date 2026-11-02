@@ -143,7 +143,7 @@ async def test_a_dry_run_reads_the_file_and_writes_nothing(tmp_path, capsys):
 
 
 def test_the_shipped_file_is_one_the_importer_accepts():
-    """The 794 courses in the repository, checked without a database."""
+    """The courses in the repository, checked without a database."""
     from pathlib import Path
 
     records = json.loads(Path("data/partner_courses.json").read_text(encoding="utf-8"))
@@ -152,7 +152,11 @@ def test_the_shipped_file_is_one_the_importer_accepts():
     assert len({row["slug"] for row in rows}) == len(rows), "two courses share a slug"
     assert all(row["external_url"].startswith("https://") for row in rows)
     # Stepik is the bulk of it; the Uzbek platforms are the reason the file
-    # exists at all for a reader who does not read Russian.
+    # exists at all for a reader who does not read Russian; the English
+    # courses (Coursera, Khan Academy) used to live in a separate block on the
+    # programmes page and now sit in the same catalogue as everything else.
     sources = {row["source"] for row in rows}
-    assert "stepik" in sources
-    assert sources <= {"stepik", "ochiqkurs", "direktor", "spbu"}
+    assert {"stepik", "ochiqkurs", "coursera"} <= sources
+    assert sources <= {"stepik", "ochiqkurs", "direktor", "spbu", "coursera", "khanacademy"}
+    assert sum(row["source"] == "coursera" for row in rows) == 14
+    assert sum(row["source"] == "khanacademy" for row in rows) == 1

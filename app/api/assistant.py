@@ -24,6 +24,7 @@ from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip
 from app.api.deps import _verified as deps_verified
 from app.core.constants import ConsentScope, GoalHorizon, Region, ScoreDimension
 from app.core.security import decode_token
+from app.core.text import tidy_name
 from app.models.consent import ConsentLog
 from app.models.profile import Goal, Profile
 from app.models.user import User
@@ -385,7 +386,9 @@ async def onboarding(
         record = Profile(user_id=user_id)
         session.add(record)
 
-    record.full_name = " ".join(part for part in (payload.name, payload.surname) if part.strip())
+    record.full_name = tidy_name(
+        " ".join(part for part in (payload.name, payload.surname) if part.strip())
+    )
 
     # A given date is stored as given; a bare age from a legacy client is
     # anchored to *today*, not to 1 January.

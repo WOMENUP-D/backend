@@ -17,6 +17,7 @@ from app.core.constants import (
     ScoreDimension,
     UserStatus,
 )
+from app.core.text import tidy_name
 from app.schemas.common import ORMModel, validate_birth_date
 
 
@@ -74,6 +75,12 @@ class ProfileUpdate(ProfileBase, ProfileSensitive):
     # the field leaves the stored choice alone (`exclude_unset`), and sending
     # an explicit null — which would violate the column — is rejected.
     news_interests: list[NewsTopic] = []
+
+    @field_validator("full_name")
+    @classmethod
+    def written_as_a_name(cls, value: str | None) -> str | None:
+        # Typed in lower case on a phone, shown as a name on her card.
+        return tidy_name(value)
 
     # The same rule the onboarding applies, so this endpoint cannot be used to
     # store a date of birth the sign-up form would have refused.
