@@ -27,7 +27,7 @@ from app.core.constants import (
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.models.program import Program
 from app.models.user import User
-from app.services.plan_service import close_plan_items_for_program
+from app.services.plan_service import close_diagnostic_items, close_plan_items_for_program
 
 
 async def _user(session: AsyncSession) -> uuid.UUID:
@@ -188,3 +188,48 @@ async def test_the_completion_time_is_not_rewritten(session: AsyncSession) -> No
     await close_plan_items_for_program(session, user_id, program_id)
 
     assert item.completed_at == first
+
+
+async def _worded(
+    session: AsyncSession,
+    plan: DevelopmentPlan,
+    action: str,
+    *,
+    status: PlanItemStatus = PlanItemStatus.PLANNED,
+) -> PlanItem:
+    """A step with no programme behind it, identified by its wording alone."""
+    item = PlanItem(plan_id=plan.id, order_index=0, action=action, status=status)
+    session.add(item)
+    await session.flush()
+    return item
+
+
+@pytest.mark.asyncio
+async def test_the_step_that_is_the_diagnostic_closes_once_she_sat_it(
+    session: AsyncSession,
+) -> None:
+    """The model words it in her language; the match is on the words."""
+    user_id = await _user(session)
+    plan = await _plan(session, user_id, active=True)
+    ru = await _worded(session, plan, "Пройти диагностику Development Score на портале")
+    uz = await _worded(session, plan, "Diagnostikadan öting")
+    cv = await _worded(session, plan, "Rezyumeni yangilang")
+    skipped = await _worded(session, plan, "Take the diagnostic", status=PlanItemStatus.SKIPPED)
+
+    changed = await close_diagnostic_items(session, user_id)
+
+    assert {c.id for c in changed} == {ru.id, uz.id}
+    assert ru.status == PlanItemStatus.DONE and ru.completed_at is not None
+    assert uz.status == PlanItemStatus.DONE
+    # A step about something else, and a step she skipped herself, stay hers.
+    assert cv.status == PlanItemStatus.PLANNED
+    assert skipped.status == PlanItemStatus.SKIPPED
+
+
+@pytest.mark.asyncio
+async def test_a_diagnostic_step_in_a_draft_plan_is_not_touched(session: AsyncSession) -> None:
+    user_id = await _user(session)
+    draft = await _plan(session, user_id, active=False)
+    item = await _worded(session, draft, "Пройти диагностику Development Score")
+    assert await close_diagnostic_items(session, user_id) == []
+    assert item.status == PlanItemStatus.PLANNED

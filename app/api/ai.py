@@ -33,9 +33,10 @@ from app.schemas.ai import (
 from app.schemas.common import Message
 from app.schemas.recommendation import RecommendationsRead
 from app.schemas.week import WeekRead
-from app.services import ai_limits, rag, telemetry
+from app.services import ai_limits, plan_service, rag, telemetry
 from app.services.ai_navigator import answer as navigator_answer
 from app.services.recommendation import recommendations_for
+from app.services.scoring import is_baseline_assessment
 from app.services.uzbek import convert_if_uzbek
 from app.services.week import week_for
 
@@ -121,6 +122,10 @@ async def recommendations(user: CurrentUserDep, session: DbSession) -> Recommend
     clients. Up to three steps, each with its reason, and nothing named that the
     database does not hold. Deterministic, with no model call.
     """
+    # A roadmap step that told her to sit the diagnostic must not be her "next
+    # step" once she has — settle such steps before the engine reads the plan.
+    if not await is_baseline_assessment(session, uuid.UUID(user.id)):
+        await plan_service.close_diagnostic_items(session, uuid.UUID(user.id))
     return await recommendations_for(session, uuid.UUID(user.id))
 
 

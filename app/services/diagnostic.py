@@ -38,6 +38,7 @@ from app.models.assessment import Assessment, AssessmentAnswer, AssessmentQuesti
 from app.models.career import EducationEntry, WorkExperience
 from app.models.skill import Skill
 from app.schemas.recommendation import NextStep
+from app.services import plan_service
 from app.services import recommendation as engine
 from app.services import skills as skill_service
 from app.services.scoring import is_baseline_assessment, persist_scores
@@ -481,6 +482,8 @@ async def submit(
     await persist_scores(
         session, user_id, attempt.id, {dimension: float(v) for dimension, v in scores.items()}
     )
+    # A roadmap step that told her to sit this diagnostic is now done.
+    await plan_service.close_diagnostic_items(session, user_id)
     await session.flush()
     return attempt, True
 
