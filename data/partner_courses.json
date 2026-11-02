@@ -10204,5 +10204,208 @@
   "skills": [
    "русский язык"
   ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "google-data-analytics",
+  "title": "Google Data Analytics",
+  "url": "https://www.coursera.org/professional-certificates/google-data-analytics",
+  "category": "vocational_skills",
+  "language": "en",
+  "provider": "Google",
+  "summary": "Google's professional certificate on Coursera: spreadsheets, SQL, Tableau and R for a first job in data analytics. Self-paced, about six months at a few hours a week.",
+  "skills": [
+   "анализ данных",
+   "sql",
+   "excel"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "careerdevelopment",
+  "title": "English for Career Development",
+  "url": "https://www.coursera.org/learn/careerdevelopment",
+  "category": "vocational_skills",
+  "language": "en",
+  "provider": "University of Pennsylvania",
+  "summary": "A free University of Pennsylvania course on Coursera: the English of a job search — vacancies, CVs, interviews and networking.",
+  "skills": [
+   "английский язык",
+   "поиск работы"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "digital-marketing-specialist",
+  "title": "Digital Marketing Specialist",
+  "url": "https://www.coursera.org/career-academy/roles/digital-marketing-specialist",
+  "category": "vocational_skills",
+  "language": "en",
+  "provider": "Coursera Career Academy",
+  "summary": "Coursera's career path for a digital marketing role: a set of courses from Google and others that leads to a professional certificate.",
+  "skills": [
+   "маркетинг"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "financial-markets-global",
+  "title": "Financial Markets",
+  "url": "https://www.coursera.org/learn/financial-markets-global",
+  "category": "financial_literacy",
+  "language": "en",
+  "provider": "Yale University · Robert Shiller",
+  "summary": "Robert Shiller's Yale course on Coursera: how markets, banks, insurance and investing work, and how to think about risk.",
+  "skills": [
+   "финансовая грамотность",
+   "инвестиции"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "financial-planning",
+  "title": "Financial Planning for Young Adults",
+  "url": "https://www.coursera.org/learn/financial-planning",
+  "category": "financial_literacy",
+  "language": "en",
+  "provider": "University of Illinois",
+  "summary": "University of Illinois on Coursera: budgets, saving, credit, insurance and the basics of investing, for a first financial plan.",
+  "skills": [
+   "финансовая грамотность"
+  ]
+ },
+ {
+  "source": "khanacademy",
+  "external_id": "personal-finance",
+  "title": "Personal Finance",
+  "url": "https://www.khanacademy.org/college-careers-more/personal-finance",
+  "category": "financial_literacy",
+  "language": "en",
+  "provider": "Khan Academy",
+  "summary": "Khan Academy's free unit on personal finance: saving, budgeting, taxes, loans, insurance and retirement in short videos and exercises.",
+  "skills": [
+   "финансовая грамотность",
+   "налоги"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "google-digital-marketing-ecommerce",
+  "title": "Google Digital Marketing & E-commerce",
+  "url": "https://www.coursera.org/professional-certificates/google-digital-marketing-ecommerce",
+  "category": "entrepreneurship",
+  "language": "en",
+  "provider": "Google",
+  "summary": "Google's professional certificate on Coursera: online marketing, an e-commerce store, email and social campaigns, analytics. Self-paced, about six months at a few hours a week.",
+  "skills": [
+   "маркетинг",
+   "продажи"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "foundations-of-digital-marketing-and-e-commerce",
+  "title": "Foundations of Digital Marketing and E-commerce",
+  "url": "https://www.coursera.org/learn/foundations-of-digital-marketing-and-e-commerce",
+  "category": "entrepreneurship",
+  "language": "en",
+  "provider": "Google",
+  "summary": "The first course of Google's digital marketing certificate on Coursera: the basics of marketing and selling online, in about a week.",
+  "skills": [
+   "маркетинг"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "ibm-ui-ux-designer",
+  "title": "IBM UI/UX Designer",
+  "url": "https://www.coursera.org/professional-certificates/ibm-ui-ux-designer",
+  "category": "digital_safety",
+  "language": "en",
+  "provider": "IBM",
+  "summary": "IBM's professional certificate on Coursera: user research, wireframes and prototypes in Figma, usability testing and a portfolio.",
+  "skills": [
+   "дизайн"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "introduction-cybersecurity-cyber-attacks",
+  "title": "Introduction to Cybersecurity Tools & Cyberattacks",
+  "url": "https://www.coursera.org/learn/introduction-cybersecurity-cyber-attacks",
+  "category": "digital_safety",
+  "language": "en",
+  "provider": "IBM",
+  "summary": "IBM's introduction on Coursera: how attacks happen, the tools that stop them and the vocabulary of the field.",
+  "skills": [
+   "кибербезопасность"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "the-science-of-well-being",
+  "title": "The Science of Well-Being",
+  "url": "https://www.coursera.org/learn/the-science-of-well-being",
+  "category": "health",
+  "language": "en",
+  "provider": "Yale University · Laurie Santos",
+  "summary": "Laurie Santos's Yale course on Coursera: what research says about happiness, with weekly exercises to practise it.",
+  "skills": [
+   "психология",
+   "здоровье"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "childnutrition",
+  "title": "Child Nutrition and Cooking",
+  "url": "https://www.coursera.org/learn/childnutrition",
+  "category": "health",
+  "language": "en",
+  "provider": "Stanford Online",
+  "summary": "Stanford Online on Coursera: what children need to eat, how to read labels, and cooking simple meals at home.",
+  "skills": [
+   "питание"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "everyday-parenting",
+  "title": "Everyday Parenting: The ABCs of Child Rearing",
+  "url": "https://www.coursera.org/learn/everyday-parenting",
+  "category": "parenting",
+  "language": "en",
+  "provider": "Yale University",
+  "summary": "Yale's course on Coursera: practical ways to encourage the behaviour you want from a child and reduce the behaviour you do not.",
+  "skills": [
+   "воспитание детей",
+   "психология"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "negotiation-skills",
+  "title": "Successful Negotiation: Essential Strategies and Skills",
+  "url": "https://www.coursera.org/learn/negotiation-skills",
+  "category": "leadership",
+  "language": "en",
+  "provider": "University of Michigan",
+  "summary": "University of Michigan on Coursera: preparing for, conducting and closing a negotiation, with a practice negotiation at the end.",
+  "skills": [
+   "переговоры"
+  ]
+ },
+ {
+  "source": "coursera",
+  "external_id": "motivate-people-teams",
+  "title": "Inspiring and Motivating Individuals",
+  "url": "https://www.coursera.org/learn/motivate-people-teams",
+  "category": "leadership",
+  "language": "en",
+  "provider": "University of Michigan",
+  "summary": "University of Michigan on Coursera: setting a vision, motivating people and leading a team day to day.",
+  "skills": [
+   "лидерство"
+  ]
  }
 ]

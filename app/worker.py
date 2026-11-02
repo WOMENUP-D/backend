@@ -17,6 +17,7 @@ calls a third party's API on a quota and it changes what the jobs page shows.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from dataclasses import asdict
@@ -25,6 +26,7 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
+from app import import_courses
 from app.core.config import settings
 from app.core.constants import DataClassification, RiskFlagType
 from app.core.logging import configure_logging
@@ -255,6 +257,37 @@ async def run_hh_sync(*, force: bool = False) -> hh_jobs.SyncResult:
         return hh_jobs.SyncResult(reason="error")
 
 
+#: The partner courses shipped with the image. They are ordinary catalogue
+#: rows (`app.import_courses`), so a release that edits the file is enough to
+#: change what the catalogue shows — the worker applies it on its first tick.
+CATALOGUE_FILE = Path(__file__).resolve().parents[1] / "data" / "partner_courses.json"
+
+
+async def run_catalogue_import() -> tuple[int, int] | None:
+    """Upsert the shipped partner courses. Returns (added, updated), or None
+    when there is no file or it is not one the importer accepts — that is
+    logged once and never stops the worker. Database errors propagate so the
+    loop retries them like everything else."""
+    if not CATALOGUE_FILE.exists():
+        return None
+    try:
+        records = json.loads(CATALOGUE_FILE.read_text(encoding="utf-8"))
+        if not isinstance(records, list):
+            raise import_courses.ImportError_("the file must hold a list of courses")
+        rows = [import_courses.clean(record, index) for index, record in enumerate(records)]
+    except (OSError, json.JSONDecodeError, import_courses.ImportError_) as exc:
+        logger.error("catalogue import refused: %s", exc)
+        return None
+    async with SessionLocal() as session:
+        added, updated = await import_courses.load(session, rows)
+        await session.commit()
+    logger.info(
+        "catalogue import",
+        extra={"extra_fields": {"added": added, "updated": updated, "read": len(rows)}},
+    )
+    return added, updated
+
+
 async def run() -> None:
     configure_logging()
     logger.info("worker started (poll=%ss)", POLL_SECONDS)
@@ -265,6 +298,7 @@ async def run() -> None:
     # which is exactly what `run()` survives today.
     news_due_at: float | None = None
     hh_due_at: float | None = None
+    catalogue_loaded = False
 
     while True:
         try:
@@ -272,6 +306,10 @@ async def run() -> None:
                 delivered = await dispatch_pending(session)
                 sent, failed = await drain_outbox(session)
                 await session.commit()
+
+            if not catalogue_loaded:
+                await run_catalogue_import()
+                catalogue_loaded = True
 
             if heartbeat := os.getenv("WORKER_HEARTBEAT_FILE"):
                 Path(heartbeat).touch()
