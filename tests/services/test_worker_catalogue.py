@@ -59,3 +59,11 @@ async def test_a_refused_file_is_logged_not_raised(worker_sessions, monkeypatch,
 async def test_no_file_means_nothing_to_do(worker_sessions, monkeypatch, tmp_path: Path):
     monkeypatch.setattr(worker, "CATALOGUE_FILE", tmp_path / "absent.json")
     assert await worker.run_catalogue_import() is None
+
+
+def test_the_default_file_is_the_one_shipped_beside_the_code():
+    # Relative to the working directory, as in the image (/app) and in this
+    # repository; a path taken from `__file__` would point into site-packages
+    # once the package is installed, which is how the first release missed it.
+    assert Path("data/partner_courses.json") == worker.CATALOGUE_FILE
+    assert worker.CATALOGUE_FILE.exists()
