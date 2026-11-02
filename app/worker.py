@@ -260,7 +260,10 @@ async def run_hh_sync(*, force: bool = False) -> hh_jobs.SyncResult:
 #: The partner courses shipped with the image. They are ordinary catalogue
 #: rows (`app.import_courses`), so a release that edits the file is enough to
 #: change what the catalogue shows — the worker applies it on its first tick.
-CATALOGUE_FILE = Path(__file__).resolve().parents[1] / "data" / "partner_courses.json"
+#: Relative to the working directory, like the CLI's own example: in the image
+#: the code lives installed in the virtualenv and `data/` sits beside it under
+#: /app, so a path taken from `__file__` would point into site-packages.
+CATALOGUE_FILE = Path(os.getenv("CATALOGUE_FILE", "data/partner_courses.json"))
 
 
 async def run_catalogue_import() -> tuple[int, int] | None:
@@ -269,6 +272,7 @@ async def run_catalogue_import() -> tuple[int, int] | None:
     logged once and never stops the worker. Database errors propagate so the
     loop retries them like everything else."""
     if not CATALOGUE_FILE.exists():
+        logger.info("catalogue import skipped: no file at %s", CATALOGUE_FILE.resolve())
         return None
     try:
         records = json.loads(CATALOGUE_FILE.read_text(encoding="utf-8"))
