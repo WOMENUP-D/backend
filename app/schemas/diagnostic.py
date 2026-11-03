@@ -13,8 +13,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import ScoreDimension
+from app.core.constants import EnrollmentStatus, ScoreDimension
+from app.schemas.program import ProgramRead
 from app.schemas.recommendation import NextStep
+from app.schemas.skill import SkillRef
 
 Level = Literal[
     "starting_point", "building_foundation", "good_foundation", "strong_area", "advanced"
@@ -33,11 +35,17 @@ class DiagnosticQuestion(BaseModel):
     code: str
     # Null for the goals question, which measures no dimension.
     dimension: ScoreDimension | None
-    type: Literal["single_choice", "routing", "goals"]
+    type: Literal["single_choice", "routing", "goals", "multi_choice", "text"]
     order_index: int
     text_i18n: dict
     hint_i18n: dict | None = None
     max_choices: int = 1
+    # Version 3: the block the question belongs to, whether it may be left
+    # out, the rule that shows it (see `diagnostic.visible`), the text limit.
+    section: str | None = None
+    optional: bool = False
+    show_if: dict | None = None
+    max_length: int | None = None
     options: list[DiagnosticOption]
 
 
@@ -89,6 +97,9 @@ class DiagnosticResult(BaseModel):
     next_steps: list[NextStep]
     goals: list[str]
     family_focus: str | None = None
+    # Version 3: what she told us about herself — situation, goals (primary
+    # first), interests, self-rated skills, difficulties, learning preferences.
+    profile: dict | None = None
 
 
 class DiagnosticHistoryItem(BaseModel):
@@ -100,3 +111,63 @@ class DiagnosticHistoryItem(BaseModel):
     overall: int | None = None
     dimensions: dict[str, int] = {}
     goals: list[str] = []
+
+
+# --- the course recommendation built from an attempt --------------------------
+
+Priority = Literal["high", "medium", "additional"]
+RecommendationMode = Literal["ai", "rules", "insufficient"]
+
+
+class RecommendedCourse(BaseModel):
+    """One course chosen for her, with why in her words and what it gives."""
+
+    program: ProgramRead
+    priority: Priority
+    why_i18n: dict[str, str]
+    outcome_i18n: dict[str, str]
+    # The gap skills this course closes, named in every language.
+    covers: list[SkillRef] = []
+    enrollment_status: EnrollmentStatus | None = None
+
+
+class RoadmapItem(BaseModel):
+    kind: Literal["course", "activity"]
+    program_id: uuid.UUID | None = None
+    activity: str | None = None
+    text_i18n: dict[str, str] | None = None
+
+
+class RoadmapStage(BaseModel):
+    title_i18n: dict[str, str]
+    items: list[RoadmapItem]
+
+
+class GapRead(BaseModel):
+    slug: str
+    name_i18n: dict = {}
+    # goal | goal_other | interest | difficulty | dimension
+    why: str
+    source: str
+
+
+class RecommendationSummary(BaseModel):
+    goal_i18n: dict[str, str] = {}
+    situation_i18n: dict[str, str] = {}
+    gaps_i18n: dict[str, list[str]] = {}
+
+
+class DiagnosticRecommendation(BaseModel):
+    attempt_id: uuid.UUID
+    generated_at: datetime
+    # ai: the model explained the rules' candidates; rules: the rules wrote the
+    # words themselves; insufficient: too little in the profile to recommend.
+    mode: RecommendationMode
+    summary: RecommendationSummary
+    courses: list[RecommendedCourse]
+    roadmap: list[RoadmapStage]
+    next_steps: list[dict[str, str]]
+    follow_up: dict[str, str] | None = None
+    gaps: list[GapRead]
+    # True while the model has yet to write its words; the page may poll.
+    ai_pending: bool = False

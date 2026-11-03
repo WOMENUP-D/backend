@@ -30,15 +30,17 @@ async def _instrument(session) -> list[AssessmentQuestion]:
 
 
 def _payload(questions, letter="c", goals=("find_job",), **extra) -> dict:
-    answers = []
-    for q in questions:
-        if q.question_type == "goals":
-            ids = list(goals)
-        elif q.question_type == "routing":
-            ids = ["a"]
-        else:
-            ids = [letter]
-        answers.append({"question_id": str(q.id), "option_ids": ids})
+    """An attempt that answers every question she would be shown. `goals`
+    carries version-3 goal codes (primary first); the version-2 code
+    "find_job" is accepted as a synonym of "first_job"."""
+    v3 = ["first_job" if g == "find_job" else g for g in goals]
+    overrides = {"pro.q3": v3[:1], "pro.q4": v3[1:4]} if v3 else {}
+    answers = [
+        {"question_id": str(qid), "option_ids": ids}
+        for qid, ids in diagnostic.sample_answers(
+            questions, scored=letter, family="a", profile=overrides
+        )
+    ]
     return {"answers": answers, **extra}
 
 
@@ -67,14 +69,20 @@ async def test_questions_come_in_order_without_their_scores(client, session, aut
     response = await client.get(f"{BASE}/questions", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == 2
+    assert body["version"] == 3
     codes = [q["code"] for q in body["questions"]]
-    assert codes[0] == "edu.q1" and codes[-1] == "goals.q25" and len(codes) == 25
+    assert codes[0] == "pro.q1" and codes[-1] == "lea.q23" and len(codes) == 41
     for question in body["questions"]:
         for option in question["options"]:
             assert set(option) == {"id", "label_i18n"}
-    goals = body["questions"][-1]
-    assert goals["type"] == "goals" and goals["max_choices"] == 3 and goals["dimension"] is None
+    by_code = {q["code"]: q for q in body["questions"]}
+    goals = by_code["pro.q4"]
+    assert goals["type"] == "multi_choice" and goals["max_choices"] == 3
+    assert goals["dimension"] is None
+    assert goals["optional"] is True and goals["section"] == "goals"
+    # The rule that shows a question travels with it, so the page branches the same way.
+    assert by_code["sit.q13"]["show_if"] == {"question": "pro.q1", "in": ["entrepreneur"]}
+    assert by_code["pro.q5"]["type"] == "text" and by_code["pro.q5"]["max_length"] == 300
 
 
 @pytest.mark.asyncio

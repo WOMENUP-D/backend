@@ -1924,10 +1924,18 @@ def _demo_answers(
             answers.append((question.id, random.sample(ids, random.randint(1, 3))))
         elif question.question_type == "routing":
             answers.append((question.id, [random.choice(ids)]))
-        else:
+        elif question.question_type == "single_choice" and question.dimension is not None:
             centre = centre_for(question)
             option = min(question.options, key=lambda o: abs(o["value"] - centre))
             answers.append((question.id, [option["id"]]))
+        elif question.question_type == "text":
+            continue
+        elif question.code in diagnostic.SAMPLE_PROFILE:
+            answers.append((question.id, list(diagnostic.SAMPLE_PROFILE[question.code])))
+        elif ids:
+            # Version 3's profile block: one plausible option; hidden ones are
+            # dropped by the service like a page that moved on would be.
+            answers.append((question.id, ids[:1]))
     return answers
 
 
@@ -2355,14 +2363,22 @@ async def seed(*, force: bool = False) -> None:
             ScoreDimension.FAMILY_PARENTING: ["d", "c"],
             ScoreDimension.LEADERSHIP: ["b", "b", "c"],
         }
-        demo_answers = []
+        demo_letters: dict[str, str] = {}
         for question in questions:
-            if question.question_type == "goals":
-                demo_answers.append((question.id, ["find_job", "digital_ai"]))
-            elif question.question_type == "routing":
-                demo_answers.append((question.id, ["e"]))
-            else:
-                demo_answers.append((question.id, [demo_options[question.dimension].pop(0)]))
+            if question.question_type == "single_choice" and question.dimension is not None:
+                demo_letters[question.code] = demo_options[question.dimension].pop(0)
+        demo_answers = diagnostic.sample_answers(
+            questions,
+            scored=demo_letters,
+            family="e",
+            profile={
+                "pro.q1": ["employed"],
+                "pro.q3": ["first_job"],
+                "pro.q4": ["improve_skills"],
+                "pro.q6": ["it_programming", "ai"],
+                "skl.q16": ["l1"],
+            },
+        )
         demo_attempt, _ = await diagnostic.submit(
             session,
             user_id=demo_user.id,
