@@ -119,8 +119,8 @@ SITUATION_URGENCY: dict[str, float] = {
 URGENCY_ANSWERS: dict[ScoreDimension, tuple[str, dict[str, float]]] = {
     # "Not working and no direction" is the most pressing career situation.
     D.EMPLOYMENT: ("car.q4", {"a": 100.0, "b": 75.0}),
-    # Spending everything leaves no buffer.
-    D.FINANCIAL_LITERACY: ("fin.q11", {"a": 75.0}),
+    # Not tracking the budget at all leaves no buffer.
+    D.FINANCIAL_LITERACY: ("fin.q10", {"a": 75.0}),
 }
 
 #: Q19 options. "f" — the topic is not relevant to her right now.
@@ -207,17 +207,12 @@ def question_rows(bank: dict) -> list[dict]:
 SAMPLE_PROFILE: dict[str, list[str]] = {
     "pro.q1": ["employed"],
     "pro.q3": ["improve_skills"],
-    "pro.q4": ["promotion"],
     "pro.q6": ["it_programming", "business"],
     "sit.q10": ["specialist"],
     "sit.q11": ["deepen"],
-    "sit.q12": ["y1_3"],
     "skl.q16": ["l1"],
     "skl.q17": ["l1"],
     "pro.q21": ["lack_skills", "time"],
-    "pro.q22": ["video", "short_practical"],
-    "pro.q23": ["h2_5"],
-    "pro.q24": ["ru"],
 }
 
 
@@ -390,26 +385,19 @@ def validate(
 #: Profile answers, by question code, to the key the profile is read by.
 PROFILE_FIELDS: dict[str, str] = {
     "pro.q1": "situation",
-    "pro.q2": "situation_other",
     "pro.q3": "goal_primary",
-    "pro.q4": "goals_other",
     "pro.q5": "goal_text",
     "pro.q6": "interests",
     "sit.q7": "study_field",
-    "sit.q8": "practice",
     "sit.q9": "first_job_when",
     "sit.q10": "position",
     "sit.q11": "career_wish",
-    "sit.q12": "experience",
     "sit.q13": "business_stage",
     "sit.q14": "business_challenges",
     "sit.q15": "job_search_duration",
     "pro.q21": "difficulties",
-    "pro.q22": "formats",
-    "pro.q23": "hours",
-    "pro.q24": "language",
 }
-MULTI_FIELDS = {"goals_other", "interests", "business_challenges", "difficulties", "formats"}
+MULTI_FIELDS = {"interests", "business_challenges", "difficulties"}
 
 
 def profile_from(submission: Submission) -> dict | None:

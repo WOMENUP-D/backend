@@ -15,17 +15,20 @@ change starts from the design rather than from the code.
 - Recommendations were "the next course in the weak dimension" — a
   catalogue walk, not a match. Courses were never explained.
 
-## 2. The instrument (`data/diagnostic_v3.json`, 41 questions)
+## 2. The instrument (`data/diagnostic_v3.json`, 26 questions)
 
+Short on purpose: a run is 3–4 minutes. Thanks to the branching a woman
+sees about 17–20 screens (4 about her, 1–2 for her situation, 1–2 level
+questions, 1 on difficulties, 8 scored and the family routing question).
 Two blocks, one question per screen, in the order they are asked:
 
 | Block | Codes | Shown when | Scored |
 |---|---|---|---|
-| About her: situation, goals (main + up to 3 more), goal in her own words, interests (up to 4) | `pro.q1`–`pro.q6` | always (`pro.q2`, `pro.q4`, `pro.q5` optional) | no |
-| Her situation in detail | `sit.q7`–`sit.q15` | by `pro.q1`: student → studies/practice/first job; employed/freelancer → position, wish, experience; entrepreneur → stage, challenges; seeking/not working → how long | no |
+| About her: situation, main goal, goal in her own words, interests (up to 3) | `pro.q1`, `pro.q3`, `pro.q5`, `pro.q6` | always (`pro.q5` optional) | no |
+| Her situation in detail | `sit.q7`–`sit.q15` | by `pro.q1`: student → field, first job when; employed/freelancer → position, wish; entrepreneur → stage, challenges; seeking/not working → how long | no |
 | Self-rated level in a field (0 none … 4 professional) | `skl.q16`–`skl.q20` | by `pro.q6` (and `pro.q3` for English and finance) | no |
-| Difficulties (up to 3), formats, hours a week, language | `pro.q21`–`pro.q24` | always | no |
-| Development Score: two questions per dimension plus the family routing question | `edu.q1,q2 car.q5,q6 ent.q7,q8 fin.q10,q11 dig.q13,q15 hea.q17,q18 fam.q19–q21 lea.q22,q23` | family questions by `fam.q19` | yes |
+| Difficulties (up to 3) | `pro.q21` | always | no |
+| Development Score: one question per dimension plus the family routing question | `edu.q1 car.q5 ent.q8 fin.q10 dig.q13 hea.q17 fam.q19 (routing) fam.q20 lea.q22` | always | yes |
 
 Conditions travel with the question (`show_if`: `{question, in}` or
 `{any: [...]}`) and are evaluated identically in the browser
@@ -37,8 +40,9 @@ never scored. Question types: `single_choice`, `routing`, `goals`,
 ## 3. Scoring
 
 Unchanged in kind — each scored option carries 0/25/50/75/100, a dimension
-is the mean of its answers, the overall score the mean of dimensions — but
-the profile now feeds the priorities:
+is the mean of its answers (now one answer each, so a dimension reads in
+steps of 25), the overall score the mean of dimensions — but the profile
+now feeds the priorities:
 
 - `goal_match`: version-3 goals map to the version-2 goal codes
   (`GOAL_LEGACY`) so `GOAL_DIRECT/INDIRECT` keep working.
@@ -68,7 +72,8 @@ Four steps, each inspectable:
    then by score: coverage (two strongest needs in full, the rest by half) ×
    precision (discounted by resolved tags outside her needs, holdings and
    fields), + language (her language 2, neighbour 1), level fit (±), length
-   against her hours, +1 for our own courses, +1.5 for one she has started.
+   (neutral now that hours are not asked), +1 for our own courses, +1.5
+   for one she has started.
    Candidates are spread so no skill takes more than four of the 24 places.
 4. **Words.** The rules write an explanation at once (why: the need it
    closes; outcome: the course's own description) and a route (foundation →

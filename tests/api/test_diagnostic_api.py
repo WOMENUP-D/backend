@@ -34,7 +34,7 @@ def _payload(questions, letter="c", goals=("find_job",), **extra) -> dict:
     carries version-3 goal codes (primary first); the version-2 code
     "find_job" is accepted as a synonym of "first_job"."""
     v3 = ["first_job" if g == "find_job" else g for g in goals]
-    overrides = {"pro.q3": v3[:1], "pro.q4": v3[1:4]} if v3 else {}
+    overrides = {"pro.q3": v3[:1]} if v3 else {}
     answers = [
         {"question_id": str(qid), "option_ids": ids}
         for qid, ids in diagnostic.sample_answers(
@@ -71,15 +71,16 @@ async def test_questions_come_in_order_without_their_scores(client, session, aut
     body = response.json()
     assert body["version"] == 3
     codes = [q["code"] for q in body["questions"]]
-    assert codes[0] == "pro.q1" and codes[-1] == "lea.q23" and len(codes) == 41
+    assert codes[0] == "pro.q1" and codes[-1] == "lea.q22" and len(codes) == 26
     for question in body["questions"]:
         for option in question["options"]:
             assert set(option) == {"id", "label_i18n"}
     by_code = {q["code"]: q for q in body["questions"]}
-    goals = by_code["pro.q4"]
-    assert goals["type"] == "multi_choice" and goals["max_choices"] == 3
-    assert goals["dimension"] is None
-    assert goals["optional"] is True and goals["section"] == "goals"
+    interests = by_code["pro.q6"]
+    assert interests["type"] == "multi_choice" and interests["max_choices"] == 3
+    assert interests["dimension"] is None
+    assert interests["optional"] is False and interests["section"] == "interests"
+    assert by_code["pro.q5"]["optional"] is True and by_code["pro.q5"]["section"] == "goals"
     # The rule that shows a question travels with it, so the page branches the same way.
     assert by_code["sit.q13"]["show_if"] == {"question": "pro.q1", "in": ["entrepreneur"]}
     assert by_code["pro.q5"]["type"] == "text" and by_code["pro.q5"]["max_length"] == 300

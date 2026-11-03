@@ -48,7 +48,7 @@ async def test_submitting_the_diagnostic_produces_insights(client, session, auth
         and q.question_type == "single_choice"
     }
     answers = diagnostic.sample_answers(
-        questions, scored=letters, profile={"pro.q3": ["first_job"], "pro.q4": []}
+        questions, scored=letters, profile={"pro.q3": ["first_job"]}
     )
 
     submitted = await client.post(

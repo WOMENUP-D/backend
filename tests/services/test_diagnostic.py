@@ -31,11 +31,10 @@ def _answers(
 ) -> list[tuple[uuid.UUID, list[str]]]:
     """Every question answered. `scored` is one letter for all scored
     questions, or a {code: letter} map over a default of "c". `goals` sets
-    the version-3 primary goal (first) and the other goals."""
+    the version-3 main goal (the first one)."""
     overrides = dict(profile or {})
     if goals is not None:
         overrides["pro.q3"] = goals[:1]
-        overrides["pro.q4"] = goals[1:4]
     return diagnostic.sample_answers(
         QUESTIONS, scored=scored, family=family, profile=overrides, text=text
     )
@@ -48,12 +47,13 @@ def _scores(answers) -> dict[ScoreDimension, int]:
 # --- the instrument ---------------------------------------------------------------
 
 
-def test_the_bank_opens_with_the_profile_and_scores_two_questions_per_dimension():
-    assert len(QUESTIONS) == 41
+def test_the_bank_opens_with_the_profile_and_scores_one_question_per_dimension():
+    # Short on purpose: a run is 3–4 minutes, about twenty screens.
+    assert len(QUESTIONS) == 26
     scored = [q for q in QUESTIONS if q.question_type == "single_choice" and q.dimension]
-    assert len(scored) == 16
+    assert len(scored) == 8
     for dimension in ScoreDimension:
-        assert sum(q.dimension == dimension for q in scored) == 2
+        assert sum(q.dimension == dimension for q in scored) == 1
     assert BY_CODE["fam.q19"].question_type == "routing"
     assert BY_CODE["fam.q19"].weight == 0
     # The profile block: her situation, her goals, her interests — no score.
@@ -61,18 +61,11 @@ def test_the_bank_opens_with_the_profile_and_scores_two_questions_per_dimension(
     assert BY_CODE["pro.q1"].dimension is None and BY_CODE["pro.q1"].weight == 0
     assert BY_CODE["pro.q3"].meta["section"] == "goals"
     assert BY_CODE["pro.q6"].question_type == "multi_choice"
-    assert BY_CODE["pro.q6"].meta["max_choices"] == 4
+    assert BY_CODE["pro.q6"].meta["max_choices"] == 3
     assert BY_CODE["pro.q5"].question_type == "text" and BY_CODE["pro.q5"].meta["optional"]
-    # Fifteen questions depend on earlier answers; the profile comes first.
-    assert sum(1 for q in QUESTIONS if q.meta.get("show_if")) == 15
-    assert [q.code for q in QUESTIONS][:6] == [
-        "pro.q1",
-        "pro.q2",
-        "pro.q3",
-        "pro.q4",
-        "pro.q5",
-        "pro.q6",
-    ]
+    # Twelve questions depend on earlier answers; the profile comes first.
+    assert sum(1 for q in QUESTIONS if q.meta.get("show_if")) == 12
+    assert [q.code for q in QUESTIONS][:4] == ["pro.q1", "pro.q3", "pro.q5", "pro.q6"]
 
 
 def test_every_question_and_option_is_written_in_every_language():
@@ -114,29 +107,29 @@ def test_an_average_run_scores_50():
 
 
 @pytest.mark.parametrize(
-    ("dimension", "codes"),
+    ("dimension", "code"),
     [
-        (D.EDUCATION_SKILLS, ("edu.q1", "edu.q2")),
-        (D.EMPLOYMENT, ("car.q5", "car.q6")),
-        (D.ENTREPRENEURSHIP, ("ent.q7", "ent.q8")),
-        (D.FINANCIAL_LITERACY, ("fin.q10", "fin.q11")),
-        (D.DIGITAL_SKILLS, ("dig.q13", "dig.q15")),
-        (D.HEALTHY_LIFESTYLE, ("hea.q17", "hea.q18")),
-        (D.LEADERSHIP, ("lea.q22", "lea.q23")),
+        (D.EDUCATION_SKILLS, "edu.q1"),
+        (D.EMPLOYMENT, "car.q5"),
+        (D.ENTREPRENEURSHIP, "ent.q8"),
+        (D.FINANCIAL_LITERACY, "fin.q10"),
+        (D.DIGITAL_SKILLS, "dig.q13"),
+        (D.HEALTHY_LIFESTYLE, "hea.q17"),
+        (D.LEADERSHIP, "lea.q22"),
     ],
 )
-def test_each_dimension_is_the_sum_of_its_two_answers_over_8(dimension, codes):
-    # e (4) + b (1) = 5 → 5 / 8 * 100 = 62.5 → 63 (half up)
-    scores = _scores(_answers(dict(zip(codes, "eb", strict=True))))
-    assert scores[dimension] == 63
+def test_each_dimension_is_its_one_answer_over_4(dimension, code):
+    # b (1) → 1 / 4 * 100 = 25; e (4) → 100
+    assert _scores(_answers({code: "b"}))[dimension] == 25
+    scores = _scores(_answers({code: "e"}))
+    assert scores[dimension] == 100
     assert all(v == 50 for d, v in scores.items() if d != dimension)
 
 
-def test_family_is_scored_on_its_two_questions_and_ignores_the_routing_one():
-    # Q20 = e (4), Q21 = d (3) → 7 / 8 * 100 = 87.5 → 88 (half up)
+def test_family_is_scored_on_its_question_and_ignores_the_routing_one():
     for family in "abcdef":
-        scores = _scores(_answers({"fam.q20": "e", "fam.q21": "d"}, family=family))
-        assert scores[D.FAMILY_PARENTING] == 88
+        scores = _scores(_answers({"fam.q20": "d"}, family=family))
+        assert scores[D.FAMILY_PARENTING] == 75
 
 
 def test_goals_and_the_profile_never_change_the_score():
@@ -212,19 +205,19 @@ def test_answering_a_question_twice_is_refused():
 
 
 def test_an_incomplete_run_names_what_is_missing():
-    answers = [a for a in _answers() if a[0] not in {BY_CODE["edu.q2"].id, BY_CODE["lea.q23"].id}]
+    answers = [a for a in _answers() if a[0] not in {BY_CODE["edu.q1"].id, BY_CODE["lea.q22"].id}]
     with pytest.raises(DiagnosticError) as error:
         diagnostic.validate(QUESTIONS, answers)
     assert error.value.code == "incomplete"
-    assert error.value.items == ["edu.q2", "lea.q23"]
+    assert error.value.items == ["edu.q1", "lea.q22"]
 
 
-def test_at_most_three_other_goals():
-    four = ["start_business", "promotion", "international", "academic"]
+def test_at_most_three_interests():
+    four = ["it_programming", "ai", "data", "business"]
     with pytest.raises(DiagnosticError) as error:
-        diagnostic.validate(QUESTIONS, _answers(profile={"pro.q4": four}))
+        diagnostic.validate(QUESTIONS, _answers(profile={"pro.q6": four}))
     assert error.value.code == "too_many_goals"
-    diagnostic.validate(QUESTIONS, _answers(profile={"pro.q4": four[:3]}))
+    diagnostic.validate(QUESTIONS, _answers(profile={"pro.q6": four[:3]}))
 
 
 def test_an_unknown_goal_is_refused():
@@ -247,7 +240,7 @@ def test_goal_match_is_direct_indirect_or_none():
 def test_urgency_reads_only_explicit_status_answers():
     assert diagnostic.urgency(D.EMPLOYMENT, {"car.q4": ["a"]}) == 100
     assert diagnostic.urgency(D.EMPLOYMENT, {"car.q4": ["e"]}) == 50
-    assert diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q11": ["a"]}) == 75
+    assert diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q10": ["a"]}) == 75
     # Nothing medical or sensitive is ever made urgent.
     assert diagnostic.urgency(D.HEALTHY_LIFESTYLE, {"hea.q17": ["a"]}) == 50
     assert diagnostic.urgency(D.FAMILY_PARENTING, {}) == 50
@@ -320,7 +313,7 @@ def _shown(answers) -> set[str]:
 
 def test_a_student_and_an_entrepreneur_are_asked_different_questions():
     student = _shown(_answers(profile={"pro.q1": ["university_student"], "sit.q7": ["it"]}))
-    assert {"sit.q7", "sit.q8", "sit.q9"} <= student
+    assert {"sit.q7", "sit.q9"} <= student
     assert not ({"sit.q10", "sit.q13", "sit.q14", "sit.q15"} & student)
     owner = _shown(_answers(profile={"pro.q1": ["entrepreneur"], "sit.q13": ["idea"]}))
     assert {"sit.q13", "sit.q14"} <= owner and "sit.q7" not in owner
@@ -343,7 +336,7 @@ def test_an_answer_to_a_hidden_question_is_dropped_and_a_hidden_one_is_not_requi
 
 
 def test_optional_questions_may_be_left_out_and_text_is_kept_trimmed():
-    answers = [a for a in _answers() if a[0] not in {BY_CODE["pro.q4"].id, BY_CODE["pro.q22"].id}]
+    answers = [a for a in _answers() if a[0] != BY_CODE["pro.q5"].id]
     diagnostic.validate(QUESTIONS, answers)
     told = _answers(text={"pro.q5": "  Найти работу аналитиком данных  "})
     profile = diagnostic.profile_from(diagnostic.validate(QUESTIONS, told))
@@ -357,25 +350,22 @@ def test_the_profile_is_what_she_said_about_herself():
         profile={
             "pro.q1": ["graduate"],
             "pro.q6": ["it_programming", "languages"],
-            "sit.q8": ["internship"],
             "sit.q9": ["now"],
             "skl.q16": ["l2"],
             "skl.q19": ["l3"],
             "pro.q21": ["cv", "lack_experience"],
-            "pro.q23": ["h5_10"],
-            "pro.q24": ["en"],
         },
     )
     profile = diagnostic.profile_from(diagnostic.validate(QUESTIONS, answers))
     assert profile["situation"] == "graduate"
     assert profile["goal_primary"] == "first_job"
-    assert profile["goals"] == ["first_job", "improve_skills", "international"]
+    assert profile["goals"] == ["first_job"]
     assert profile["interests"] == ["it_programming", "languages"]
-    assert profile["practice"] == "internship" and profile["first_job_when"] == "now"
+    assert profile["first_job_when"] == "now"
     assert profile["skill_levels"] == {"it": 2, "english": 3}
     assert profile["difficulties"] == ["cv", "lack_experience"]
-    assert profile["hours"] == "h5_10" and profile["language"] == "en"
-    assert diagnostic.legacy_goals(profile) == ["find_job", "learn_skills", "international"]
+    assert "hours" not in profile and "language" not in profile
+    assert diagnostic.legacy_goals(profile) == ["find_job"]
 
 
 def test_the_situation_sets_how_pressing_employment_is():
@@ -384,6 +374,6 @@ def test_the_situation_sets_how_pressing_employment_is():
     assert diagnostic.urgency(D.EMPLOYMENT, {}, {"situation": "employed"}) == 50
     # Other dimensions keep their own rule.
     assert (
-        diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q11": ["a"]}, {"situation": "job_seeker"})
+        diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q10": ["a"]}, {"situation": "job_seeker"})
         == 75
     )

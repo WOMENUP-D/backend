@@ -2374,7 +2374,6 @@ async def seed(*, force: bool = False) -> None:
             profile={
                 "pro.q1": ["employed"],
                 "pro.q3": ["first_job"],
-                "pro.q4": ["improve_skills"],
                 "pro.q6": ["it_programming", "ai"],
                 "skl.q16": ["l1"],
             },
