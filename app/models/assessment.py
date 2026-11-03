@@ -94,6 +94,12 @@ class Assessment(UUIDMixin, TimestampMixin, Base):
     # Goal ids she chose (Q25) and the family topic she routed to (Q19).
     goals: Mapped[list[str]] = mapped_column(ARRAY(String(40)), default=list, nullable=False)
     family_focus: Mapped[str | None] = mapped_column(String(10))
+    # Version 3: what she told us about herself — situation, goals, interests,
+    # self-rated skills, difficulties, how she likes to learn. The answers to
+    # the profile block, derived once, so every reader gets the same shape.
+    profile: Mapped[dict | None] = mapped_column(JSONB)
+    # The course recommendation built from this attempt, with its trace.
+    recommendation: Mapped[dict | None] = mapped_column(JSONB)
     # [{"dimension", "priority", "need", "goal_match", "skill_gap", "urgency"}]
     priorities: Mapped[list | None] = mapped_column(JSONB)
     # The browser's id for this attempt. A double tap on "finish" sends it

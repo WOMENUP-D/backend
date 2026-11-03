@@ -33,7 +33,7 @@ from app.core.logging import configure_logging
 from app.db import SessionLocal
 from app.models.audit import AuditLog, RiskFlag
 from app.models.user import User
-from app.services import hh_jobs, retention
+from app.services import course_match, hh_jobs, retention
 from app.services.audit_service import record_audit
 from app.services.integration_gateway import drain_outbox
 from app.services.news_ingest import AUDIT_ACTION, IngestResult, ingest_news
@@ -305,6 +305,18 @@ async def run_catalogue_import() -> tuple[int, int] | None:
     return added, updated
 
 
+async def run_course_explanations() -> int:
+    """Give the model its turn on diagnostic recommendations still waiting
+    for its words. The API never waits for the model: it stores the rules'
+    answer and leaves the explanation to this tick."""
+    async with SessionLocal() as session:
+        handled = await course_match.explain_pending(session)
+        await session.commit()
+    if handled:
+        logger.info("course explanations", extra={"extra_fields": {"handled": handled}})
+    return handled
+
+
 async def run() -> None:
     configure_logging()
     logger.info("worker started (poll=%ss)", POLL_SECONDS)
@@ -328,6 +340,8 @@ async def run() -> None:
                 await run_taxonomy_load()
                 await run_catalogue_import()
                 catalogue_loaded = True
+
+            await run_course_explanations()
 
             if heartbeat := os.getenv("WORKER_HEARTBEAT_FILE"):
                 Path(heartbeat).touch()

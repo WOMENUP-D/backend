@@ -42,12 +42,15 @@ from app.services import recommendation as engine
 from app.services import skills as skill_service
 from app.services.scoring import is_baseline_assessment, persist_scores
 
-VERSION = 2
-DATA = Path(__file__).resolve().parents[2] / "data" / "diagnostic_v2.json"
+VERSION = 3
+DATA = Path(__file__).resolve().parents[2] / "data" / "diagnostic_v3.json"
 
 SCORED = "single_choice"
 ROUTING = "routing"
 GOALS = "goals"
+MULTI = "multi_choice"
+TEXT = "text"
+TEXT_MAX = 300
 
 D = ScoreDimension
 _CANONICAL = list(ScoreDimension)
@@ -86,14 +89,38 @@ GOAL_INDIRECT: dict[str, tuple[ScoreDimension, ...]] = {
 # --- urgency -------------------------------------------------------------------
 
 NEUTRAL = 50.0
+
+#: Version-3 goals → the version-2 goal codes `GOAL_DIRECT`/`GOAL_INDIRECT`
+#: are written in, so the priority ranking keeps working across versions.
+GOAL_LEGACY: dict[str, tuple[str, ...]] = {
+    "first_job": ("find_job",),
+    "change_direction": ("grow_career", "learn_skills"),
+    "promotion": ("grow_career",),
+    "improve_skills": ("learn_skills",),
+    "start_business": ("business",),
+    "grow_business": ("business",),
+    "new_profession": ("learn_skills", "find_job"),
+    "financial_independence": ("finances",),
+    "communication_leadership": ("leadership", "personal_skills"),
+    "international": ("international",),
+    "academic": ("learn_skills",),
+    "discover": ("personal_skills",),
+}
+#: Her situation says how pressing employment is; version 2 read it off a
+#: self-rating. Not listed: neutral.
+SITUATION_URGENCY: dict[str, float] = {
+    "job_seeker": 100.0,
+    "not_working": 75.0,
+    "graduate": 75.0,
+}
 #: Urgency read from explicit current-status answers, nowhere else. Health and
 #: family are deliberately absent: the instrument asks nothing medical, and a
 #: sensitive area is never made "urgent" by inference.
 URGENCY_ANSWERS: dict[ScoreDimension, tuple[str, dict[str, float]]] = {
     # "Not working and no direction" is the most pressing career situation.
     D.EMPLOYMENT: ("car.q4", {"a": 100.0, "b": 75.0}),
-    # Spending everything leaves no buffer.
-    D.FINANCIAL_LITERACY: ("fin.q11", {"a": 75.0}),
+    # Not tracking the budget at all leaves no buffer.
+    D.FINANCIAL_LITERACY: ("fin.q10", {"a": 75.0}),
 }
 
 #: Q19 options. "f" — the topic is not relevant to her right now.
@@ -133,45 +160,101 @@ def load_bank(path: Path = DATA) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+META_KEYS = ("show_if", "optional", "max_choices", "max_length", "section", "skill")
+
+
 def question_rows(bank: dict) -> list[dict]:
     """The authored instrument as `AssessmentQuestion` fields — what migration
-    0028 inserted, for the seed to insert the same way."""
+    0039 inserted, for the seed and the tests to insert the same way."""
     rows = []
     for index, question in enumerate(bank["questions"], start=1):
-        scored = question["type"] == SCORED
-        meta = {}
+        scored = question["type"] == SCORED and bool(question.get("dimension"))
+        meta = {key: question[key] for key in META_KEYS if question.get(key) is not None}
         if question.get("hint"):
             meta["hint_i18n"] = question["hint"]
-        if question.get("max_choices"):
-            meta["max_choices"] = question["max_choices"]
+        options = []
+        for option in question.get("options", []):
+            row = {"id": option["id"], "label_i18n": option["label"]}
+            if scored:
+                row["score"] = option["score"]
+                row["value"] = option["score"] * 25
+            else:
+                row["value"] = 0
+            if "level" in option:
+                row["level"] = option["level"]
+            options.append(row)
         rows.append(
             {
                 "version": bank["version"],
                 "code": question["code"],
                 "dimension": ScoreDimension(question["dimension"])
-                if question["dimension"]
+                if question.get("dimension")
                 else None,
                 "order_index": index,
                 "question_type": question["type"],
                 "text_i18n": question["text"],
-                "options": [
-                    {
-                        "id": option["id"],
-                        **(
-                            {"score": option["score"], "value": option["score"] * 25}
-                            if scored
-                            else {"value": 0}
-                        ),
-                        "label_i18n": option["label"],
-                    }
-                    for option in question["options"]
-                ],
+                "options": options,
                 "meta": meta,
                 "weight": 1.0 if scored else 0.0,
                 "is_active": True,
             }
         )
     return rows
+
+
+#: A plausible run of the version-3 profile block, for the seed and the tests:
+#: an employed woman who wants to grow, interested in IT and business.
+SAMPLE_PROFILE: dict[str, list[str]] = {
+    "pro.q1": ["employed"],
+    "pro.q3": ["improve_skills"],
+    "pro.q6": ["it_programming", "business"],
+    "sit.q10": ["specialist"],
+    "sit.q11": ["deepen"],
+    "skl.q16": ["l1"],
+    "skl.q17": ["l1"],
+    "pro.q21": ["lack_skills", "time"],
+}
+
+
+def sample_answers(
+    questions: list[AssessmentQuestion],
+    *,
+    scored: str | dict[str, str] = "c",
+    family: str = "a",
+    profile: dict[str, list[str]] | None = None,
+    text: dict[str, str] | None = None,
+) -> list[tuple[uuid.UUID, list[str]]]:
+    """Every question she would be shown, answered.
+
+    `scored` is one letter for all scored questions, or a {code: letter} map
+    over a default of "c"; `profile` overrides `SAMPLE_PROFILE` by code; a
+    profile question not covered takes its first option (multi: first one);
+    `text` answers text questions by code, otherwise they are left out.
+    Hidden questions are answered too and dropped by `validate`, which is
+    what a page that moved on would send.
+    """
+    chosen = dict(SAMPLE_PROFILE)
+    chosen.update(profile or {})
+    out = []
+    for q in questions:
+        if q.question_type == TEXT:
+            if text and q.code in text:
+                out.append((q.id, [text[q.code]]))
+            continue
+        if q.question_type == ROUTING:
+            out.append((q.id, [family]))
+        elif q.question_type == SCORED and q.dimension is not None:
+            letter = scored if isinstance(scored, str) else scored.get(q.code, "c")
+            out.append((q.id, [letter]))
+        elif q.code in chosen:
+            if chosen[q.code]:  # an empty override means "left out"
+                out.append((q.id, list(chosen[q.code])))
+        elif q.question_type == GOALS:
+            out.append((q.id, ["find_job"]))
+        else:
+            ids = _option_ids(q)
+            out.append((q.id, ids[:1]))
+    return out
 
 
 # --- the question set ------------------------------------------------------------
@@ -188,6 +271,35 @@ async def active_questions(session: AsyncSession) -> list[AssessmentQuestion]:
 
 def _option_ids(question: AssessmentQuestion) -> list[str]:
     return [str(option["id"]) for option in question.options if "id" in option]
+
+
+def _meta(question: AssessmentQuestion) -> dict:
+    return question.meta or {}
+
+
+def _matches(rule: dict, by_code: dict[str, list[str]]) -> bool:
+    chosen = set(by_code.get(str(rule.get("question", "")), []))
+    return bool(chosen & {str(v) for v in rule.get("in", [])})
+
+
+def visible(question: AssessmentQuestion, by_code: dict[str, list[str]]) -> bool:
+    """Whether the question is asked, given the answers so far.
+
+    `meta.show_if` is either one rule — `{"question": code, "in": [...]}`,
+    true when any chosen option of that question is listed — or
+    `{"any": [rule, ...]}`. A student and an entrepreneur see different
+    questions; the server and the page apply the same rule.
+    """
+    rule = _meta(question).get("show_if")
+    if not rule:
+        return True
+    if "any" in rule:
+        return any(_matches(r, by_code) for r in rule["any"])
+    return _matches(rule, by_code)
+
+
+def is_optional(question: AssessmentQuestion) -> bool:
+    return bool(_meta(question).get("optional"))
 
 
 def _option(question: AssessmentQuestion, option_id: str) -> dict:
@@ -211,11 +323,16 @@ class Submission:
 def validate(
     questions: list[AssessmentQuestion], answers: list[tuple[uuid.UUID, list[str]]]
 ) -> Submission:
-    """Every active question answered once, with options it actually has."""
+    """Every question she was shown answered once, with options it actually has.
+
+    Version 3 branches: a question hidden by her earlier answers is not
+    required, and an answer to one (a page that moved on after she changed
+    an earlier answer) is dropped rather than refused. Optional questions
+    may be left out. A text question carries its text as the one "option".
+    """
     if not questions:
         raise DiagnosticError("no_questions", "The diagnostic is not available")
     known = {question.id: question for question in questions}
-
     chosen: dict[uuid.UUID, list[str]] = {}
     for question_id, option_ids in answers:
         question = known.get(question_id)
@@ -225,14 +342,20 @@ def validate(
             raise DiagnosticError(
                 "duplicate_answer", "A question was answered twice", [question.code or ""]
             )
+        if question.question_type == TEXT:
+            text = " ".join(str(part) for part in option_ids).strip()
+            limit = int(_meta(question).get("max_length") or TEXT_MAX)
+            if text:
+                chosen[question_id] = [text[:limit]]
+            continue
         allowed = set(_option_ids(question))
         ids = list(dict.fromkeys(option_ids))
         if len(ids) != len(option_ids) or not ids or any(i not in allowed for i in ids):
             raise DiagnosticError(
                 "invalid_answer", "Not an option of this question", [question.code or ""]
             )
-        if question.question_type == GOALS:
-            limit = int((question.meta or {}).get("max_choices") or 3)
+        if question.question_type in (GOALS, MULTI):
+            limit = int(_meta(question).get("max_choices") or 3)
             if len(ids) > limit:
                 raise DiagnosticError(
                     "too_many_goals", f"Choose at most {limit}", [question.code or ""]
@@ -242,13 +365,77 @@ def validate(
                 "invalid_answer", "Choose exactly one option", [question.code or ""]
             )
         chosen[question_id] = ids
-
+    by_code = {q.code: chosen[q.id] for q in questions if q.code and q.id in chosen}
+    shown = [question for question in questions if visible(question, by_code)]
+    for question in questions:
+        if question.id in chosen and question not in shown:
+            del chosen[question.id]
     missing = [
-        question.code or str(question.id) for question in questions if question.id not in chosen
+        question.code or str(question.id)
+        for question in shown
+        if question.id not in chosen and not is_optional(question)
     ]
     if missing:
         raise DiagnosticError("incomplete", "Some questions are unanswered", missing)
-    return Submission(questions=questions, chosen=chosen)
+    return Submission(questions=shown, chosen=chosen)
+
+
+# --- the profile (version 3) -----------------------------------------------------
+
+#: Profile answers, by question code, to the key the profile is read by.
+PROFILE_FIELDS: dict[str, str] = {
+    "pro.q1": "situation",
+    "pro.q3": "goal_primary",
+    "pro.q5": "goal_text",
+    "pro.q6": "interests",
+    "sit.q7": "study_field",
+    "sit.q9": "first_job_when",
+    "sit.q10": "position",
+    "sit.q11": "career_wish",
+    "sit.q13": "business_stage",
+    "sit.q14": "business_challenges",
+    "sit.q15": "job_search_duration",
+    "pro.q21": "difficulties",
+}
+MULTI_FIELDS = {"interests", "business_challenges", "difficulties"}
+
+
+def profile_from(submission: Submission) -> dict | None:
+    """What she said about herself, as one record. None for a version-2 attempt."""
+    by_code = submission.by_code()
+    if "pro.q1" not in by_code:
+        return None
+    profile: dict = {"version": VERSION}
+    for code, key in PROFILE_FIELDS.items():
+        ids = by_code.get(code)
+        if not ids:
+            continue
+        profile[key] = list(ids) if key in MULTI_FIELDS else ids[0]
+    primary = profile.get("goal_primary")
+    others = [g for g in profile.get("goals_other", []) if g != primary]
+    profile["goals"] = ([primary] if primary else []) + others
+    profile["goals_other"] = others
+    levels: dict[str, int] = {}
+    for question in submission.questions:
+        skill = _meta(question).get("skill")
+        if not skill or question.id not in submission.chosen:
+            continue
+        option = _option(question, submission.chosen[question.id][0])
+        levels[skill] = int(option.get("level", 0))
+    profile["skill_levels"] = levels
+    return profile
+
+
+def legacy_goals(profile: dict | None) -> list[str]:
+    """The version-2 goal codes a version-3 profile stands for, primary first."""
+    if not profile:
+        return []
+    out: list[str] = []
+    for goal in profile.get("goals", []):
+        for legacy in GOAL_LEGACY.get(goal, ()):
+            if legacy not in out:
+                out.append(legacy)
+    return out
 
 
 # --- scoring ---------------------------------------------------------------------
@@ -260,6 +447,8 @@ def dimension_scores(submission: Submission) -> dict[ScoreDimension, int]:
     counts: dict[ScoreDimension, int] = {}
     for question in submission.questions:
         if question.question_type != SCORED or question.dimension is None:
+            continue
+        if question.id not in submission.chosen:
             continue
         score = int(_option(question, submission.chosen[question.id][0])["score"])
         totals[question.dimension] = totals.get(question.dimension, 0) + score
@@ -305,7 +494,11 @@ def goal_match(dimension: ScoreDimension, goals: list[str]) -> float:
     return 0.0
 
 
-def urgency(dimension: ScoreDimension, by_code: dict[str, list[str]]) -> float:
+def urgency(
+    dimension: ScoreDimension, by_code: dict[str, list[str]], profile: dict | None = None
+) -> float:
+    if dimension == D.EMPLOYMENT and profile and profile.get("situation") in SITUATION_URGENCY:
+        return SITUATION_URGENCY[profile["situation"]]
     rule = URGENCY_ANSWERS.get(dimension)
     if rule is None:
         return NEUTRAL
@@ -343,6 +536,7 @@ def priorities(
     by_code: dict[str, list[str]],
     skill_gaps: dict[ScoreDimension, float],
     family_focus: str | None,
+    profile: dict | None = None,
 ) -> list[Priority]:
     """Every dimension ranked by 0.4·Need + 0.3·GoalMatch + 0.2·SkillGap + 0.1·Urgency.
 
@@ -356,7 +550,7 @@ def priorities(
         need = float(100 - scores[dimension])
         match = goal_match(dimension, goals)
         gap = skill_gaps.get(dimension, NEUTRAL)
-        urgent = urgency(dimension, by_code)
+        urgent = urgency(dimension, by_code, profile)
         value = (
             WEIGHTS["need"] * need
             + WEIGHTS["goal_match"] * match
@@ -440,13 +634,18 @@ async def submit(
 
     goals_question = next((q for q in questions if q.question_type == GOALS), None)
     routing_question = next((q for q in questions if q.question_type == ROUTING), None)
-    goals = submission.chosen.get(goals_question.id, []) if goals_question else []
+    profile = profile_from(submission)
+    goals = (
+        legacy_goals(profile)
+        if profile is not None
+        else (submission.chosen.get(goals_question.id, []) if goals_question else [])
+    )
     family_focus = (
         (submission.chosen.get(routing_question.id) or [None])[0] if routing_question else None
     )
 
     gaps = await skill_gaps(session, user_id)
-    ranked = priorities(scores, goals, by_code, gaps, family_focus)
+    ranked = priorities(scores, goals, by_code, gaps, family_focus, profile)
 
     now = completed_at or datetime.now(UTC)
     if started_at is None or started_at > now or (now - started_at).days > 1:
@@ -462,14 +661,21 @@ async def submit(
         goals=goals,
         family_focus=family_focus,
         priorities=[p.as_dict() for p in ranked],
+        profile=profile,
         client_ref=client_ref,
     )
     session.add(attempt)
     await session.flush()
 
-    for question in questions:
-        ids = submission.chosen[question.id]
-        value = _option(question, ids[0]).get("value", 0) if question.question_type == SCORED else 0
+    for question in submission.questions:
+        ids = submission.chosen.get(question.id)
+        if not ids:
+            continue  # an optional question she left out
+        value = (
+            _option(question, ids[0]).get("value", 0)
+            if question.question_type == SCORED and question.dimension is not None
+            else 0
+        )
         session.add(
             AssessmentAnswer(
                 assessment_id=attempt.id,

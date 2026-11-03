@@ -39,18 +39,21 @@ async def test_submitting_the_diagnostic_produces_insights(client, session, auth
     session.add_all(questions)
     await session.flush()
 
-    def option(question: AssessmentQuestion) -> list[str]:
-        if question.question_type == "goals":
-            return ["find_job"]
-        if question.dimension == ScoreDimension.EMPLOYMENT:
-            return ["b"]  # 25
-        if question.dimension == ScoreDimension.HEALTHY_LIFESTYLE:
-            return ["e"]  # 100
-        return ["c"]  # 50
+    # Employment answered low (b), healthy lifestyle high (e), the rest in the
+    # middle; the goal is a first job, as the old "find_job" code said.
+    letters = {
+        q.code: ("b" if q.dimension == ScoreDimension.EMPLOYMENT else "e")
+        for q in questions
+        if q.dimension in (ScoreDimension.EMPLOYMENT, ScoreDimension.HEALTHY_LIFESTYLE)
+        and q.question_type == "single_choice"
+    }
+    answers = diagnostic.sample_answers(
+        questions, scored=letters, profile={"pro.q3": ["first_job"]}
+    )
 
     submitted = await client.post(
         "/api/v1/diagnostic/attempt",
-        json={"answers": [{"question_id": str(q.id), "option_ids": option(q)} for q in questions]},
+        json={"answers": [{"question_id": str(q), "option_ids": ids} for q, ids in answers]},
         headers=auth_headers,
     )
     assert submitted.status_code == 201
