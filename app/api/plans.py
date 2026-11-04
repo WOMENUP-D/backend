@@ -17,8 +17,9 @@ from app.schemas.plan import (
     PlanItemUpdate,
     PlanRead,
 )
-from app.services import telemetry
+from app.services import plan_service, telemetry
 from app.services.plan_service import accept_plan, generate_plan
+from app.services.scoring import is_baseline_assessment
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -53,6 +54,11 @@ async def read_active(user: CurrentUserDep, session: DbSession) -> DevelopmentPl
     )
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active plan")
+    # Plans drafted before this rule existed may still carry an open "sit the
+    # diagnostic" step for a woman who has long since sat it; reading the plan
+    # settles it, so the roadmap she sees is the one the records support.
+    if not await is_baseline_assessment(session, uuid.UUID(user.id)):
+        await plan_service.close_diagnostic_items(session, uuid.UUID(user.id))
     return plan
 
 

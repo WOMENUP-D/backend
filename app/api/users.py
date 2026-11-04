@@ -34,27 +34,17 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from app.services import activity, retention, score_progress, skills, telemetry
+from app.services import (
+    activity,
+    profile_completeness,
+    retention,
+    score_progress,
+    skills,
+    telemetry,
+)
 from app.services.audit_service import current_consents, record_audit, record_consent
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-# Fields that count towards the profile completeness indicator.
-COMPLETENESS_FIELDS = (
-    "full_name",
-    "birth_date",
-    "district",
-    "education_level",
-    "employment_status",
-    "profession",
-    "skills",
-    "interests",
-)
-
-
-def _completeness(profile: Profile) -> int:
-    filled = sum(1 for f in COMPLETENESS_FIELDS if getattr(profile, f, None))
-    return round(filled * 100 / len(COMPLETENESS_FIELDS))
 
 
 @router.get("/me", response_model=UserRead)
@@ -83,7 +73,13 @@ async def read_profile(user: CurrentUserDep, session: DbSession) -> Profile:
     if profile is None:
         profile = Profile(user_id=uuid.UUID(user.id))
         session.add(profile)
-        await session.flush()
+    # Her region lives on the account and a goal in its own table, so the
+    # figure is refreshed here rather than trusted from the last write.
+    await profile_completeness.refresh(session, profile)
+    await session.flush()
+    # The flush expires `updated_at` (filled by the database); fetch it now,
+    # while we are still inside the async context — see update_profile.
+    await session.refresh(profile)
     return profile
 
 
@@ -106,7 +102,7 @@ async def update_profile(
     changes.pop("age_group", None)
     for field, value in changes.items():
         setattr(profile, field, value)
-    profile.completeness_percent = _completeness(profile)
+    await profile_completeness.refresh(session, profile)
 
     await record_audit(
         session,

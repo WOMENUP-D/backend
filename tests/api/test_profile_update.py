@@ -16,6 +16,8 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import Region
+from app.models.profile import Goal
 from app.models.user import User
 
 
@@ -83,3 +85,28 @@ async def test_a_name_typed_in_lower_case_is_saved_as_a_name(
     # Read back, not just echoed.
     again = await client.get("/api/v1/users/me/profile", headers=auth_headers)
     assert again.json()["full_name"] == "Durdona Kim"
+
+
+@pytest.mark.asyncio
+async def test_completeness_counts_only_what_the_portal_asks_for(
+    client: AsyncClient, auth_headers: dict[str, str], signed_in: uuid.UUID, session: AsyncSession
+) -> None:
+    """Name, date of birth, region, interests and a goal — five things she can
+    actually fill in. Nothing the site never asks for is held against her."""
+    account = await session.get(User, signed_in)
+    assert account is not None
+    account.region = Region.TASHKENT_CITY
+    await session.flush()
+
+    response = await client.put(
+        "/api/v1/users/me/profile",
+        json={"full_name": "Durdona Kim", "birth_date": "2002-05-10", "interests": ["marketing"]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["completeness_percent"] == 80
+
+    session.add(Goal(user_id=signed_in, title="Öz biznesimni oçiş", horizon="6m"))
+    await session.flush()
+    again = await client.get("/api/v1/users/me/profile", headers=auth_headers)
+    assert again.json()["completeness_percent"] == 100

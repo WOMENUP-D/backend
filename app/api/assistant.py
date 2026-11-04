@@ -36,7 +36,7 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
-from app.services import ai_assistant, ai_coach, ai_limits, telemetry
+from app.services import ai_assistant, ai_coach, ai_limits, profile_completeness, telemetry
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
@@ -420,7 +420,6 @@ async def onboarding(
     chosen = [i.strip() for i in payload.interests if i.strip()][:12]
     if chosen:
         record.interests = chosen
-    record.completeness_percent = max(record.completeness_percent or 0, 60)
 
     # One goal, tied to a development dimension when the direction maps to one.
     # Both are optional: a woman who skipped the second step still gets an
@@ -464,6 +463,10 @@ async def onboarding(
                 session, actor=actor, **telemetry.business("onboarding_completed", key=user_id)
             )
 
+    await session.flush()
+    # Counted over what she was just asked, now that the goal and the region
+    # are in: nothing else on the site can move this number yet.
+    await profile_completeness.refresh(session, record)
     await session.flush()
     await session.commit()
 

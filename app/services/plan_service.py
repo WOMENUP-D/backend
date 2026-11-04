@@ -513,6 +513,50 @@ async def close_plan_items_for_program(
     return items
 
 
+#: Words a roadmap step uses when it tells her to sit the diagnostic. The
+#: model writes these steps in her language ("Пройти диагностику Development
+#: Score на портале", "Diagnostikadan öting"), so the match is on words, not
+#: on a field — there is no programme behind such a step to bind it to.
+DIAGNOSTIC_WORDS = ("development score", "диагностик", "diagnostik", "diagnostic")
+
+
+async def close_diagnostic_items(session: AsyncSession, user_id: uuid.UUID) -> list[PlanItem]:
+    """Close the steps that *are* the diagnostic, once she has sat it.
+
+    A plan drafted before the first diagnostic often opens with "take the
+    Development Score diagnostic". When she then does, the step stayed
+    outstanding on her roadmap and kept being offered as her next step,
+    because nothing bound it to the assessment the way a course step is bound
+    to its programme. Same rules as `close_plan_items_for_program`: the active
+    plan only, forward only, never a step she already closed or skipped, and
+    only steps with no programme behind them whose wording names the
+    diagnostic. Returns what it changed.
+    """
+    rows = await session.execute(
+        select(PlanItem)
+        .join(DevelopmentPlan, PlanItem.plan_id == DevelopmentPlan.id)
+        .where(
+            DevelopmentPlan.user_id == user_id,
+            DevelopmentPlan.is_active.is_(True),
+            PlanItem.program_id.is_(None),
+            PlanItem.status.not_in((PlanItemStatus.DONE, PlanItemStatus.SKIPPED)),
+        )
+    )
+    items = [
+        item
+        for item in rows.scalars()
+        if any(word in item.action.lower() for word in DIAGNOSTIC_WORDS)
+    ]
+    now = datetime.now(UTC)
+    for item in items:
+        item.status = PlanItemStatus.DONE
+        if item.completed_at is None:
+            item.completed_at = now
+    if items:
+        await session.flush()
+    return items
+
+
 def _reformed(value):
     """Every string the model wrote for an Uzbek plan, in the reformed alphabet."""
     if isinstance(value, str):
