@@ -48,7 +48,7 @@ class PlanRead(ORMModel):
 
 
 class PlanGenerateRequest(BaseModel):
-    horizon: GoalHorizon = GoalHorizon.M6
+    horizon: GoalHorizon = GoalHorizon.M3
     focus_dimensions: list[ScoreDimension] = Field(
         default=[], max_length=3, description="Leave empty to let the AI choose."
     )
