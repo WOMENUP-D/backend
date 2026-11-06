@@ -5,16 +5,18 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
 from app.core.config import settings
 from app.models import Base  # registers every table on Base.metadata
 
 config = context.config
-config.set_main_option("sqlalchemy.url", str(settings.database_url))
+# ConfigParser interprets percent signs; URL-encoded credentials must survive
+# that layer unchanged when SQLAlchemy reads the option back.
+config.set_main_option("sqlalchemy.url", str(settings.database_url).replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
