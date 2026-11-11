@@ -1016,11 +1016,25 @@ def dimension_actions(ctx: LearnerContext, dimension: ScoreDimension) -> list[Ne
     return actions
 
 
+def _names_the_diagnostic(action: str | None) -> bool:
+    from app.services.plan_service import DIAGNOSTIC_WORDS
+
+    text = (action or "").lower()
+    return any(word in text for word in DIAGNOSTIC_WORDS)
+
+
 def _pending_plan_item(ctx: LearnerContext) -> PlanItem | None:
     """The next step of the plan she confirmed: earliest due, then plan order."""
     if ctx.active_plan is None:
         return None
-    pending = [item for item in ctx.active_plan.items if item.status not in _CLOSED_PLAN_ITEM]
+    pending = [
+        item
+        for item in ctx.active_plan.items
+        if item.status not in _CLOSED_PLAN_ITEM
+        # A legacy "sit the diagnostic" step is not her next step once she
+        # has a score — skipped here, read-only, rather than written on a GET.
+        and not (ctx.scores and item.program_id is None and _names_the_diagnostic(item.action))
+    ]
     if not pending:
         return None
     return min(pending, key=lambda item: (item.due_date or date.max, item.order_index))

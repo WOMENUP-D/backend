@@ -40,6 +40,7 @@ from app.schemas.practice import (
     TaskSubmitIn,
 )
 from app.services import organizations, practice, skills
+from app.services.audit_service import record_staff_action
 
 router = APIRouter(prefix="/practical-tasks", tags=["practical-tasks"])
 
@@ -255,7 +256,7 @@ async def submit_task(
         )
     except practice.SubmissionError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"reason": exc.reason, "field": exc.field},
         ) from exc
     return await _mine(session, task, user_id)
@@ -359,6 +360,9 @@ async def create_task(
     )
     session.add(task)
     await session.flush()
+    await record_staff_action(
+        session, user, action="task.create", entity_type="practical_task", entity_id=str(task.id)
+    )
     return practice.detail(task, index=await practice.index_for(session, [task]))
 
 
@@ -378,6 +382,14 @@ async def update_task(
         task.published_at = datetime.now(UTC)
     for field, value in changes.items():
         setattr(task, field, value)
+    await record_staff_action(
+        session,
+        user,
+        action="task.update",
+        entity_type="practical_task",
+        entity_id=str(task.id),
+        changes={"fields": sorted(changes)},
+    )
     await session.flush()
     return practice.detail(task, index=await practice.index_for(session, [task]))
 

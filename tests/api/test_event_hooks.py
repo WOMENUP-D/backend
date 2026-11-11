@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from sqlalchemy import func, select, text
 
-from app.api import auth as auth_api
 from app.core.constants import Language, ProgramCategory, ProgramFormat, Role
 from app.core.security import create_token
 from app.models.analytics import AnalyticsEvent
@@ -22,11 +20,7 @@ from app.models.program import Program, ProgramModule
 from app.models.user import User
 from app.services.traffic import hash_visitor
 
-
-@pytest.fixture(autouse=True)
-def fresh_throttles():
-    auth_api._login_throttle = auth_api.IpThrottle(limit=8)
-    auth_api._register_throttle = auth_api.IpThrottle(limit=6, window=300.0)
+# The auth throttles are counted in the database, which every test gets fresh.
 
 
 async def _events(session, name: str) -> list[AnalyticsEvent]:

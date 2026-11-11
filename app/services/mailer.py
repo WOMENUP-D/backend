@@ -55,6 +55,40 @@ BODIES = {
 }
 
 
+RESET_SUBJECTS = {
+    "uz": "WomanUP — parolni tiklaş",
+    "ru": "WomanUP — восстановление пароля",
+    "en": "WomanUP — reset your password",
+}
+
+RESET_BODIES = {
+    "uz": (
+        "Assalomu alaykum!\n\n"
+        "WomanUP hisobingiz uçun yangi parol örnatiş havolasi:\n{link}\n\n"
+        "Havola {minutes} daqiqa amal qiladi va faqat bir marta işlaydi. Agar "
+        "parolni tiklaşni siz söramagan bölsangiz, bu xatni eʼtiborsiz qoldiring — "
+        "parolingiz özgarmaydi.\n\n"
+        "WomanUP"
+    ),
+    "ru": (
+        "Здравствуйте!\n\n"
+        "Ссылка, чтобы задать новый пароль для аккаунта WomanUP:\n{link}\n\n"
+        "Ссылка действует {minutes} минут и срабатывает один раз. Если вы не "
+        "запрашивали восстановление пароля, просто не обращайте внимания на это "
+        "письмо — пароль не изменится.\n\n"
+        "WomanUP"
+    ),
+    "en": (
+        "Hello,\n\n"
+        "Use this link to set a new password for your WomanUP account:\n{link}\n\n"
+        "The link is valid for {minutes} minutes and works once. If you did not "
+        "ask to reset your password, ignore this message — your password stays "
+        "the same.\n\n"
+        "WomanUP"
+    ),
+}
+
+
 class MailNotConfigured(Exception):
     """No SMTP host in the environment."""
 
@@ -67,14 +101,29 @@ def enabled() -> bool:
     return bool(settings.smtp_host)
 
 
-def _compose(to: str, code: str, language: str) -> EmailMessage:
-    lang = language if language in SUBJECTS else "uz"
+def _message(to: str, subject: str, body: str) -> EmailMessage:
     message = EmailMessage()
-    message["Subject"] = SUBJECTS[lang]
+    message["Subject"] = subject
     message["From"] = settings.smtp_from or (settings.smtp_user or "no-reply@womanup.uz")
     message["To"] = to
-    message.set_content(BODIES[lang].format(code=code, minutes=settings.otp_ttl_seconds // 60))
+    message.set_content(body)
     return message
+
+
+def _compose(to: str, code: str, language: str) -> EmailMessage:
+    lang = language if language in SUBJECTS else "uz"
+    return _message(
+        to, SUBJECTS[lang], BODIES[lang].format(code=code, minutes=settings.otp_ttl_seconds // 60)
+    )
+
+
+def compose_reset(to: str, link: str, language: str) -> EmailMessage:
+    lang = language if language in RESET_SUBJECTS else "uz"
+    return _message(
+        to,
+        RESET_SUBJECTS[lang],
+        RESET_BODIES[lang].format(link=link, minutes=settings.password_reset_ttl_minutes),
+    )
 
 
 def _send(message: EmailMessage) -> None:
@@ -95,7 +144,7 @@ def _send(message: EmailMessage) -> None:
                 server.send_message(message)
     except (smtplib.SMTPException, OSError) as exc:
         # Never log the message body: it carries a live sign-in code.
-        logger.warning("could not send the sign-in code: %s", type(exc).__name__)
+        logger.warning("could not send a message: %s", type(exc).__name__)
         raise MailFailed(str(exc)) from exc
 
 
@@ -104,3 +153,10 @@ async def send_code(to: str, code: str, language: str = "uz") -> None:
     if not enabled():
         raise MailNotConfigured("no SMTP host configured")
     await to_thread.run_sync(_send, _compose(to, code, language))
+
+
+async def send_password_reset(to: str, link: str, language: str = "uz") -> None:
+    """Send a password-reset link. Raises rather than failing silently."""
+    if not enabled():
+        raise MailNotConfigured("no SMTP host configured")
+    await to_thread.run_sync(_send, compose_reset(to, link, language))

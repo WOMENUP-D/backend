@@ -17,6 +17,7 @@ from app.api.deps import (
     TrackerDep,
     coordinator_region,
 )
+from app.core.constants import DataClassification
 from app.models.assessment import DevelopmentScore
 from app.models.audit import RiskFlag
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
@@ -33,10 +34,10 @@ from app.schemas.ai import (
 from app.schemas.common import Message
 from app.schemas.recommendation import RecommendationsRead
 from app.schemas.week import WeekRead
-from app.services import ai_limits, plan_service, rag, telemetry
+from app.services import ai_limits, rag, telemetry
 from app.services.ai_navigator import answer as navigator_answer
+from app.services.audit_service import record_staff_action
 from app.services.recommendation import recommendations_for
-from app.services.scoring import is_baseline_assessment
 from app.services.uzbek import convert_if_uzbek
 from app.services.week import week_for
 
@@ -122,10 +123,8 @@ async def recommendations(user: CurrentUserDep, session: DbSession) -> Recommend
     clients. Up to three steps, each with its reason, and nothing named that the
     database does not hold. Deterministic, with no model call.
     """
-    # A roadmap step that told her to sit the diagnostic must not be her "next
-    # step" once she has — settle such steps before the engine reads the plan.
-    if not await is_baseline_assessment(session, uuid.UUID(user.id)):
-        await plan_service.close_diagnostic_items(session, uuid.UUID(user.id))
+    # Read-only. A "sit the diagnostic" step is closed when the diagnostic is
+    # submitted and when a plan is accepted, not here.
     return await recommendations_for(session, uuid.UUID(user.id))
 
 
@@ -172,6 +171,13 @@ async def add_knowledge_document(
         )
 
     await session.flush()
+    await record_staff_action(
+        session,
+        user,
+        action="knowledge.add",
+        entity_type="knowledge_document",
+        entity_id=str(document.id),
+    )
     return document
 
 
@@ -186,6 +192,13 @@ async def approve_document(
     document.is_approved = True
     document.approved_by_id = uuid.UUID(user.id)
     document.approved_at = datetime.now(UTC)
+    await record_staff_action(
+        session,
+        user,
+        action="knowledge.approve",
+        entity_type="knowledge_document",
+        entity_id=str(document.id),
+    )
     await session.flush()
     return document
 
@@ -208,6 +221,14 @@ async def delete_knowledge(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     await session.delete(document)
+    await record_staff_action(
+        session,
+        user,
+        action="knowledge.delete",
+        entity_type="knowledge_document",
+        entity_id=str(document_id),
+        changes={"title": document.title},
+    )
     return Message(detail="Document deleted")
 
 
@@ -223,7 +244,18 @@ async def list_risk_flags(
     region = await coordinator_region(session, user)
     if region is not None:
         stmt = stmt.join(User, User.id == RiskFlag.user_id).where(User.region == region)
-    return list((await session.execute(stmt.limit(200))).scalars())
+    flags = list((await session.execute(stmt.limit(200))).scalars())
+    # Reading women's risk flags is a view of personal data, audited like a
+    # profile view.
+    await record_staff_action(
+        session,
+        user,
+        action="risk_flag.list",
+        entity_type="risk_flag",
+        changes={"count": len(flags), "unresolved_only": unresolved_only},
+        classification=DataClassification.SENSITIVE,
+    )
+    return flags
 
 
 @router.post("/risk-flags/{flag_id}/resolve", response_model=RiskFlagRead)
@@ -240,5 +272,13 @@ async def resolve_risk_flag(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
     flag.resolved_at = datetime.now(UTC)
     flag.resolution_note = (note or "")[:1000] or None
+    await record_staff_action(
+        session,
+        user,
+        action="risk_flag.resolve",
+        entity_type="risk_flag",
+        entity_id=str(flag.id),
+        classification=DataClassification.SENSITIVE,
+    )
     await session.flush()
     return flag

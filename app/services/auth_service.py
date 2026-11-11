@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import case, desc, func, select, update
@@ -269,24 +270,142 @@ def issue_tokens(user: User) -> TokenPair:
     return _tokens_for(user)
 
 
-def _tokens_for(user: User) -> TokenPair:
+def _tokens_for(user: User, parent_jti: str | None = None) -> TokenPair:
     role = user.primary_role
     claims = {
         "roles": [r.value for r in user.role_set],
         "gen": int(getattr(user, "session_generation", 0) or 0),
     }
+    # A rotated refresh token names the one it replaced, so signing out with
+    # it can also close the reuse grace of its predecessor.
+    refresh_claims = {**claims, "pjti": parent_jti} if parent_jti else claims
     return TokenPair(
         access_token=create_token(user.id, role, "access", claims),
-        refresh_token=create_token(user.id, role, "refresh", claims),
+        refresh_token=create_token(user.id, role, "refresh", refresh_claims),
         expires_in=settings.access_token_ttl_minutes * 60,
     )
 
 
-async def refresh_tokens(session: AsyncSession, user_id: str) -> TokenPair:
+async def refresh_tokens(
+    session: AsyncSession, user_id: str, parent_jti: str | None = None
+) -> TokenPair:
     user = await session.scalar(select(User).where(User.id == user_id))
     if user is None or user.status in (UserStatus.SUSPENDED, UserStatus.DELETED):
         raise AuthError("account is not active")
-    return _tokens_for(user)
+    return _tokens_for(user, parent_jti)
+
+
+# ------------------------------------------------------------ password reset
+
+RESET_PURPOSE = "password_reset"
+
+
+class ResetTokenInvalid(AuthError):
+    """The link is unknown, expired or already used."""
+
+
+class WeakPassword(AuthError):
+    """The new password is one an attacker would try first."""
+
+
+def _reset_identifier(user_id) -> str:
+    # Keyed on the account, not the address: a reset challenge must never be
+    # mistaken for a sign-in code addressed to the same mailbox.
+    return f"pwreset:{user_id}"
+
+
+async def start_password_reset(session: AsyncSession, email: str) -> tuple[User, str] | None:
+    """A reset token for the account at `email`, or None when there is none
+    to reset.
+
+    None for an unknown address, a suspended or erased account, and a desk
+    account — staff get a new password from an administrator, so a mailbox
+    alone never opens a dashboard. The caller answers the same in every case.
+    Earlier unused links for the account stop working: only the newest is
+    good.
+    """
+    address = email.strip().lower()
+    user = await session.scalar(
+        select(User).where(func.lower(User.email) == address).options(selectinload(User.roles))
+    )
+    if user is None or user.status in (UserStatus.SUSPENDED, UserStatus.DELETED):
+        return None
+    if any(assignment.role in STAFF_ROLES for assignment in user.roles):
+        return None
+
+    now = datetime.now(UTC)
+    identifier = _reset_identifier(user.id)
+    await session.execute(
+        update(OtpChallenge)
+        .where(OtpChallenge.identifier == identifier, OtpChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+    secret = secrets.token_urlsafe(32)
+    salt = secrets.token_hex(8)
+    challenge = OtpChallenge(
+        identifier=identifier,
+        code_hash=hash_otp(secret, salt),
+        salt=salt,
+        purpose=RESET_PURPOSE,
+        expires_at=now + timedelta(minutes=settings.password_reset_ttl_minutes),
+    )
+    session.add(challenge)
+    await session.flush()
+    return user, f"{challenge.id.hex}.{secret}"
+
+
+async def reset_password(session: AsyncSession, token: str, password: str) -> User:
+    """Set a new password with a reset token — once.
+
+    The token is spent in one statement, so two requests carrying it cannot
+    both succeed. Proving the mailbox also verifies the address. Every
+    session of the account ends: whoever else held one is out.
+    """
+    from app.schemas.auth import password_is_weak
+
+    challenge_hex, _, secret = token.partition(".")
+    try:
+        challenge_id = uuid.UUID(hex=challenge_hex)
+    except ValueError:
+        raise ResetTokenInvalid("reset_token_invalid") from None
+    now = datetime.now(UTC)
+    challenge = await session.get(OtpChallenge, challenge_id)
+    if (
+        challenge is None
+        or challenge.purpose != RESET_PURPOSE
+        or challenge.consumed_at is not None
+        or challenge.expires_at < now
+        or not secret
+        or not verify_otp(secret, challenge.salt, challenge.code_hash)
+    ):
+        raise ResetTokenInvalid("reset_token_invalid")
+
+    user_id = uuid.UUID(challenge.identifier.removeprefix("pwreset:"))
+    user = await session.scalar(
+        select(User).where(User.id == user_id).options(selectinload(User.roles))
+    )
+    if user is None or user.status in (UserStatus.SUSPENDED, UserStatus.DELETED):
+        raise ResetTokenInvalid("reset_token_invalid")
+    if password_is_weak(password, user.email):
+        # Checked before the token is spent: a weak choice costs her nothing.
+        raise WeakPassword("weak_password")
+
+    consumed = await session.scalar(
+        update(OtpChallenge)
+        .where(OtpChallenge.id == challenge.id, OtpChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+        .returning(OtpChallenge.id)
+    )
+    if consumed is None:
+        raise ResetTokenInvalid("reset_token_invalid")
+
+    user.password_hash = hash_password(password)
+    user.email_verified = True
+    from app.services import token_revocation
+
+    await token_revocation.revoke_all(session, user.id, reason="password_reset")
+    await session.flush()
+    return user
 
 
 # Roles that sign in with a login and a password rather than a phone code.
@@ -365,6 +484,20 @@ async def login_with_google(session: AsyncSession, identity: GoogleIdentity) -> 
             # into the dashboard, so staff keep the password they already have.
             if any(assignment.role in STAFF_ROLES for assignment in user.roles):
                 raise AuthError("staff accounts sign in with a login and a password")
+            if user.status in (UserStatus.SUSPENDED, UserStatus.DELETED):
+                # Refused before anything is linked or changed.
+                raise AuthError("account is not active")
+            if not user.email_verified:
+                # Nobody proved this mailbox when the account was opened, so
+                # its password may be somebody else's — opened in her name
+                # before she arrived. Google has now proved the mailbox: the
+                # password and every session issued under it go.
+                user.password_hash = None
+                from app.services import token_revocation
+
+                await token_revocation.revoke_all(session, user.id, reason="google_link")
+                await session.flush()
+                await session.refresh(user, ["session_generation"])
             user.firebase_uid = identity.subject
             user.email_verified = True
 

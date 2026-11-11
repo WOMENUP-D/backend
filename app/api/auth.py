@@ -3,20 +3,29 @@
 from __future__ import annotations
 
 import contextlib
-import time
+import logging
 import uuid
-from collections import defaultdict
+from datetime import timedelta
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from app.api.deps import CurrentUserDep, DbSession, client_ip
 from app.core import security_log
 from app.core.config import settings
 from app.core.constants import ConsentScope
 from app.core.security import decode_token
+from app.models.auth_token import RevokedToken
 from app.models.user import User
 from app.schemas.auth import (
     GoogleAuthRequest,
@@ -24,7 +33,9 @@ from app.schemas.auth import (
     LogoutRequest,
     OtpRequest,
     OtpVerify,
+    PasswordForgot,
     PasswordLogin,
+    PasswordReset,
     RefreshRequest,
     RegisterRequest,
     StaffLogin,
@@ -40,7 +51,14 @@ from app.services import (
     token_revocation,
 )
 from app.services.audit_service import record_consent
-from app.services.auth_service import AuthError, EmailTaken, OtpThrottled, StaffOtpBlocked
+from app.services.auth_service import (
+    AuthError,
+    EmailTaken,
+    OtpThrottled,
+    ResetTokenInvalid,
+    StaffOtpBlocked,
+    WeakPassword,
+)
 from app.services.firebase_auth import (
     FirebaseAuthError,
     FirebaseNotConfigured,
@@ -48,6 +66,7 @@ from app.services.firebase_auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 OTP_OFF = "sign in with your e-mail address and password"
@@ -115,13 +134,23 @@ def _presented_refresh(
     return request.cookies.get(settings.auth_cookie_name)
 
 
+ACCOUNT_LOCKED = "account_locked"
+
+
 async def _refuse_if_held(session: DbSession, limit: rate_limit.Limit, identifier: str) -> None:
-    """A held account answers the same 401 as a wrong password, so the hold
-    itself does not confirm that the account exists."""
+    """A held address is told so — `429 account_locked` with how long to wait.
+
+    Telling her "wrong password" while she types the right one sent women in
+    circles. Saying "held" does not confirm the account exists: the counter is
+    kept per *address*, every wrong attempt counts whether or not an account
+    is behind it, so an unknown address is held exactly the same way.
+    """
     if await rate_limit.exhausted(session, limit, identifier):
         security_log.event("auth.account_held", identifier=security_log.masked(identifier))
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid email or password"
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=ACCOUNT_LOCKED,
+            headers={"Retry-After": str(rate_limit.retry_after(limit))},
         )
 
 
@@ -201,39 +230,51 @@ async def request_otp(payload: OtpRequest, request: Request, session: DbSession)
 
 
 class IpThrottle:
-    """Failed attempts per IP in a rolling window.
+    """Attempts per IP in a fixed window, counted in the database.
 
-    In-process, so it protects a single worker and resets on restart — enough
-    to make guessing pointless at this scale, and the place to swap in Redis
-    when there is more than one worker. Each endpoint gets its own instance so
-    a wrong staff password cannot lock a woman out of Google sign-in.
+    Counted in `auth_throttle` through `services.rate_limit`, so the limit
+    holds across workers and restarts — an in-process counter reset on every
+    deploy and was per worker. Each endpoint has its own scope so a wrong
+    staff password cannot lock a woman out of Google sign-in.
     """
 
-    def __init__(self, limit: int, window: float = 60.0) -> None:
-        self._limit = limit
-        self._window = window
-        self._failures: dict[str, list[float]] = defaultdict(list)
+    def __init__(self, name: str) -> None:
+        self.name = name
 
-    def allowed(self, ip: str) -> bool:
-        now = time.monotonic()
-        recent = [t for t in self._failures[ip] if now - t < self._window]
-        self._failures[ip] = recent
-        return len(recent) < self._limit
+    @property
+    def limit(self) -> rate_limit.Limit:
+        # Read on every call so a changed setting (or a test) takes effect.
+        return rate_limit.auth_ip_limits()[self.name]
 
-    def record_failure(self, ip: str) -> None:
-        self._failures[ip].append(time.monotonic())
+    async def refuse_if_exhausted(self, session: DbSession, ip: str, detail: str) -> None:
+        limit = self.limit
+        if await rate_limit.exhausted(session, limit, ip):
+            security_log.event("auth.throttled", endpoint=self.name, ip=ip)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=detail,
+                headers={"Retry-After": str(rate_limit.retry_after(limit))},
+            )
+
+    async def record(self, session: DbSession, ip: str) -> bool:
+        """Count one attempt; committed at once (see `rate_limit.take`)."""
+        return await rate_limit.take(session, self.limit, ip)
 
 
-_staff_throttle = IpThrottle(limit=5)
+_staff_throttle = IpThrottle("staff_login")
 # Same reasoning as the staff endpoint: a password is worth guessing at.
-_login_throttle = IpThrottle(limit=8)
-# Registration is throttled too, so the endpoint cannot be used to farm
-# accounts or to walk a list of addresses looking for "already registered".
-_register_throttle = IpThrottle(limit=6, window=300.0)
+_login_throttle = IpThrottle("login")
+# Registration counts every attempt, successful or not, so the endpoint can
+# neither farm accounts nor walk a list of addresses looking for "taken".
+_register_throttle = IpThrottle("register")
 # Looser than the password endpoint: a Google code is single-use and already
 # proves Google authenticated somebody, so the risk is retry storms rather
 # than guessing.
-_google_throttle = IpThrottle(limit=15)
+_google_throttle = IpThrottle("google")
+_forgot_throttle = IpThrottle("password_forgot")
+_reset_throttle = IpThrottle("password_reset")
+
+WAIT_A_MINUTE = "too many attempts, wait a minute"
 
 
 def _client_ip(request: Request) -> str:
@@ -244,9 +285,8 @@ def _client_ip(request: Request) -> str:
     passwords a minute from anybody refused a password sign-in to every woman
     in the country, while the attacker's own allowance was the same one.
 
-    Caddy overwrites `X-Forwarded-For` with the connecting address, so the
-    left-most entry is the client and a header the client sets itself cannot
-    survive the hop. `client_ip` is the one place that reads it.
+    `client_ip` is the one place that reads the forwarded address, and it
+    believes it only from a trusted proxy (see its docstring).
     """
     return client_ip(request) or "unknown"
 
@@ -262,11 +302,12 @@ async def register(
     abandoned.
     """
     ip = _client_ip(request)
-    if not _register_throttle.allowed(ip):
+    if not await _register_throttle.record(session, ip):
         security_log.event("auth.throttled", endpoint="register", ip=ip)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many attempts, please wait",
+            headers={"Retry-After": str(rate_limit.retry_after(_register_throttle.limit))},
         )
 
     try:
@@ -274,8 +315,7 @@ async def register(
             session, str(payload.email), payload.password
         )
     except EmailTaken as exc:
-        _register_throttle.record_failure(ip)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_taken") from exc
 
     # Append-only, and written in the same transaction as the account: an
     # account that exists without the consent that justifies holding its data
@@ -309,12 +349,7 @@ async def login(
 ) -> TokenPair:
     """Sign in with an address and a password."""
     ip = _client_ip(request)
-    if not _login_throttle.allowed(ip):
-        security_log.event("auth.throttled", endpoint="login", ip=ip)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="too many attempts, wait a minute",
-        )
+    await _login_throttle.refuse_if_exhausted(session, ip, WAIT_A_MINUTE)
     by_account, _ = rate_limit.login_failure_limits()
     identifier = str(payload.email).strip().lower()
     await _refuse_if_held(session, by_account, identifier)
@@ -322,7 +357,7 @@ async def login(
     try:
         user = await auth_service.authenticate_user(session, str(payload.email), payload.password)
     except AuthError as exc:
-        _login_throttle.record_failure(ip)
+        await _login_throttle.record(session, ip)
         await rate_limit.take(session, by_account, identifier)
         security_log.event(
             "auth.login_failed",
@@ -355,12 +390,7 @@ async def staff_login(
     password endpoint is worth guessing at and a one-time code is not.
     """
     ip = _client_ip(request)
-    if not _staff_throttle.allowed(ip):
-        security_log.event("auth.throttled", endpoint="staff_login", ip=ip)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="too many attempts, wait a minute",
-        )
+    await _staff_throttle.refuse_if_exhausted(session, ip, WAIT_A_MINUTE)
     _, by_account = rate_limit.login_failure_limits()
     identifier = payload.login.strip().lower()
     await _refuse_if_held(session, by_account, identifier)
@@ -368,7 +398,7 @@ async def staff_login(
     try:
         user = await auth_service.authenticate_staff(session, payload.login, payload.password)
     except AuthError as exc:
-        _staff_throttle.record_failure(ip)
+        await _staff_throttle.record(session, ip)
         await rate_limit.take(session, by_account, identifier)
         # A wrong password on a desk account is the event most worth an
         # alert: staff accounts are the ones worth guessing at.
@@ -404,11 +434,7 @@ async def google_login(
     nobody ends up with two WomanUP IDs.
     """
     ip = _client_ip(request)
-    if not _google_throttle.allowed(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="too many attempts, wait a minute",
-        )
+    await _google_throttle.refuse_if_exhausted(session, ip, WAIT_A_MINUTE)
 
     try:
         identity = await firebase_auth.verify(payload.id_token)
@@ -419,14 +445,16 @@ async def google_login(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
     except FirebaseAuthError as exc:
-        _google_throttle.record_failure(ip)
+        await _google_throttle.record(session, ip)
         security_log.event("auth.login_failed", endpoint="google", ip=ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     try:
         user, created = await auth_service.login_with_google(session, identity)
     except AuthError as exc:
-        _google_throttle.record_failure(ip)
+        # Nothing is pending here: `login_with_google` refuses before it
+        # changes anything, so the commit inside `record` saves only the count.
+        await _google_throttle.record(session, ip)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     actor = telemetry.actor_from_record(request, user)
@@ -520,24 +548,30 @@ async def refresh(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
             )
     # Spent first, and committed on its own: of two requests racing with the
-    # same token only one inserts the revocation row, and only that one is
-    # answered. A failure after this point costs that client a sign-in, which
-    # is the safe side of the trade.
+    # same token only one inserts the revocation row. A failure after this
+    # point costs that client a sign-in, which is the safe side of the trade.
     if not await token_revocation.revoke(session, claims, reason="rotated"):
-        security_log.event("auth.refresh_replayed", user_id=str(claims.get("sub")))
-        with contextlib.suppress(ValueError):
-            await token_revocation.revoke_all(
-                session, uuid.UUID(str(claims.get("sub"))), reason="reused"
+        if not await _within_reuse_grace(session, claims):
+            security_log.event("auth.refresh_replayed", user_id=str(claims.get("sub")))
+            with contextlib.suppress(ValueError):
+                await token_revocation.revoke_all(
+                    session, uuid.UUID(str(claims.get("sub"))), reason="reused"
+                )
+            await session.commit()
+            _clear_session_cookie(response)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
             )
-        await session.commit()
-        _clear_session_cookie(response)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
-        )
+        # Two tabs loading at once present the same cookie; the second one,
+        # seconds after the first rotated it, is the same browser and gets
+        # its own pair for the same session instead of ending them all.
+        security_log.event("auth.refresh_grace", user_id=str(claims.get("sub")), level=20)
     await session.commit()
 
     try:
-        tokens = await auth_service.refresh_tokens(session, claims["sub"])
+        tokens = await auth_service.refresh_tokens(
+            session, claims["sub"], parent_jti=str(claims.get("jti") or "") or None
+        )
     except AuthError as exc:
         _clear_session_cookie(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
@@ -550,23 +584,45 @@ async def refresh(
     return _deliver(tokens, request, response)
 
 
+async def _within_reuse_grace(session: DbSession, claims: dict) -> bool:
+    """Whether this already-spent refresh token was *rotated* moments ago.
+
+    Only a rotation opens the grace: a token that was signed out, or whose
+    successor was signed out (see `logout`), is refused as a replay.
+    """
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not jti or settings.refresh_reuse_grace_seconds <= 0:
+        return False
+    window = timedelta(seconds=settings.refresh_reuse_grace_seconds)
+    found = await session.scalar(
+        select(RevokedToken.id).where(
+            RevokedToken.jti == jti[:64],
+            RevokedToken.reason == "rotated",
+            RevokedToken.created_at >= func.now() - window,
+        )
+    )
+    return found is not None
+
+
 _bearer = HTTPBearer(auto_error=False)
 
 
-@router.post("/logout", response_model=Message)
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    user: CurrentUserDep,
     request: Request,
     response: Response,
     session: DbSession,
     payload: LogoutRequest | None = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> Message:
-    """Sign out, on the server as well as in the browser.
+) -> Response:
+    """Sign out, on the server as well as in the browser — always 204.
 
-    The access token that made this call is revoked, and so is the refresh
-    token — the cookie, or the one in the body — when it belongs to the same
-    account. The cookie is cleared. Either token presented again is a 401.
+    Works without a live access token: a tab left open past the access
+    token's half hour still ends its session. The refresh token presented —
+    the cookie, or the one in the body — is revoked, and with it the reuse
+    grace of the token it replaced; the access token, when it is still
+    valid, is revoked too. The cookie is always cleared. Holding a refresh
+    token is enough to end that session and nothing more.
     """
     if credentials is not None:
         with contextlib.suppress(jwt.PyJWTError):
@@ -577,12 +633,19 @@ async def logout(
     if presented:
         with contextlib.suppress(jwt.PyJWTError):
             claims = decode_token(presented, "refresh")
-            if str(claims.get("sub")) == user.id:
-                await token_revocation.revoke(session, claims, reason="signed_out")
+            await token_revocation.revoke(session, claims, reason="signed_out")
+            parent = claims.get("pjti")
+            if isinstance(parent, str) and parent:
+                await session.execute(
+                    update(RevokedToken)
+                    .where(RevokedToken.jti == parent[:64], RevokedToken.reason == "rotated")
+                    .values(reason="signed_out")
+                )
     await token_revocation.forget_expired(session)
     await session.commit()
+    response.status_code = status.HTTP_204_NO_CONTENT
     _clear_session_cookie(response)
-    return Message(detail="Logged out")
+    return response
 
 
 @router.post("/logout-all", response_model=Message)
@@ -600,3 +663,95 @@ async def logout_everywhere(
     _clear_session_cookie(response)
     security_log.event("auth.signed_out_everywhere", user_id=user.id, level=20)
     return Message(detail="Signed out everywhere")
+
+
+# ------------------------------------------------------------ password reset
+
+RESET_TOKEN_INVALID = "reset_token_invalid"
+
+
+def _reset_link(token: str) -> str:
+    return f"{settings.public_web_url}/parol-tiklash?token={token}"
+
+
+async def _send_reset(to: str, link: str, language: str) -> None:
+    """Runs after the response is sent, so how long the mail server takes
+    says nothing about whether an account exists."""
+    try:
+        await mailer.send_password_reset(to, link, language)
+    except mailer.MailNotConfigured:
+        if settings.environment == "local":
+            # Local development has no mailbox; the link goes to the console.
+            logger.warning("password reset link (local only): %s", link)
+        else:
+            logger.error("password reset requested but e-mail sending is not configured")
+    except mailer.MailFailed:
+        logger.warning("could not send a password reset message")
+
+
+@router.post("/password/forgot", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+    payload: PasswordForgot,
+    request: Request,
+    session: DbSession,
+    background: BackgroundTasks,
+) -> Response:
+    """E-mail a single-use link to set a new password — always 202.
+
+    The answer is the same for an address with an account, without one, a
+    desk account and a request over its limit, so the endpoint tells nobody
+    which addresses are registered. Limited per address and per mailbox;
+    over a limit nothing is sent.
+    """
+    accepted = Response(status_code=status.HTTP_202_ACCEPTED)
+    ip = _client_ip(request)
+    if not await _forgot_throttle.record(session, ip):
+        security_log.event("auth.throttled", endpoint="password_forgot", ip=ip)
+        return accepted
+    address = str(payload.email).strip().lower()
+    if not await rate_limit.take(session, rate_limit.password_forgot_identifier_limit(), address):
+        return accepted
+
+    started = await auth_service.start_password_reset(session, address)
+    if started is None:
+        return accepted
+    user, token = started
+    await session.commit()
+    security_log.event("auth.password_reset_requested", user_id=str(user.id), level=20)
+    background.add_task(_send_reset, user.email or address, _reset_link(token), payload.language)
+    return accepted
+
+
+@router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(payload: PasswordReset, request: Request, session: DbSession) -> Response:
+    """Set a new password with the link's token — once.
+
+    Ends every session of the account and lifts a sign-in hold on the
+    address. Unknown, expired or used token: `400 reset_token_invalid`;
+    a password an attacker would guess first: `422 weak_password`.
+    """
+    ip = _client_ip(request)
+    if not await _reset_throttle.record(session, ip):
+        security_log.event("auth.throttled", endpoint="password_reset", ip=ip)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many attempts, please wait",
+            headers={"Retry-After": str(rate_limit.retry_after(_reset_throttle.limit))},
+        )
+    try:
+        user = await auth_service.reset_password(session, payload.token, payload.password)
+    except ResetTokenInvalid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=RESET_TOKEN_INVALID
+        ) from None
+    except WeakPassword:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="weak_password"
+        ) from None
+
+    if user.email:
+        by_account, _ = rate_limit.login_failure_limits()
+        await rate_limit.clear(session, by_account, user.email.strip().lower())
+    await session.commit()
+    security_log.event("auth.password_reset", user_id=str(user.id), level=20)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

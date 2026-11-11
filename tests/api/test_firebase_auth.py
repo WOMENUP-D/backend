@@ -14,7 +14,6 @@ from dataclasses import replace
 import pytest
 from sqlalchemy import func, select
 
-from app.api import auth as auth_api
 from app.core.constants import Role, UserStatus
 from app.core.security import hash_password
 from app.models.profile import Profile
@@ -35,11 +34,7 @@ DILNOZA = GoogleIdentity(
 )
 
 
-@pytest.fixture(autouse=True)
-def fresh_throttle():
-    """The IP throttle lives for the life of the process; tests must not
-    inherit each other's failures."""
-    auth_api._google_throttle = auth_api.IpThrottle(limit=15)
+# The auth throttles are counted in the database, which every test gets fresh.
 
 
 @pytest.fixture

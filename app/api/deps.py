@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
+import ipaddress
 import uuid
 from collections.abc import Callable
+from functools import lru_cache
 from typing import Annotated
 
 import jwt
@@ -13,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security_log
+from app.core.config import settings
 from app.core.constants import ROLE_PERMISSIONS, Permission, Region, Role, UserStatus
 from app.core.logging import user_id_ctx
 from app.core.security import decode_token
@@ -54,8 +58,8 @@ async def _verified(session: AsyncSession, payload: dict) -> CurrentUser:
     revoked (signed out, or a refresh token already spent), that the account is
     not suspended or deleted, and — for a desk account — that every staff role
     the token carries is still granted. A revoked role falls away at once
-    instead of surviving until the token expires; an account that no longer
-    exists keeps nothing but a participant's standing.
+    instead of surviving until the token expires; a token for an account that
+    does not exist is refused.
     """
     if await token_revocation.is_revoked(session, payload):
         security_log.event("auth.revoked_token_used", user_id=str(payload.get("sub")))
@@ -73,10 +77,15 @@ async def _verified(session: AsyncSession, payload: dict) -> CurrentUser:
             select(User.status, User.session_generation).where(User.id == user_id)
         )
     ).first()
-    if account is not None and account[0] in BLOCKED_STATUSES:
+    if account is None:
+        # A well-signed token for an account that does not exist — removed,
+        # or never there — authenticates nobody.
+        security_log.event("auth.unknown_account_token", user_id=str(user_id))
+        raise _unauthorised("Invalid token")
+    if account[0] in BLOCKED_STATUSES:
         security_log.event("auth.blocked_account_used", user_id=str(user_id))
         raise _unauthorised("Account is not active")
-    if account is not None and not token_revocation.generation_matches(payload, account[1]):
+    if not token_revocation.generation_matches(payload, account[1]):
         # Signed out everywhere, or a refresh token of hers was replayed:
         # every token from before that moment is refused.
         security_log.event("auth.revoked_token_used", user_id=str(user_id), scope="account")
@@ -214,20 +223,56 @@ async def coordinator_region(session: AsyncSession, user: CurrentUser) -> Region
     return scoped
 
 
-def client_ip(request: Request) -> str | None:
-    """Client IP, honouring the proxy header set by the ingress.
+@lru_cache(maxsize=8)
+def _trusted_networks(spec: tuple[str, ...]) -> tuple[ipaddress._BaseNetwork, ...]:
+    networks = []
+    for entry in spec:
+        with contextlib.suppress(ValueError):
+            networks.append(ipaddress.ip_network(entry.strip(), strict=False))
+    return tuple(networks)
 
-    The *last* address in `X-Forwarded-For`, not the first. The ingress
-    appends (or sets) the address it saw; anything before that is whatever the
-    client chose to send. Reading the first entry let a client pick its own
-    identity for every per-address limit on the API with one header.
+
+def _is_trusted(address: str | None) -> bool:
+    if not address:
+        return False
+    try:
+        ip = ipaddress.ip_address(address.strip())
+    except ValueError:
+        return False
+    return any(ip in network for network in _trusted_networks(tuple(settings.trusted_proxies)))
+
+
+def client_ip(request: Request) -> str | None:
+    """The visitor's address, for every per-address limit on the API.
+
+    Forwarded headers are believed only when the connecting peer is a
+    trusted proxy (`TRUSTED_PROXIES`, private networks by default — the
+    ingress). A request that reaches the API from anywhere else is keyed on
+    its own address, whatever headers it carries: otherwise one header would
+    let a client pick a new identity for every attempt.
+
+    From a trusted proxy: the edge's own header when one is configured
+    (`CLIENT_IP_HEADER`, e.g. `CF-Connecting-IP`), otherwise
+    `X-Forwarded-For` read from the right — each hop appends the address it
+    saw, so the right-most entry that is not itself a trusted proxy is the
+    first one a client could not have written.
     """
+    peer = request.client.host if request.client else None
+    if not _is_trusted(peer):
+        return peer
+    if settings.client_ip_header:
+        edge = (request.headers.get(settings.client_ip_header) or "").strip()
+        if edge:
+            return edge
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         parts = [part.strip() for part in forwarded.split(",") if part.strip()]
+        for part in reversed(parts):
+            if not _is_trusted(part):
+                return part
         if parts:
-            return parts[-1]
-    return request.client.host if request.client else None
+            return parts[0]
+    return peer
 
 
 # --- Analytics -------------------------------------------------------------

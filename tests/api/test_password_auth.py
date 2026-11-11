@@ -12,7 +12,6 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select
 
-from app.api import auth as auth_api
 from app.core.constants import (
     PRIVACY_POLICY_VERSION,
     ConsentScope,
@@ -27,12 +26,7 @@ EMAIL = "dilnoza@example.com"
 PASSWORD = "olma-daraxti-2026"
 
 
-@pytest.fixture(autouse=True)
-def fresh_throttles():
-    """The throttles live for the life of the process; tests must not inherit
-    each other's failures."""
-    auth_api._login_throttle = auth_api.IpThrottle(limit=8)
-    auth_api._register_throttle = auth_api.IpThrottle(limit=6, window=300.0)
+# The auth throttles are counted in the database, which every test gets fresh.
 
 
 async def register(client, email=EMAIL, password=PASSWORD, **extra):

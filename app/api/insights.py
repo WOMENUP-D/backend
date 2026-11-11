@@ -40,13 +40,13 @@ _STAFF = Query(default=False, description="Count staff accounts' own browsing an
 def _query(date_from: date | None, date_to: date | None, include_staff: bool) -> insights.Query:
     if date_from and date_to and date_from > date_to:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"reason": "period_reversed"}
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"reason": "period_reversed"}
         )
     try:
         filters = insights.filters_for(date_from, date_to)
     except insights.PeriodTooLong:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"reason": "period_too_long"}
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"reason": "period_too_long"}
         ) from None
     return insights.Query(filters=filters, include_staff=include_staff)
 

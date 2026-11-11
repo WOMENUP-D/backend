@@ -1,4 +1,5 @@
 """Alembic must accept URL-encoded credentials without connecting to a database."""
+
 import runpy
 import sys
 import unittest
@@ -23,8 +24,10 @@ class AlembicUrlTests(unittest.TestCase):
                 models_module.Base = SimpleNamespace(metadata=object())
                 config = Config()
                 with (
-                    patch.dict(sys.modules, {"app.core.config": settings_module,
-                                             "app.models": models_module}),
+                    patch.dict(
+                        sys.modules,
+                        {"app.core.config": settings_module, "app.models": models_module},
+                    ),
                     patch.object(context, "config", config, create=True),
                     patch.object(context, "is_offline_mode", return_value=True),
                     patch.object(context, "configure") as configure,

@@ -15,7 +15,7 @@ dependencies = [
     "pgvector>=0.3.6",
     "redis>=5.2.0",
     "httpx>=0.28.0",
-    "pyjwt>=2.10.0",
+    "pyjwt>=2.15.0",
     "passlib[argon2]>=1.7.4",
     "python-multipart>=0.0.17",
     "anthropic>=0.40.0",
@@ -63,3 +63,8 @@ python_version = "3.14"
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 warn_unused_ignores = true
+
+[tool.uv]
+# Transitive (firebase-admin -> google-api-core). 1.44.0 carries
+# GHSA-xcq7-p3pf-p88h; held at the patched release.
+constraint-dependencies = ["opentelemetry-api>=1.45.1"]

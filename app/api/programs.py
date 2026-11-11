@@ -36,6 +36,7 @@ from app.schemas.program import (
     ProgressUpdate,
 )
 from app.services import learning, skills, telemetry
+from app.services.audit_service import record_staff_action
 from app.services.uzbek import to_new_alphabet, to_old_alphabet
 
 router = APIRouter(prefix="/programs", tags=["programs"])
@@ -509,6 +510,9 @@ async def create_program(payload: ProgramCreate, user: ContentDep, session: DbSe
     program = Program(**payload.model_dump(), author_id=uuid.UUID(user.id))
     session.add(program)
     await session.flush()
+    await record_staff_action(
+        session, user, action="program.create", entity_type="program", entity_id=str(program.id)
+    )
     return program
 
 
@@ -531,6 +535,14 @@ async def update_program(
         program.published_at = datetime.now(UTC)
     for field, value in changes.items():
         setattr(program, field, value)
+    await record_staff_action(
+        session,
+        user,
+        action="program.update",
+        entity_type="program",
+        entity_id=str(program.id),
+        changes={"fields": sorted(changes)},
+    )
     await session.flush()
     return program
 
@@ -611,7 +623,7 @@ async def update_progress(
     module_ids, _ = await learning.course_units(session, enrollment.program_id)
     if str(payload.module_id) not in module_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Module does not belong to this programme",
         )
 
@@ -651,7 +663,7 @@ async def complete_lesson(
     )
     if lesson is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Lesson does not belong to this programme",
         )
 

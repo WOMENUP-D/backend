@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -75,9 +76,25 @@ class OpportunityFilter(BaseModel):
     active_only: bool = True
 
 
+#: What an application's answers may hold: a short value per question.
+AnswerValue = (
+    Annotated[str, Field(max_length=4000)]
+    | bool
+    | int
+    | float
+    | None
+    | Annotated[list[Annotated[str, Field(max_length=500)]], Field(max_length=50)]
+)
+
+
 class ApplicationCreate(BaseModel):
     opportunity_id: uuid.UUID
-    payload: dict = {}
+    # Her answers travel to the partner as they are, so their shape is
+    # bounded: at most 50 questions, each a short value or a short list —
+    # never an arbitrary document.
+    payload: dict[Annotated[str, Field(max_length=100)], AnswerValue] = Field(
+        default={}, max_length=50
+    )
 
 
 class OpportunitySummary(BaseModel):

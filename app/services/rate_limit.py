@@ -87,6 +87,24 @@ async def exhausted(session: AsyncSession, limit: Limit, key: str) -> bool:
     return int(hits or 0) >= limit.limit
 
 
+def retry_after(limit: Limit, now: datetime | None = None) -> int:
+    """Seconds until the current window of `limit` closes — what a client is
+    told to wait in `Retry-After`."""
+    stamp = int((now or datetime.now(UTC)).timestamp())
+    return max(1, limit.window_seconds - stamp % limit.window_seconds)
+
+
+async def clear(session: AsyncSession, limit: Limit, key: str) -> None:
+    """Forget the current window's count for `key` — after she proved who she
+    is another way (a password reset), a hold meant for a guesser is lifted.
+    Not committed here; the caller's transaction carries it."""
+    now = datetime.now(UTC)
+    window_start = int(now.timestamp()) // limit.window_seconds * limit.window_seconds
+    await session.execute(
+        delete(AuthThrottle).where(AuthThrottle.bucket == _bucket(limit.scope, key, window_start))
+    )
+
+
 def login_failure_limits() -> tuple[Limit, Limit]:
     """Failed password attempts per account, for the two password doors.
 
@@ -130,3 +148,29 @@ def otp_verify_limits() -> tuple[Limit, Limit]:
             settings.otp_verify_identifier_window_seconds,
         ),
     )
+
+
+def auth_ip_limits() -> dict[str, Limit]:
+    """Per-address allowances for the auth endpoints, counted in the database
+    so they hold across workers and restarts.
+
+    `login`, `staff_login` and `google` count failures; `register` counts
+    every attempt, successful or not, so the endpoint cannot be used to farm
+    accounts; `password_forgot` and `password_reset` count every request.
+    """
+    return {
+        "login": Limit("ip_login_failures", settings.login_ip_failures_per_minute, 60),
+        "staff_login": Limit("ip_staff_failures", settings.staff_login_ip_failures_per_minute, 60),
+        "google": Limit("ip_google_failures", settings.google_ip_failures_per_minute, 60),
+        "register": Limit(
+            "ip_register", settings.register_ip_limit, settings.register_ip_window_seconds
+        ),
+        "password_forgot": Limit("ip_password_forgot", settings.password_reset_ip_per_hour, 3600),
+        "password_reset": Limit("ip_password_reset", settings.password_reset_ip_per_hour, 3600),
+    }
+
+
+def password_forgot_identifier_limit() -> Limit:
+    """Reset messages one address may be sent in an hour — so the endpoint
+    cannot be used to fill somebody's mailbox."""
+    return Limit("password_forgot_identifier", settings.password_reset_identifier_per_hour, 3600)

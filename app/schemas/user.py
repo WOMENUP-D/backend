@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Annotated
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -69,7 +70,27 @@ class ProfileSensitive(BaseModel):
     is_in_women_register: bool | None = None
 
 
+#: One entry of a free-text list (a skill, an interest, a language).
+ListEntry = Annotated[str, Field(max_length=120)]
+
+
 class ProfileUpdate(ProfileBase, ProfileSensitive):
+    # Bounded on the way in only — the read models inherit `ProfileBase`, and
+    # a limit there would turn an old over-long row into a 500 on every read.
+    # The limits are the columns' own, so an over-long value is a 422 rather
+    # than a database error, and a free-text field cannot carry a megabyte to
+    # the public portfolio.
+    age_group: str | None = Field(default=None, max_length=20)
+    education_level: str | None = Field(default=None, max_length=60)
+    education_field: str | None = Field(default=None, max_length=120)
+    employment_status: str | None = Field(default=None, max_length=60)
+    profession: str | None = Field(default=None, max_length=120)
+    skills: list[ListEntry] = Field(default=[], max_length=100)
+    interests: list[ListEntry] = Field(default=[], max_length=100)
+    languages: list[ListEntry] = Field(default=[], max_length=30)
+    bio: str | None = Field(default=None, max_length=4000)
+    marital_status: str | None = Field(default=None, max_length=40)
+
     # Typed on the way in, so a subject outside the vocabulary is a 422 rather
     # than a row the news ranker will silently ignore. Not optional: omitting
     # the field leaves the stored choice alone (`exclude_unset`), and sending
@@ -111,7 +132,7 @@ class ProfileReadFull(ProfileRead, ProfileSensitive):
 
 class GoalCreate(BaseModel):
     title: str = Field(max_length=255)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=4000)
     horizon: GoalHorizon
     dimension: ScoreDimension | None = None
     priority: Priority = Priority.MEDIUM
@@ -119,8 +140,8 @@ class GoalCreate(BaseModel):
 
 
 class GoalUpdate(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=4000)
     priority: Priority | None = None
     target_date: date | None = None
     achieved: bool | None = None

@@ -79,6 +79,10 @@ jobs:
           python-version: '3.14'
           enable-cache: true
       - run: uv sync --frozen --extra dev
+      - name: Lint and format check
+        run: |
+          uv run --frozen ruff check app tests
+          uv run --frozen ruff format --check app tests
       - run: python3 .ci/test_promote.py
       - run: uv run --frozen pytest --junitxml=reports/pytest.xml
       - name: Migrate a fresh database
