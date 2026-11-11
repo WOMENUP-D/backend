@@ -28,10 +28,12 @@ import re
 OKINA = "ʻ"  # ʻ — the letter mark in the old oʻ and gʻ
 TUTUQ = "ʼ"  # ʼ — the glottal stop, unchanged by the reform
 #: Marks people, keyboards and models substitute for ʻ in oʻ / gʻ: the left
-#: quote, the right quote and the plain apostrophe. After an o or a g any of
-#: them means the letter; elsewhere a quote or apostrophe is the glottal stop
-#: (taʼlim, maʼlumot) and is left alone.
-OKINA_LIKE = OKINA + "‘’'"
+#: quote, the right quote, the plain apostrophe and the modifier apostrophe ʼ
+#: itself (models write "koʼnikma" as often as "koʻnikma"). After an o or a g
+#: any of them means the letter — Uzbek has no glottal stop straight after o
+#: or g; elsewhere a quote or apostrophe is the glottal stop (taʼlim,
+#: maʼlumot) and is left alone.
+OKINA_LIKE = OKINA + TUTUQ + "‘’'"
 
 #: A word that cannot be Uzbek: left untouched.
 _FOREIGN = re.compile(r"[wW]|[cC](?![hH])|[pP][hH]|[tT][hH]|[cC][kK]|(?<=[a-z])[A-Z]")
@@ -48,6 +50,8 @@ _VERBATIM = re.compile(
 _OLD_TO_NEW: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern), repl)
     for pattern, repl in (
+        # "qöʼlda": the new letter *and* the old mark — the mark is a leftover.
+        (f"([ÖöĞğ])[{OKINA_LIKE}]", r"\1"),
         (f"O[{OKINA_LIKE}]", "Ö"),
         (f"o[{OKINA_LIKE}]", "ö"),
         (f"G[{OKINA_LIKE}]", "Ğ"),
@@ -91,11 +95,58 @@ def _map_words(text: str, convert) -> str:
     return "".join(out)
 
 
+#: Cyrillic letters to the reformed Latin, for the one case where a Cyrillic
+#: letter is certainly a slip: inside a word that is otherwise Latin
+#: ("bölади", "köniкmalar" — model output mixes scripts mid-word).
+_CYRILLIC_TO_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
+    "ж": "j", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "x", "ц": "ts", "ч": "ç", "ш": "ş", "щ": "şç", "ъ": TUTUQ,
+    "ы": "i", "ь": "", "э": "e", "ю": "yu", "я": "ya", "ў": "ö", "қ": "q",
+    "ғ": "ğ", "ҳ": "h",
+}  # fmt: skip
+#: Letters of neighbouring alphabets that are not Uzbek and that models slip
+#: into Uzbek words: Turkish ü and dotless ı, and ñ for the ng sound.
+_NOT_UZBEK = {"ü": "u", "Ü": "U", "ı": "i", "ñ": "ng", "Ñ": "Ng"}
+_ANY_WORD = re.compile(r"[^\W\d_][^\W_]*", re.UNICODE)
+_LATIN_LETTER = re.compile(r"[A-Za-zÖöĞğŞşÇç]")
+_NOT_UZBEK_LETTER = re.compile("[üÜıñÑ]")
+
+
+def _cyrillic_letter(letter: str) -> str:
+    latin = _CYRILLIC_TO_LATIN.get(letter.lower())
+    if latin is None:
+        return letter
+    return latin.capitalize() if letter.isupper() else latin
+
+
+def _mend_word(match: re.Match[str]) -> str:
+    word = match.group(0)
+    if _CYRILLIC.search(word) and _LATIN_LETTER.search(word):
+        word = "".join(_cyrillic_letter(ch) if _CYRILLIC.match(ch) else ch for ch in word)
+    if _NOT_UZBEK_LETTER.search(word):
+        word = "".join(_NOT_UZBEK.get(ch, ch) for ch in word)
+    return word
+
+
+def mend_script(text: str | None) -> str:
+    """Repair the script slips model-written Uzbek makes inside a word.
+
+    A Cyrillic letter inside an otherwise Latin word, and the Turkish ü / ı or
+    ñ, are never right in Uzbek Latin. Whole Cyrillic words are left alone —
+    a Russian name quoted in an Uzbek sentence is not a slip.
+    """
+    if not text:
+        return text or ""
+    return _ANY_WORD.sub(_mend_word, text)
+
+
 def to_new_alphabet(text: str | None) -> str:
     """Uzbek text in the reformed alphabet, whatever alphabet it arrived in."""
     if not text:
         return text or ""
-    return _map_words(text, _convert_word)
+    return _map_words(mend_script(text), _convert_word)
 
 
 def has_old_digraphs(text: str | None) -> bool:
@@ -165,3 +216,72 @@ def convert_if_uzbek(text: str | None, language: str | None) -> str:
     if lang == "uz" or (not lang and looks_uzbek(text)):
         return to_new_alphabet(text)
     return text
+
+
+# --- which language a question is written in --------------------------------
+
+#: Letters only Uzbek Cyrillic has.
+_UZBEK_CYRILLIC = re.compile("[ЎўҚқҒғҲҳ]")
+_LATIN_WORD = re.compile(r"[A-Za-zÖöĞğŞşÇçʻʼ‘’'-]+")
+#: Uzbek words a question is made of that `_UZBEK_HINTS` does not list.
+_UZBEK_QUESTION_WORDS = frozenset(
+    "qanday qanaqa qaysi qayerda qayerdan qachon nima nimaga nega necha kim men menga "  # noqa: SIM905
+    "mening meni sizga sizning bormi yoqmi mumkinmi kerakmi qilsam bolsam olsam "
+    "qilaman olaman bolaman boladi qiladi kurs kurslar dastur dasturlar portal "
+    "portalda sertifikat ish ishga oqish oqishni organish yordam salom rahmat "
+    "iltimos haqida uchun uçun".split()
+)
+#: Suffixes that mark a Latin word as Uzbek: possessive, case, plural,
+#: the question particle and first-person endings.
+_UZBEK_SUFFIX = re.compile(
+    r"(?:ning|ni|ga|da|dan|lar|larni|larga|imni|ingiz|imiz|miz|sizmi|mi|man|aman|yapman|"
+    r"yapti|moqda|gan|dagi)$"
+)
+_ENGLISH_WORDS = frozenset(
+    "the a an and or of to in on for with from by is are was were be been am do does did "  # noqa: SIM905
+    "how what which where when why who whom can could should would will i my me you your "
+    "it this that these those there get have has please help course courses certificate "
+    "reset password become want need about any some there's i'm".split()
+)
+
+
+def _fold_word(word: str) -> str:
+    word = word.lower()
+    for new, old in (("ö", "o"), ("ğ", "g"), ("ş", "sh"), ("ç", "ch")):
+        word = word.replace(new, old)
+    return re.sub("[ʻʼ‘’'`]", "", word)
+
+
+def question_language(text: str | None) -> str | None:
+    """The language a question is written in — uz, ru or en — or None.
+
+    The interface locale is not the question's language: a woman reading the
+    portal in Uzbek may type in Russian, and answering her in Uzbek from Uzbek
+    sources only is how a question with an answer came back "not found".
+    `None` means "too short or too mixed to tell", and the caller keeps the
+    interface locale.
+    """
+    if not text:
+        return None
+    cyrillic = len(_CYRILLIC.findall(text))
+    latin = len(re.findall("[A-Za-zÖöĞğŞşÇç]", text))
+    if cyrillic and cyrillic >= latin:
+        return "uz" if _UZBEK_CYRILLIC.search(text) else "ru"
+    if not latin:
+        return None
+    if re.search("[ʻÖöĞğŞşÇç]", text):
+        return "uz"
+    words = [w for w in (_fold_word(m) for m in _LATIN_WORD.findall(text)) if w]
+    english = sum(1 for w in words if w in _ENGLISH_WORDS)
+    uzbek = len(_UZBEK_HINTS.findall(text)) + sum(
+        1
+        for w in words
+        if w in _UZBEK_QUESTION_WORDS
+        or (len(w) > 4 and _UZBEK_SUFFIX.search(w) and w not in _ENGLISH_WORDS)
+        or re.search("q(?!u)", w)
+    )
+    if english > uzbek and english >= 1:
+        return "en"
+    if uzbek > english and uzbek >= 1:
+        return "uz"
+    return None

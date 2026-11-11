@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -19,8 +19,23 @@ class SourceRef(BaseModel):
     chunk_id: str
 
 
+class HistoryTurn(BaseModel):
+    """One earlier turn of the conversation, as the browser kept it.
+
+    Accepted generously and trimmed on the server (the last 8 turns, each cut
+    to 2000 characters — see `services.conversation`), so an older client that
+    sends more never gets a 422 for it.
+    """
+
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=20000)
+
+
 class AssistantAsk(BaseModel):
     message: str = Field(min_length=2, max_length=1000)
+    #: The recent turns, so a follow-up question can be answered. Optional:
+    #: without it every question is answered on its own, as before.
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=50)
     # "auto" lets the router choose; the explicit values are for the section
     # buttons, so a woman who knows what she wants can skip the routing call.
     route: str = Field(default="auto", max_length=16)
@@ -85,6 +100,9 @@ class AssistantReply(BaseModel):
     is_uncertain: bool = False
     route: str = "education"
     guest_questions_left: int | None = None
+    #: True when the model was unavailable and the answer was composed by rules
+    #: or quoted from approved sources — the page shows a "limited mode" badge.
+    degraded: bool = False
 
 
 class AssistantProfile(BaseModel):

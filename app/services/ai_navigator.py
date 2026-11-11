@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.audit import AiInteraction
 from app.schemas.ai import NavigatorAnswer, SourceRef
-from app.services import rag
+from app.services import conversation, rag
 from app.services.llm_gateway import (
     LlmGateway,
     LlmResponse,
@@ -18,6 +18,7 @@ from app.services.llm_gateway import (
     llm_gateway,
 )
 from app.services.prompts import NAVIGATOR_SCHEMA, NAVIGATOR_SYSTEM
+from app.services.uzbek import question_language
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +40,20 @@ HUMAN_HANDOFF_TEXT = {
     ),
 }
 
+#: Said whenever the answer is a quotation rather than a generated reply —
+#: because the key is off, the provider failed, or its reply was unusable.
 EXTRACTIVE_PREFIX = {
     "uz": (
-        "AI generatsiya rejimi yoqilmagan, şuning uçun tasdiqlangan manbadan "
-        "töğridan-töğri parça keltiraman:"
+        "AI yordamçi hozir cheklangan rejimda işlayapti, şuning uçun tasdiqlangan "
+        "manbadan töğridan-töğri parça keltiraman:"
     ),
     "ru": (
-        "Режим генерации ИИ не подключён, поэтому привожу фрагмент из "
-        "проверённого источника напрямую:"
+        "AI-помощник сейчас работает в ограниченном режиме, поэтому привожу "
+        "фрагмент из проверенного источника напрямую:"
     ),
     "en": (
-        "AI generation is not enabled, so here is the relevant passage from an "
-        "approved source, quoted directly:"
+        "The AI assistant is in limited mode right now, so here is the relevant "
+        "passage from an approved source, quoted directly:"
     ),
 }
 
@@ -71,6 +74,7 @@ async def answer(
     language: str = "uz",
     conversation_id: uuid.UUID | None = None,
     gateway: LlmGateway | None = None,
+    history: list | None = None,
 ) -> NavigatorAnswer:
     """Answer a portal question from approved sources only.
 
@@ -103,15 +107,25 @@ async def answer(
         )
         return result
 
-    chunks = await rag.retrieve(session, question, language=lang)
+    # The question's own language, not the interface's: a Russian question
+    # typed on the Uzbek site is answered in Russian, from Russian sources.
+    lang = question_language(question) or lang
+    turns = conversation.clean(history)
 
-    if not chunks and lang != "uz":
-        # The knowledge base is authored in Uzbek, the primary locale. Rather
-        # than tell a Russian- or English-speaking user that nothing exists,
-        # fall back to the sources that do — the model is instructed to answer
-        # in her language regardless of the language of the source. Degrade,
+    chunks = await rag.retrieve(session, question, language=lang)
+    if not chunks:
+        # Every edition of the knowledge base, in any language — the model is
+        # instructed to answer in her language regardless of the source's.
+        # This used to apply to ru/en only, so an Uzbek question whose answer
+        # existed only in another edition was told nothing exists. Degrade,
         # do not fail.
         chunks = await rag.retrieve(session, question, language=None)
+    if not chunks and turns:
+        # A bare follow-up ("and the certificate?") carries few words of its
+        # own; her previous question supplies the topic.
+        chunks = await rag.retrieve(
+            session, f"{conversation.last_user_text(turns)} {question}", language=None
+        )
 
     if not chunks:
         return NavigatorAnswer(
@@ -124,31 +138,15 @@ async def answer(
         )
 
     if not gateway.enabled:
-        # Extractive degradation: quote the best-matching approved source
-        # verbatim instead of generating. Nothing is invented, and the user
-        # still gets the information.
-        best = chunks[0]
-        return NavigatorAnswer(
-            answer=f"{EXTRACTIVE_PREFIX[lang]}\n\n{best.content.strip()}",
-            sources=[
-                SourceRef(
-                    document_id=chunk.document_id,
-                    document_title=chunk.document_title,
-                    chunk_id=chunk.chunk_id,
-                    score=chunk.score,
-                    excerpt=chunk.excerpt,
-                )
-                for chunk in chunks[:3]
-            ],
-            confidence=0.0,
-            is_uncertain=True,
-            escalation_reason="ai_disabled",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+        return await _extractive(
+            session, chunks, lang, question, user_id, conversation_id, reason="ai_disabled"
         )
 
     context = rag.build_context(chunks)
-    user_content = f"{context}\n\nUSER LANGUAGE: {lang}\nQUESTION: {gateway.sanitise(question)}"
+    user_content = (
+        f"{context}\n\n{conversation.as_prompt(turns)}"
+        f"USER LANGUAGE: {lang}\nQUESTION: {gateway.sanitise(question)}"
+    )
 
     try:
         response: LlmResponse = await gateway.complete(
@@ -156,16 +154,27 @@ async def answer(
             messages=[{"role": "user", "content": user_content}],
             json_schema=NAVIGATOR_SCHEMA,
             max_tokens=4000,
+            timeout=settings.ai_interactive_timeout_seconds,
         )
     except LlmUnavailableError as exc:
-        logger.warning("navigator fell back to uncertain: %s", exc)
-        return NavigatorAnswer(
-            answer=UNCERTAIN_TEXT[lang],
-            confidence=0.0,
-            is_uncertain=True,
-            escalation_reason="model_unavailable",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+        # The sources were found; only the writer is missing. Quote them
+        # rather than claim nothing exists (which is what this used to say).
+        logger.warning("navigator fell back to extractive: %s", exc)
+        return await _extractive(
+            session, chunks, lang, question, user_id, conversation_id, reason="model_unavailable"
+        )
+
+    if response.parsed is None and not response.refused:
+        logger.warning("navigator produced no usable payload; quoting the source")
+        return await _extractive(
+            session,
+            chunks,
+            lang,
+            question,
+            user_id,
+            conversation_id,
+            reason="model_unavailable",
+            response=response,
         )
 
     payload = response.parsed or {}
@@ -224,6 +233,56 @@ async def answer(
         latency_ms=response.latency_ms,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
+    )
+    return result
+
+
+async def _extractive(
+    session: AsyncSession,
+    chunks: list[rag.RetrievedChunk],
+    lang: str,
+    question: str,
+    user_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
+    *,
+    reason: str,
+    response: LlmResponse | None = None,
+) -> NavigatorAnswer:
+    """Extractive degradation: quote the best-matching approved source verbatim
+    instead of generating. Nothing is invented, and the user still gets the
+    information."""
+    best = chunks[0]
+    result = NavigatorAnswer(
+        answer=f"{EXTRACTIVE_PREFIX[lang]}\n\n{best.content.strip()}",
+        sources=[
+            SourceRef(
+                document_id=chunk.document_id,
+                document_title=chunk.document_title,
+                chunk_id=chunk.chunk_id,
+                score=chunk.score,
+                excerpt=chunk.excerpt,
+            )
+            for chunk in chunks[:3]
+        ],
+        confidence=0.0,
+        is_uncertain=True,
+        escalation_reason=reason,
+        trace_id=response.trace_id if response else uuid.uuid4().hex,
+        conversation_id=conversation_id,
+    )
+    await _record(
+        session,
+        user_id=user_id,
+        trace_id=result.trace_id,
+        model=response.model if response else "extractive",
+        prompt_version="navigator-extractive",
+        question=question,
+        answer=result.answer,
+        sources=[str(chunk.chunk_id) for chunk in chunks[:3]],
+        confidence=0.0,
+        latency_ms=response.latency_ms if response else None,
+        input_tokens=response.input_tokens if response else None,
+        output_tokens=response.output_tokens if response else None,
     )
     return result
 

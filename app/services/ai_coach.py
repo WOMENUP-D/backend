@@ -35,6 +35,7 @@ is down is worse than one that says the true thing plainly.
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,6 +43,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.constants import (
     AssistantSection,
     ConsentScope,
@@ -81,18 +83,19 @@ from app.schemas.event import EventCard
 from app.schemas.opportunity import OpportunityDetail
 from app.schemas.recommendation import NextStep, OpportunitySuggestion
 from app.services import career_path as career_service
+from app.services import conversation, rag
 from app.services import events as event_service
 from app.services import opportunities as opportunity_service
 from app.services import portfolio as portfolio_service
 from app.services import practice as practice_service
-from app.services import rag
 from app.services import recommendation as engine
 from app.services import skills as skill_service
 from app.services.audit_service import has_consent
 from app.services.llm_gateway import LlmResponse, LlmUnavailableError, llm_gateway
 from app.services.prompts import COACH_SCHEMA, COACH_SYSTEM
 from app.services.score_insights import band_for
-from app.services.scoring import composite_score
+from app.services.scoring import WEAKEST_MARGIN, composite_score
+from app.services.uzbek import question_language
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +251,13 @@ def _score_of(ctx: engine.LearnerContext) -> CoachScore:
             for row in sorted(dimensions, key=lambda d: -d.current)
             if row.band == DimensionBand.STRONG.value
         ][:3],
-        focus=engine.focus_dimensions(ctx),
+        # Eight equal scores have no "area that needs her most"; naming three
+        # of them anyway was an invented weakness (D-22).
+        focus=(
+            engine.focus_dimensions(ctx)
+            if max(current.values()) - min(current.values()) >= WEAKEST_MARGIN
+            else []
+        ),
     )
 
 
@@ -913,6 +922,11 @@ def _context_lines(read: CoachContextRead, steps: list[NextStep], language: str)
             f"  - {row.dimension.value}: {row.current}/100 ({row.band})"
             for row in read.score.dimensions
         ]
+        if read.score.dimensions and not read.score.focus:
+            lines.append(
+                "  - her dimensions are all at a similar level: do not call any of them "
+                "her weakest or the one that needs attention"
+            )
     else:
         lines.append(
             "- Development Score: she has not taken the diagnostic yet. "
@@ -1238,12 +1252,17 @@ async def answer(
     context: CoachContext | None = None,
     gateway=None,
     opportunity_id: uuid.UUID | None = None,
+    history: list | None = None,
 ) -> CoachReply:
     """One coaching answer, grounded in her records and in nothing else."""
     gateway = gateway or llm_gateway
+    started = time.perf_counter()
+    # Answered in the language she wrote in, not the page's (B-16).
+    language = question_language(question) or language
     context = context or await build(
         session, user_id, language=language, opportunity_id=opportunity_id
     )
+    context_ms = int((time.perf_counter() - started) * 1000)
 
     # Safety before the model, as everywhere else in the AI layer: a disclosure
     # of violence or self-harm goes to a person and is never a prompt.
@@ -1259,8 +1278,10 @@ async def answer(
         await _record(session, user_id, question, reply, None, model="guardrail")
         return reply
 
+    turns = conversation.clean(history)
     content = (
         f"{context.as_prompt()}\n\n"
+        f"{conversation.as_prompt(turns)}"
         f"HER QUESTION: {gateway.sanitise(question)}\n"
         f"ANSWER LANGUAGE: {context.language}"
     )
@@ -1274,6 +1295,7 @@ async def answer(
             json_schema=COACH_SCHEMA,
             max_tokens=8000,
             effort="low",
+            timeout=settings.ai_interactive_timeout_seconds,
         )
         if response.refused or not response.parsed:
             logger.warning("coach produced no usable payload (refused=%s)", response.refused)
@@ -1281,6 +1303,18 @@ async def answer(
             payload = response.parsed
     except LlmUnavailableError as exc:
         logger.warning("coach unavailable: %s", exc)
+    model_ms = int((time.perf_counter() - started) * 1000) - context_ms
+    # Server-side timings (H-04): where a slow answer spent its time.
+    logger.info(
+        "coach timings",
+        extra={
+            "extra_fields": {
+                "context_ms": context_ms,
+                "model_ms": model_ms,
+                "model_latency_ms": response.latency_ms if response else None,
+            }
+        },
+    )
 
     if payload is None:
         # The provider is down. The context is not, so she still gets a true
@@ -1356,7 +1390,8 @@ def deterministic(context: CoachContext) -> CoachReply:
     else:
         parts.append(copy["nothing"])
 
-    parts.append(copy["offline"])
+    # No "the AI is offline" sentence here: `generated=False` is what the page
+    # shows its limited-mode notice from, and saying it twice read as an error.
 
     return CoachReply(
         message=" ".join(parts),
@@ -1429,7 +1464,6 @@ _FALLBACK = {
         "next_path": "Keyingi qadam: «{title}» yo'nalishi.",
         "take_assessment": "Keyingi qadam: diagnostikadan o'tish.",
         "nothing": "Hozircha katalogda sizga mos yangi taklif yo'q.",
-        "offline": "AI yordamchisi vaqtincha ishlamayapti — bu ma'lumot sizning yozuvlaringizdan.",
     },
     "ru": {
         "score": "Текущий Development Score: {score}/100.",
@@ -1439,7 +1473,6 @@ _FALLBACK = {
         "next_path": "Следующий шаг: направление «{title}».",
         "take_assessment": "Следующий шаг: пройти диагностику.",
         "nothing": "Сейчас в каталоге нет подходящего для вас нового предложения.",
-        "offline": "AI-помощник временно недоступен — это данные из ваших записей.",
     },
     "en": {
         "score": "Your Development Score is {score}/100.",
@@ -1451,7 +1484,6 @@ _FALLBACK = {
         "next_path": "Your next step is the learning path “{title}”.",
         "take_assessment": "Your next step is to take the diagnostic.",
         "nothing": "There is nothing in the catalogue that matches you right now.",
-        "offline": "The AI assistant is unavailable — this comes straight from your own records.",
     },
 }
 

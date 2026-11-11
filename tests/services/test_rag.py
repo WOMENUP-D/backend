@@ -93,4 +93,5 @@ def test_keyword_fallback_searches_both_spellings():
     assert "rivojlaniş" in reformed and "rivojlanish" in reformed
     old = _or_query("rivojlanish rejasi")
     assert "rivojlaniş" in old and "rivojlanish" in old
-    assert _or_query("план развития") == "план | развития"
+    # Russian keeps the words and adds a stemmed prefix for the other forms.
+    assert _or_query("план развития") == "план | развития | развит:*"

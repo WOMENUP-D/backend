@@ -57,4 +57,10 @@ class SlidingWindow:
 #: board proxy (each distinct query is a call against the board's quota) and
 #: the model-backed endpoints (each call costs money). Matched by prefix
 #: under the API prefix; the hourly database counters still apply on top.
-EXPENSIVE_PREFIXES = ("/vacancies", "/assistant", "/ai/", "/diagnostic/recommendations/refresh")
+EXPENSIVE_PREFIXES = (
+    "/vacancies",
+    "/assistant",
+    "/ai/",
+    "/diagnostic/recommendations/refresh",
+    "/plans/generate",
+)
