@@ -806,6 +806,8 @@ class IntegrationEventStatus(StrEnum):
     ACKNOWLEDGED = "acknowledged"
     FAILED = "failed"
     DEAD_LETTER = "dead_letter"
+    #: Never sent: the consent that authorised it was withdrawn first.
+    CANCELLED = "cancelled"
 
 
 class RiskFlagType(StrEnum):

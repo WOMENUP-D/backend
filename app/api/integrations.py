@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -12,6 +13,7 @@ from sqlalchemy import select
 
 from app.api.deps import AdminDep, CurrentUserDep, DbSession, NationalStaffDep, client_ip
 from app.core import security_log
+from app.core.config import settings
 from app.core.constants import (
     EVENT_TYPES,
     ApplicationStatus,
@@ -31,8 +33,8 @@ from app.schemas.opportunity import (
     OutcomeCreate,
     OutcomeRead,
 )
-from app.services import events
-from app.services.audit_service import has_consent, record_audit
+from app.services import events, token_revocation
+from app.services.audit_service import has_consent, record_audit, record_staff_action
 from app.services.integration_gateway import (
     CONSENT_FOR_SYSTEM,
     ConsentMissingError,
@@ -40,6 +42,7 @@ from app.services.integration_gateway import (
     drain_outbox,
     minimal_profile_payload,
     queue_event,
+    resolve_pseudonym,
 )
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -113,20 +116,37 @@ def _listing_fields(item: dict) -> dict | None:
     }
 
 
+#: How old a signed callback may be. Older is refused as a possible replay.
+SIGNATURE_MAX_AGE_SECONDS = 300
+
+
+def callback_signature(secret: str, timestamp: str, body: bytes) -> str:
+    """`sha256=<hex HMAC-SHA256 of "<timestamp>." + raw body>` — what a
+    partner sends in `X-Signature` beside `X-Timestamp`."""
+    message = timestamp.encode() + b"." + body
+    return "sha256=" + hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
+
+
 async def _verify_partner(
-    system: IntegrationSystem, request: Request, client_id: str | None, signature: str | None
+    system: IntegrationSystem,
+    request: Request,
+    client_id: str | None,
+    signature: str | None,
+    session=None,
 ) -> None:
     """Authenticate an inbound callback.
 
     The client id names the partner; it is the same value WomanUP sends the
-    partner on every outbound call, so on its own it proves nothing. When a
-    client secret is configured for the system the callback must also carry
-    `X-Signature: sha256=<hex HMAC-SHA256 of the raw body under that secret>`,
-    compared in constant time. Without a secret only the id is checked — the
-    state the integrations are in before a partner contract exists.
+    partner on every outbound call, so on its own it proves nothing. Outside
+    local development a client secret is therefore required — a system
+    without one answers 503 — and every callback must carry `X-Timestamp`
+    (Unix seconds) and `X-Signature: sha256=<hex HMAC-SHA256 of
+    "<timestamp>." + raw body under that secret>`, compared in constant time.
+    A timestamp more than five minutes away is refused, and a signature is
+    accepted once: a captured callback cannot be replayed.
     """
     config = config_for(system)
-    if not config.client_id:
+    if not config.client_id or (not config.client_secret and settings.environment != "local"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Integration with {system.value} is not configured",
@@ -137,19 +157,34 @@ async def _verify_partner(
     if not client_id or not hmac.compare_digest(client_id, config.client_id):
         security_log.event("integration.auth_failed", system=system.value, ip=client_ip(request))
         raise refused
-    if config.client_secret:
-        body = await request.body()
-        expected = (
-            "sha256=" + hmac.new(config.client_secret.encode(), body, hashlib.sha256).hexdigest()
+    if not config.client_secret:
+        # Local development only, before a partner contract exists.
+        return
+
+    def fail(reason: str) -> HTTPException:
+        security_log.event(
+            "integration.auth_failed", system=system.value, ip=client_ip(request), reason=reason
         )
-        if not signature or not hmac.compare_digest(signature.strip(), expected):
-            security_log.event(
-                "integration.auth_failed",
-                system=system.value,
-                ip=client_ip(request),
-                reason="signature",
-            )
-            raise refused
+        return refused
+
+    stamp = (request.headers.get("x-timestamp") or "").strip()
+    if not stamp.isdigit():
+        raise fail("timestamp")
+    if abs(time.time() - int(stamp)) > SIGNATURE_MAX_AGE_SECONDS:
+        raise fail("stale")
+    body = await request.body()
+    expected = callback_signature(config.client_secret, stamp, body)
+    if not signature or not hmac.compare_digest(signature.strip(), expected):
+        raise fail("signature")
+    if session is not None:
+        # Each signature once: remembered, like a spent token, until it is
+        # too old to be accepted anyway.
+        nonce = {
+            "jti": "cb:" + hashlib.sha256(expected.encode()).hexdigest()[:60],
+            "exp": int(stamp) + 2 * SIGNATURE_MAX_AGE_SECONDS,
+        }
+        if not await token_revocation.revoke(session, nonce, reason="callback"):
+            raise fail("replay")
 
 
 _FINAL = (ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN)
@@ -171,7 +206,7 @@ async def receive_application_status(
     system, or one published on WomanUP, is not the partner's to decide, and
     an application already decided or withdrawn is not reopened.
     """
-    await _verify_partner(system, request, x_client_id, x_signature)
+    await _verify_partner(system, request, x_client_id, x_signature, session)
 
     application = await session.get(Application, application_id)
     if application is None:
@@ -210,7 +245,7 @@ async def receive_application_status(
 async def receive_outcome(
     system: IntegrationSystem,
     payload: OutcomeCreate,
-    user_id: uuid.UUID,
+    user_id: str,
     session: DbSession,
     request: Request,
     x_client_id: str | None = Header(default=None),
@@ -224,10 +259,18 @@ async def receive_outcome(
     through a profile she consented to share with it. Nobody else's record
     can be written to by a partner naming an id.
     """
-    await _verify_partner(system, request, x_client_id, x_signature)
+    await _verify_partner(system, request, x_client_id, x_signature, session)
 
-    if await session.get(User, user_id) is None:
+    # `user_id` is the `womanup_id` the partner was sent — its own pseudonym
+    # for her. A bare account UUID is still read, for a partner integrated
+    # before pseudonyms; deprecated, and partners no longer receive one.
+    try:
+        resolved: uuid.UUID | None = uuid.UUID(user_id)
+    except ValueError:
+        resolved = await resolve_pseudonym(session, system, user_id[:64])
+    if resolved is None or await session.get(User, resolved) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user_id = resolved
     if payload.application_id is not None:
         application = await session.get(Application, payload.application_id)
         listing = (
@@ -285,10 +328,10 @@ async def sync_opportunities(
     Keyed on (source, external_id), so a partner re-sending the same batch
     updates rather than duplicates.
     """
-    await _verify_partner(system, request, x_client_id, x_signature)
+    await _verify_partner(system, request, x_client_id, x_signature, session)
     if len(items) > 500:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="at most 500 items per batch",
         )
     source = SYSTEM_TO_SOURCE[system]
@@ -340,7 +383,7 @@ async def sync_my_profile(
             event_type="user.sync",
             user_id=user_id,
             reference=f"{user_id}:{system.value}",
-            payload=minimal_profile_payload(record, profile),
+            payload=minimal_profile_payload(record, profile, system=system),
         )
     except ConsentMissingError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -353,6 +396,13 @@ async def drain(user: AdminDep, session: DbSession, limit: int = 50) -> Message:
     """Manually flush the outbox. The worker does this on a schedule; the
     endpoint exists for operational recovery."""
     delivered, failed = await drain_outbox(session, limit=limit)
+    await record_staff_action(
+        session,
+        user,
+        action="integration.outbox_drain",
+        entity_type="integration_outbox",
+        changes={"limit": limit, "delivered": delivered, "failed": failed},
+    )
     return Message(detail=f"{delivered} delivered, {failed} failed")
 
 

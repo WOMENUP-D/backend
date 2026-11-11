@@ -6,15 +6,17 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip, coordinator_region
 from app.core.constants import SUBJECT_SCOPES, ConsentScope, DataClassification, Role
+from app.core.security import verify_password
 from app.models.career import EducationEntry, WorkExperience
 from app.models.mentor import MentorProfile, MentorSession
 from app.models.profile import Goal, Profile
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.admin import ConsentRead, ConsentUpdate
+from app.schemas.auth import AccountDeletion
 from app.schemas.career import (
     EducationIn,
     EducationRead,
@@ -36,11 +38,14 @@ from app.schemas.user import (
 )
 from app.services import (
     activity,
+    integration_gateway,
     profile_completeness,
+    rate_limit,
     retention,
     score_progress,
     skills,
     telemetry,
+    token_revocation,
 )
 from app.services.audit_service import current_consents, record_audit, record_consent
 
@@ -371,14 +376,14 @@ async def update_consent(
         scope = ConsentScope(payload.scope)
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Unknown consent scope '{payload.scope}'",
         ) from None
     if scope in SUBJECT_SCOPES:
         # Sharing with an organisation is given to that organisation — on its
         # listing or its invitation — and withdrawn there, never in general.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Consent scope '{scope.value}' is given per organisation",
         )
 
@@ -391,6 +396,9 @@ async def update_consent(
         ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
+    if not payload.accepted:
+        # Withdrawn now means withdrawn for what is already queued, too.
+        await integration_gateway.cancel_pending(session, uuid.UUID(user.id), scope)
     await record_audit(
         session,
         action="consent.grant" if payload.accepted else "consent.withdraw",
@@ -445,18 +453,54 @@ async def complete_onboarding(user: CurrentUserDep, session: DbSession, actor: T
 
 
 @router.delete("/me", response_model=Message)
-async def delete_account(user: CurrentUserDep, session: DbSession, request: Request) -> Message:
+async def delete_account(
+    payload: AccountDeletion, user: CurrentUserDep, session: DbSession, request: Request
+) -> Message:
     """Right to erasure: identifiers are cleared, activity history is kept
-    anonymised so aggregate KPI figures stay correct."""
+    anonymised so aggregate KPI figures stay correct.
+
+    Irreversible, so a valid access token alone is not enough — one left on
+    a shared phone would be. An account with a password confirms with it
+    (`403 password_incorrect` otherwise, and wrong guesses count against the
+    same hold as sign-in); one without a password sends `{"confirm":
+    "DELETE"}`. The last active administrator cannot erase herself
+    (`409 last_admin`): the platform would be left with nobody to run it.
+    """
     record = await session.get(User, uuid.UUID(user.id))
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if record.password_hash:
+        by_account, _ = rate_limit.login_failure_limits()
+        identifier = (record.email or str(record.id)).strip().lower()
+        if await rate_limit.exhausted(session, by_account, identifier):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="account_locked",
+                headers={"Retry-After": str(rate_limit.retry_after(by_account))},
+            )
+        if not payload.password or not verify_password(payload.password, record.password_hash):
+            await rate_limit.take(session, by_account, identifier)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="password_incorrect")
+    elif payload.confirm != "DELETE":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="confirmation_required"
+        )
+
+    if await _is_last_admin(session, record.id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="last_admin")
 
     from app.core.constants import UserStatus
 
     # Her assistant conversations and any codes sent to her go with the
     # identifiers — read before they are cleared.
-    await retention.erase_user(session, record.id, [record.email, record.phone])
+    await retention.erase_user(
+        session, record.id, [record.email, record.phone, f"pwreset:{record.id}"]
+    )
+    # Nothing queued for a partner leaves after she is gone, and no session
+    # of hers outlives the account.
+    await integration_gateway.cancel_pending(session, record.id)
+    await token_revocation.revoke_all(session, record.id, reason="erased")
 
     record.phone = None
     record.email = None
@@ -483,3 +527,24 @@ async def delete_account(user: CurrentUserDep, session: DbSession, request: Requ
         ip_address=client_ip(request),
     )
     return Message(detail="Account anonymised")
+
+
+async def _is_last_admin(session, user_id: uuid.UUID) -> bool:
+    """Whether this account is an administrator and no other active one exists."""
+    from app.core.constants import UserStatus
+
+    is_admin = await session.scalar(
+        select(UserRole.id).where(UserRole.user_id == user_id, UserRole.role == Role.ADMIN)
+    )
+    if is_admin is None:
+        return False
+    others = await session.scalar(
+        select(func.count(func.distinct(UserRole.user_id)))
+        .join(User, User.id == UserRole.user_id)
+        .where(
+            UserRole.role == Role.ADMIN,
+            UserRole.user_id != user_id,
+            User.status.not_in([UserStatus.SUSPENDED, UserStatus.DELETED]),
+        )
+    )
+    return not others

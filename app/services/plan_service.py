@@ -67,7 +67,7 @@ def due_for(horizon: GoalHorizon, week_offset: object, today: date) -> date:
     """The day a step falls due: the end of its week, never past the horizon."""
     try:
         week = max(0, int(week_offset or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         week = 0
     return today + timedelta(days=min(7 * (week + 1), HORIZON_DAYS[horizon]))
 
@@ -545,6 +545,14 @@ async def accept_plan(
     plan.is_active = True
     plan.accepted_at = datetime.now(UTC)
     await session.flush()
+    # A plan drafted before she sat the diagnostic may open with "sit the
+    # diagnostic". Settled here, when the plan becomes hers, and when the
+    # diagnostic is submitted — never by reading the plan (a GET writes
+    # nothing).
+    from app.services.scoring import is_baseline_assessment
+
+    if not await is_baseline_assessment(session, user_id):
+        await close_diagnostic_items(session, user_id)
     await session.refresh(plan)
     return plan
 

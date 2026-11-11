@@ -228,7 +228,7 @@ async def test_only_staff_read_results(client, session):
         assert (await client.get(f"{API}/{path}")).status_code == 401, path
 
     for role in (Role.USER, Role.MOTHER, Role.MENTOR, Role.TRAINER, Role.PARTNER):
-        headers = _token(uuid.uuid4(), role)
+        headers = _token(await _person(session, roles=(role,), profile=False), role)
         for path in (*ENDPOINTS, "export"):
             response = await client.get(f"{API}/{path}", headers=headers)
             assert response.status_code == 403, (role, path)

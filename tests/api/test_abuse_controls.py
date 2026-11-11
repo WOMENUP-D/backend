@@ -14,7 +14,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app import main as main_module
 from app.core.config import settings
@@ -107,8 +107,13 @@ async def test_two_tabs_spending_one_refresh_token_get_one_session(client, sessi
     # property under test is that the *second* spend of a token — however it
     # arrives — is refused because the revocation row already exists.
     first = await client.post(f"{API}/auth/refresh", json={"refresh_token": refresh})
-    second = await client.post(f"{API}/auth/refresh", json={"refresh_token": refresh})
     assert first.status_code == 200
+    # Past the reuse grace (C-01) — two tabs within it both get a pair.
+    await session.execute(
+        update(RevokedToken).values(created_at=datetime.now(UTC) - timedelta(seconds=120))
+    )
+    await session.commit()
+    second = await client.post(f"{API}/auth/refresh", json={"refresh_token": refresh})
     assert second.status_code == 401
     # One row: the spent token. The account-wide consequence of the replay is
     # a bumped session generation on the user, not another row.
@@ -248,7 +253,9 @@ async def test_erasing_an_account_takes_her_conversations_and_codes_with_it(clie
     )
     await session.flush()
 
-    response = await client.delete(f"{API}/users/me", headers=_headers(user))
+    response = await client.request(
+        "DELETE", f"{API}/users/me", headers=_headers(user), json={"confirm": "DELETE"}
+    )
     assert response.status_code == 200
     trace = await session.scalar(select(AiInteraction).where(AiInteraction.user_id == user.id))
     assert trace is not None and trace.prompt_excerpt is None and trace.response_excerpt is None

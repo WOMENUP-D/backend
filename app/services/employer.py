@@ -335,39 +335,78 @@ async def shares_with(session: AsyncSession, user_id: uuid.UUID, org: Organizati
     )
 
 
-async def _skills_of(session: AsyncSession, user_id: uuid.UUID) -> list[dict]:
+_SKILL_RANK = {
+    SkillStatus.VERIFIED: 0,
+    SkillStatus.ASSESSED: 1,
+    SkillStatus.LEARNED: 2,
+    SkillStatus.SELF_REPORTED: 3,
+}
+
+
+async def _skills_by_user(
+    session: AsyncSession, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[dict]]:
+    """Each woman's skills, strongest evidence first — one query for all."""
+    out: dict[uuid.UUID, list[dict]] = {user_id: [] for user_id in user_ids}
+    if not user_ids:
+        return out
     rows = await session.execute(
-        select(Skill, UserSkill.status)
+        select(UserSkill.user_id, Skill, UserSkill.status)
         .join(UserSkill, UserSkill.skill_id == Skill.id)
-        .where(UserSkill.user_id == user_id, UserSkill.status.is_not(None))
+        .where(UserSkill.user_id.in_(user_ids), UserSkill.status.is_not(None))
     )
-    rank = {
-        SkillStatus.VERIFIED: 0,
-        SkillStatus.ASSESSED: 1,
-        SkillStatus.LEARNED: 2,
-        SkillStatus.SELF_REPORTED: 3,
-    }
-    out = [
-        {"skill": skill_service.ref_for(skill).model_dump(), "status": status.value}
-        for skill, status in rows.all()
-    ]
-    out.sort(key=lambda item: (rank.get(SkillStatus(item["status"]), 9), item["skill"]["slug"]))
+    for user_id, skill, status in rows.all():
+        out[user_id].append(
+            {"skill": skill_service.ref_for(skill).model_dump(), "status": status.value}
+        )
+    for items in out.values():
+        items.sort(
+            key=lambda item: (
+                _SKILL_RANK.get(SkillStatus(item["status"]), 9),
+                item["skill"]["slug"],
+            )
+        )
     return out
 
 
-async def candidate_profile(session: AsyncSession, user_id: uuid.UUID) -> dict:
-    """Exactly `EMPLOYER_FIELDS`, built field by field. Nothing else about her
-    is read here, so nothing else can leak from here."""
-    user = await session.get(User, user_id)
-    profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
+async def _skills_of(session: AsyncSession, user_id: uuid.UUID) -> list[dict]:
+    return (await _skills_by_user(session, [user_id]))[user_id]
+
+
+async def _latest_consents(
+    session: AsyncSession,
+    user_ids: list[uuid.UUID],
+    scope: ConsentScope,
+    subject_ref: str | None = None,
+) -> set[uuid.UUID]:
+    """Who of `user_ids` currently consents to `scope` — the latest row per
+    woman, as `has_consent` reads it, in one query."""
+    if not user_ids:
+        return set()
+    subject_clause = (
+        ConsentLog.subject_ref.is_(None)
+        if subject_ref is None
+        else ConsentLog.subject_ref == subject_ref
+    )
+    rows = await session.execute(
+        select(ConsentLog.user_id, ConsentLog.accepted)
+        .where(ConsentLog.user_id.in_(user_ids), ConsentLog.scope == scope, subject_clause)
+        .order_by(ConsentLog.user_id, ConsentLog.created_at.desc())
+        .distinct(ConsentLog.user_id)
+    )
+    return {user_id for user_id, accepted in rows.all() if accepted}
+
+
+def _profile_fields(
+    user: User | None, profile: Profile | None, skills: list[dict], portfolio_shared: bool
+) -> dict:
+    """Exactly `EMPLOYER_FIELDS`, built field by field."""
     first = (profile.full_name or "").split()[0] if profile and profile.full_name else None
     portfolio = (
         f"/portfolio/{profile.portfolio_slug}"
-        if profile and profile.portfolio_public and profile.portfolio_slug
+        if profile and profile.portfolio_public and profile.portfolio_slug and portfolio_shared
         else None
     )
-    if portfolio and not await has_consent(session, user_id, ConsentScope.PUBLIC_PORTFOLIO):
-        portfolio = None
     return {
         "first_name": first,
         "region": user.region.value if user and user.region else None,
@@ -376,9 +415,38 @@ async def candidate_profile(session: AsyncSession, user_id: uuid.UUID) -> dict:
         "employment_status": profile.employment_status if profile else None,
         "profession": profile.profession if profile else None,
         "years_of_experience": profile.years_of_experience if profile else None,
-        "skills": await _skills_of(session, user_id),
+        "skills": skills,
         "public_portfolio": portfolio,
     }
+
+
+async def candidate_profiles(
+    session: AsyncSession, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict]:
+    """`candidate_profile` for many women at once, in a fixed number of
+    queries whatever their number."""
+    ids = list(dict.fromkeys(user_ids))
+    if not ids:
+        return {}
+    users = {u.id: u for u in (await session.scalars(select(User).where(User.id.in_(ids))))}
+    profiles = {
+        p.user_id: p
+        for p in (await session.scalars(select(Profile).where(Profile.user_id.in_(ids))))
+    }
+    skills = await _skills_by_user(session, ids)
+    shared = await _latest_consents(session, ids, ConsentScope.PUBLIC_PORTFOLIO)
+    return {
+        user_id: _profile_fields(
+            users.get(user_id), profiles.get(user_id), skills[user_id], user_id in shared
+        )
+        for user_id in ids
+    }
+
+
+async def candidate_profile(session: AsyncSession, user_id: uuid.UUID) -> dict:
+    """Exactly `EMPLOYER_FIELDS`, built field by field. Nothing else about her
+    is read here, so nothing else can leak from here."""
+    return (await candidate_profiles(session, [user_id]))[user_id]
 
 
 # ---------------------------------------------------------------------------
@@ -396,8 +464,18 @@ class OrgApplication:
 
 
 async def applications(
-    session: AsyncSession, org: Organization, *, opportunity_id: uuid.UUID | None = None
+    session: AsyncSession,
+    org: Organization,
+    *,
+    opportunity_id: uuid.UUID | None = None,
+    limit: int = 200,
+    offset: int = 0,
 ) -> list[OrgApplication]:
+    """A page of applications to the organisation's listings, newest first.
+
+    Consent and profiles are read for the whole page at once — a fixed
+    number of queries, not three per application.
+    """
     stmt = (
         select(Application, Opportunity)
         .join(Opportunity, Opportunity.id == Application.opportunity_id)
@@ -409,9 +487,23 @@ async def applications(
     )
     if opportunity_id is not None:
         stmt = stmt.where(Opportunity.id == opportunity_id)
+    stmt = stmt.order_by(Application.id).limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+
+    open_ids = [a.user_id for a, _ in rows if a.status != ApplicationStatus.WITHDRAWN]
+    sharing = await _latest_consents(
+        session, open_ids, ConsentScope.SHARE_WITH_EMPLOYER, subject_ref=subject(org)
+    )
+    profiles = await candidate_profiles(session, [uid for uid in open_ids if uid in sharing])
+
     out: list[OrgApplication] = []
-    for application, listing in (await session.execute(stmt)).all():
-        out.append(await _read(session, org, application, listing))
+    for application, listing in rows:
+        if application.status == ApplicationStatus.WITHDRAWN:
+            out.append(OrgApplication(application, listing, None, "withdrawn"))
+        elif application.user_id not in sharing:
+            out.append(OrgApplication(application, listing, None, "consent_withdrawn"))
+        else:
+            out.append(OrgApplication(application, listing, profiles[application.user_id], None))
     return out
 
 

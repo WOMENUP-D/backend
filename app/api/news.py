@@ -45,7 +45,7 @@ from app.schemas.news import (
     PersonalisedNewsRead,
 )
 from app.services.age_gate import age_from_profile, band_for_profile, is_minor
-from app.services.audit_service import record_audit
+from app.services.audit_service import record_audit, record_staff_action
 from app.services.news_age import AGE_GROUPS, group_for_age, group_for_profile
 from app.services.news_ai import analyse, apply_analysis
 from app.services.news_ingest import AUDIT_ACTION, ingest_news
@@ -324,6 +324,9 @@ async def create_news(payload: NewsCreate, user: ContentDep, session: DbSession)
     post = NewsPost(**payload.model_dump(), author_id=uuid.UUID(user.id))
     session.add(post)
     await session.flush()
+    await record_staff_action(
+        session, user, action="news.create", entity_type="news_post", entity_id=str(post.id)
+    )
     return post
 
 
@@ -341,6 +344,14 @@ async def update_news(
         post.published_at = datetime.now(UTC)
     for field, value in changes.items():
         setattr(post, field, value)
+    await record_staff_action(
+        session,
+        user,
+        action="news.update",
+        entity_type="news_post",
+        entity_id=str(post.id),
+        changes={"fields": sorted(changes)},
+    )
     await session.flush()
     return post
 

@@ -15,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.deps import client_ip
 from app.api.router import api_router
@@ -38,6 +40,84 @@ SECURITY_HEADERS = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
 }
+
+#: Validation failures a client maps to its own message. When one of these is
+#: among a 422's errors it becomes the response's `detail`.
+STABLE_VALIDATION_CODES = frozenset({"weak_password", "email_domain_unsupported"})
+
+#: PostgreSQL's SQLSTATE for a character text columns cannot hold (NUL).
+CHARACTER_NOT_IN_REPERTOIRE = "22021"
+
+
+def _carries_nul(request: Request) -> bool:
+    """A NUL byte in the path or the query string, raw or percent-encoded.
+    PostgreSQL text cannot hold one, so it can only ever end in an error."""
+    raw = (request.scope.get("raw_path") or b"") + b"?" + (request.scope.get("query_string") or b"")
+    return b"\x00" in raw or b"%00" in raw.lower()
+
+
+def _request_id(request: Request) -> str | None:
+    """The request's id, also after the middleware has left its context."""
+    return getattr(request.state, "request_id", None) or request_id_ctx.get()
+
+
+class BodyLimitMiddleware:
+    """Counts the bytes a request body actually streams, not only what its
+    `Content-Length` declares — a chunked upload declares nothing.
+
+    Past `MAX_REQUEST_BODY_BYTES` the app is told the client went away (so
+    nothing more is read or parsed) and whatever it answers is replaced by a
+    413. Nothing is raised through the stack: an exception thrown from
+    `receive` reaches the app wrapped in other errors and comes out as a 400.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        received = 0
+        exceeded = False
+        replied = False
+
+        async def counting_receive() -> Message:
+            nonlocal received, exceeded
+            if exceeded:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > settings.max_request_body_bytes:
+                    exceeded = True
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message: Message) -> None:
+            nonlocal replied
+            if not exceeded:
+                await send(message)
+                return
+            if replied:
+                return
+            replied = True
+            response = JSONResponse(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                content=ErrorResponse(
+                    detail="Request body too large", code="body_too_large"
+                ).model_dump(),
+            )
+            await response(scope, receive, send)
+
+        try:
+            await self.app(scope, counting_receive, guarded_send)
+        except Exception:
+            if not exceeded:
+                raise
+        if exceeded and not replied:
+            await guarded_send({"type": "http.response.start"})
+
 
 #: Per-address ceilings, rebuilt by `create_app` so tests get fresh ones.
 general_throttle = SlidingWindow(settings.rate_limit_per_minute)
@@ -141,6 +221,9 @@ def create_app() -> FastAPI:
         """Attach a request id to logs and to the response, refuse oversized
         bodies, and set the headers every API answer carries."""
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+        # Kept on the request too: the context is reset when this middleware
+        # returns, which is before an exception handler writes its answer.
+        request.state.request_id = request_id
         token = request_id_ctx.set(request_id)
         user_token = user_id_ctx.set(None)
         try:
@@ -153,10 +236,18 @@ def create_app() -> FastAPI:
                         detail="Too many requests", code="rate_limited", request_id=request_id
                     ).model_dump(),
                 )
+            if _carries_nul(request):
+                return JSONResponse(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    headers={"X-Request-ID": request_id},
+                    content=ErrorResponse(
+                        detail="Validation failed", code="validation_error", request_id=request_id
+                    ).model_dump(),
+                )
             declared = request.headers.get("content-length")
             if declared and declared.isdigit() and int(declared) > settings.max_request_body_bytes:
                 return JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                     content=ErrorResponse(
                         detail="Request body too large",
                         code="body_too_large",
@@ -191,16 +282,42 @@ def create_app() -> FastAPI:
             {key: value for key, value in error.items() if key in ("loc", "msg", "type")}
             for error in exc.errors()
         ]
+        # A rule the person can act on names itself in `detail`, so a client
+        # can show "choose a harder password" instead of "something failed".
+        detail = next(
+            (error["type"] for error in errors if error.get("type") in STABLE_VALIDATION_CODES),
+            "Validation failed",
+        )
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=ErrorResponse(
-                detail="Validation failed",
+                detail=detail,
                 code="validation_error",
-                request_id=request_id_ctx.get(),
+                request_id=_request_id(request),
             ).model_dump()
             # jsonable_encoder is required: raw errors embed exception objects.
             | {"errors": jsonable_encoder(errors)},
         )
+
+    @app.exception_handler(DBAPIError)
+    async def database_error_handler(request: Request, exc: DBAPIError) -> JSONResponse:
+        """A NUL byte in a JSON string reaches the database and is refused
+        there; that is the client's input, a 422 — not a 500 that fills the
+        error dashboard. Any other database error is a 500 as before."""
+        orig = exc.orig
+        code = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+        cause = getattr(orig, "__cause__", None)
+        code = code or getattr(cause, "sqlstate", None)
+        if code == CHARACTER_NOT_IN_REPERTOIRE:
+            return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                content=ErrorResponse(
+                    detail="Validation failed",
+                    code="validation_error",
+                    request_id=_request_id(request),
+                ).model_dump(),
+            )
+        return await unhandled_handler(request, exc)
 
     @app.exception_handler(Exception)
     async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -211,7 +328,7 @@ def create_app() -> FastAPI:
             content=ErrorResponse(
                 detail="Internal server error",
                 code="internal_error",
-                request_id=request_id_ctx.get(),
+                request_id=_request_id(request),
             ).model_dump(),
         )
 
@@ -234,6 +351,8 @@ def create_app() -> FastAPI:
         return JSONResponse(content={"status": "ready", "database": "ok"})
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+    # Outermost, so the count covers every byte before anything reads it.
+    app.add_middleware(BodyLimitMiddleware)
     return app
 
 

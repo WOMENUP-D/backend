@@ -10,7 +10,6 @@ in `services.results.DEFINITIONS`.
 
 from __future__ import annotations
 
-import csv
 import io
 import uuid
 from datetime import date
@@ -18,6 +17,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import DbSession, StaffDep, coordinator_region
+from app.core import csv_safe
 from app.core.constants import Region, Role
 from app.schemas.results import (
     ProgrammeTable,
@@ -39,7 +39,7 @@ async def _filters(
 ) -> results.Filters:
     if date_from and date_to and date_from > date_to:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"reason": "period_reversed"},
         )
     if not user.has_role(Role.ADMIN, Role.MODERATOR):
@@ -174,7 +174,7 @@ async def export(
     """The headline figures and their definitions as CSV, for a report."""
     f = await _filters(session, user, date_from, date_to, region)
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv_safe.writer(buffer)
     writer.writerow(["period_from", f.date_from or "all", "period_to", f.date_to or "all"])
     writer.writerow(["region", f.region.value if f.region else "all"])
     writer.writerow([])

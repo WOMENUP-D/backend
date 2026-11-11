@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+import email_validator
+from pydantic import BaseModel, BeforeValidator, EmailStr, Field, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.core.constants import (
     PRIVACY_POLICY_VERSION,
@@ -106,22 +108,95 @@ COMMON_PASSWORDS = frozenset(
 )
 
 
+#: The shortest password accepted, counted without surrounding spaces.
+MIN_PASSWORD_LENGTH = 8
+
+_RUNS = ("0123456789", "abcdefghijklmnopqrstuvwxyz", "qwertyuiop", "asdfghjkl", "zxcvbnm")
+
+
+def _is_simple_run(candidate: str) -> bool:
+    """`12345678`, `87654321`, `abcdefgh`, `qwertyui` — a keyboard or
+    alphabet walk is guessed as early as any word on the list."""
+    for run in _RUNS:
+        for sequence in (run, run[::-1]):
+            if candidate in sequence or candidate in sequence * 2:
+                return True
+    return False
+
+
+def password_is_weak(password: str, email: str | None = None) -> bool:
+    """Whether a password is one an attacker tries first.
+
+    Eight characters is the floor, not the goal, and it is counted on what is
+    left once surrounding spaces are taken away — eight spaces is not a
+    password. No composition rules: they push people towards "Parol1!" and
+    away from anything memorable. What is refused is a password from the
+    list every attacker opens with, one character repeated or two
+    alternating, a straight walk along the keyboard or the alphabet, and her
+    own address.
+    """
+    stripped = password.strip()
+    if len(stripped) < MIN_PASSWORD_LENGTH:
+        return True
+    candidate = stripped.lower()
+    if candidate in COMMON_PASSWORDS or len(set(candidate)) <= 2:
+        return True
+    if _is_simple_run(candidate):
+        return True
+    if email:
+        local = email.split("@", 1)[0].lower()
+        if len(local) >= 4 and candidate == local:
+            return True
+    return False
+
+
+def weak_password_error() -> PydanticCustomError:
+    """The 422 a client recognises: `detail` becomes `weak_password`."""
+    return PydanticCustomError("weak_password", "this password is too easy to guess")
+
+
+def _registration_email(value: object) -> str:
+    """An address mail can actually reach.
+
+    A domain that is reserved or special-use (`.test`, `.example`,
+    `.localhost`, …) can never receive a message, so it is refused with its
+    own code, `email_domain_unsupported`, rather than a generic "invalid" —
+    the person can act on "use another address".
+    """
+    if not isinstance(value, str):
+        raise PydanticCustomError("value_error", "value is not a valid email address")
+    try:
+        result = email_validator.validate_email(value.strip(), check_deliverability=False)
+    except email_validator.EmailNotValidError as exc:
+        reason = str(exc)
+        if "special-use or reserved" in reason or "should have a period" in reason:
+            raise PydanticCustomError(
+                "email_domain_unsupported", "this e-mail domain cannot receive mail"
+            ) from None
+        raise PydanticCustomError(
+            "value_error", "value is not a valid email address: {reason}", {"reason": reason}
+        ) from None
+    return result.normalized
+
+
+RegistrationEmail = Annotated[
+    str,
+    BeforeValidator(_registration_email),
+    Field(json_schema_extra={"format": "email"}, max_length=320),
+]
+
+
 class RegisterRequest(BaseModel):
     """Opening an account with an address and a password."""
 
-    email: EmailStr
-    # Eight characters is the floor, not the goal. No composition rules: they
-    # push people towards "Parol1!" and away from anything memorable, and the
-    # length is what actually costs an attacker. What is refused is the
-    # handful of passwords an attacker tries first, and her own address.
-    password: str = Field(min_length=8, max_length=200)
+    email: RegistrationEmail
+    # See `password_is_weak` for what is refused, and why so little.
+    password: str = Field(max_length=200, json_schema_extra={"minLength": MIN_PASSWORD_LENGTH})
 
     @model_validator(mode="after")
     def password_is_not_a_guess(self) -> Self:
-        candidate = self.password.strip().lower()
-        local = str(self.email).split("@", 1)[0].lower()
-        if candidate in COMMON_PASSWORDS or (len(local) >= 4 and candidate == local):
-            raise ValueError("this password is too common to protect an account")
+        if password_is_weak(self.password, str(self.email)):
+            raise weak_password_error()
         return self
 
     # Agreeing to the privacy policy is part of opening an account, not a
@@ -131,6 +206,21 @@ class RegisterRequest(BaseModel):
     # creating an account with no consent behind it.
     accepted_privacy_policy: Literal[True]
     policy_version: str = Field(default=PRIVACY_POLICY_VERSION, max_length=20)
+
+
+class PasswordForgot(BaseModel):
+    """Asking for a reset link. The answer is the same whoever asks."""
+
+    email: EmailStr
+    # The language the message is written in — whatever she was reading.
+    language: str = Field(default="uz", pattern="^(uz|ru|en)$")
+
+
+class PasswordReset(BaseModel):
+    """Setting a new password with the link from the message."""
+
+    token: str = Field(min_length=10, max_length=512)
+    password: str = Field(max_length=200, json_schema_extra={"minLength": MIN_PASSWORD_LENGTH})
 
 
 class PasswordLogin(BaseModel):
@@ -208,3 +298,11 @@ class StaffLogin(BaseModel):
 
     login: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=200)
+
+
+class AccountDeletion(BaseModel):
+    """Confirming an erasure: her current password, or — for an account
+    without one (Google sign-in) — the word `DELETE`."""
+
+    password: str | None = Field(default=None, max_length=200)
+    confirm: str | None = Field(default=None, max_length=20)

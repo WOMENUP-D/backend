@@ -93,7 +93,7 @@ async def submit_attempt(
         )
     except diagnostic.DiagnosticError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": error.code, "message": error.detail, "items": error.items},
         ) from None
     if created:

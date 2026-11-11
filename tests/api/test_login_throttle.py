@@ -13,8 +13,6 @@ import uuid
 
 import pytest
 
-from app.api import auth as auth_api
-
 LOGIN = "/api/v1/auth/login"
 STAFF = "/api/v1/auth/staff/login"
 
@@ -29,14 +27,7 @@ async def attempt(client, ip: str, path: str = LOGIN) -> int:
     return response.status_code
 
 
-@pytest.fixture(autouse=True)
-def fresh_throttles():
-    """Each test starts with empty counters, whatever ran before it."""
-    for throttle in (auth_api._login_throttle, auth_api._staff_throttle):
-        throttle._failures.clear()
-    yield
-    for throttle in (auth_api._login_throttle, auth_api._staff_throttle):
-        throttle._failures.clear()
+# The auth throttles are counted in the database, which every test gets fresh.
 
 
 @pytest.mark.asyncio

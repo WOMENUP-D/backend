@@ -102,7 +102,9 @@ SOURCE_TO_SYSTEM = {
 #: cannot promise less than what is sent.
 SHARED_FIELDS: tuple[str, ...] = tuple(
     minimal_profile_payload(
-        SimpleNamespace(id=uuid.UUID(int=0), region=None, language=Language.UZ), None
+        SimpleNamespace(id=uuid.UUID(int=0), region=None, language=Language.UZ),
+        None,
+        system=IntegrationSystem.EDU_JOB,
     )
 )
 
@@ -710,7 +712,7 @@ async def apply(
             payload={
                 "application_id": str(application.id),
                 "opportunity_external_id": opportunity.external_id,
-                "applicant": minimal_profile_payload(record, profile),
+                "applicant": minimal_profile_payload(record, profile, system=system),
                 "answers": answers or {},
             },
         )

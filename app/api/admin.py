@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import io
 import uuid
 from datetime import date
@@ -11,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
 from app.api.deps import AdminDep, DbSession, NationalStaffDep, StaffDep, coordinator_region
-from app.core import security_log
+from app.core import csv_safe, security_log
 from app.core.constants import DataClassification, Region, Role, UserStatus
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
@@ -72,7 +71,7 @@ async def export_kpi(
     snapshot = await kpi_snapshot(session, await _scoped_filters(session, user, filters))
 
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv_safe.writer(buffer)
     writer.writerow(["key", "label", "value", "unit", "numerator", "denominator", "target"])
     for item in snapshot.kpis:
         writer.writerow(
@@ -336,7 +335,7 @@ async def export_roster(
         roster.Query(region=region, status=user_status, search=search, identifiers=True),
     )
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv_safe.writer(buffer)
     for line in roster.export_rows(rows):
         writer.writerow(line)
     await record_audit(

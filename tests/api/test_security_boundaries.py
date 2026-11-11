@@ -12,11 +12,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.core.config import settings
 from app.core.constants import (
@@ -235,7 +236,7 @@ async def test_signing_out_revokes_both_tokens(client, session):
     response = await client.post(
         f"{API}/auth/logout", json={"refresh_token": pair["refresh_token"]}, headers=headers
     )
-    assert response.status_code == 200
+    assert response.status_code == 204
 
     # The access token that signed the call is dead...
     refused = await client.get(f"{API}/users/me", headers=headers)
@@ -257,6 +258,11 @@ async def test_a_refresh_token_is_spent_on_use(client, session):
     fresh = first.json()
     assert fresh["refresh_token"] != pair["refresh_token"]
 
+    # Past the reuse grace (C-01) — two tabs within it both get a pair.
+    await session.execute(
+        update(RevokedToken).values(created_at=datetime.now(UTC) - timedelta(seconds=120))
+    )
+    await session.commit()
     # The spent token is refused — and its reuse is treated as theft: every
     # session of the account ends, the fresh token included.
     replay = await client.post(f"{API}/auth/refresh", json={"refresh_token": pair["refresh_token"]})
@@ -456,8 +462,18 @@ async def test_a_coordinator_reads_profiles_in_her_region_only(client, session):
 # ---------------------------------------------------------------------------
 
 
-def _sign(secret: str, body: bytes) -> str:
-    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+_STAMPS = iter(range(10_000))
+
+
+def _sign(secret: str, body: bytes) -> dict[str, str]:
+    """`X-Timestamp` + `X-Signature` over "<timestamp>." + body. Every call
+    gets its own timestamp, because a signature is accepted only once."""
+    stamp = str(int(time.time()) - next(_STAMPS) % 200)
+    message = stamp.encode() + b"." + body
+    return {
+        "X-Timestamp": stamp,
+        "X-Signature": "sha256=" + hmac.new(secret.encode(), message, hashlib.sha256).hexdigest(),
+    }
 
 
 async def _listing(session, source: OpportunitySource) -> Opportunity:
@@ -566,16 +582,19 @@ async def test_a_partner_reports_outcomes_only_for_women_it_knows_and_signs_them
         await client.post(
             f"{API}/integrations/edu_job/outcomes?user_id={applicant.id}",
             content=raw,
-            headers={**headers, "X-Signature": _sign("wrong", raw)},
+            headers={**headers, **_sign("wrong", raw)},
         )
     ).status_code == 401
-    signed = {**headers, "X-Signature": _sign("edu-secret", raw)}
+
+    def signed() -> dict[str, str]:
+        return {**headers, **_sign("edu-secret", raw)}
+
     # The application belongs to somebody else: no outcome for the stranger.
     assert (
         await client.post(
             f"{API}/integrations/edu_job/outcomes?user_id={stranger.id}",
             content=raw,
-            headers=signed,
+            headers=signed(),
         )
     ).status_code == 404
     # No application and no consent: the partner does not know her.
@@ -584,7 +603,7 @@ async def test_a_partner_reports_outcomes_only_for_women_it_knows_and_signs_them
         await client.post(
             f"{API}/integrations/edu_job/outcomes?user_id={stranger.id}",
             content=bare,
-            headers={**headers, "X-Signature": _sign("edu-secret", bare)},
+            headers={**headers, **_sign("edu-secret", bare)},
         )
     ).status_code == 403
     # Her own application, properly signed: recorded.
@@ -592,7 +611,7 @@ async def test_a_partner_reports_outcomes_only_for_women_it_knows_and_signs_them
         await client.post(
             f"{API}/integrations/edu_job/outcomes?user_id={applicant.id}",
             content=raw,
-            headers=signed,
+            headers=signed(),
         )
     ).status_code == 201
     assert (await session.scalar(select(func.count()).select_from(OutcomeRecord))) == 1

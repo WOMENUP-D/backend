@@ -7,7 +7,7 @@ run backwards, a retried save is one entry, and none of it reaches a partner.
 
 import uuid
 
-from app.core.constants import Language, Role
+from app.core.constants import IntegrationSystem, Language, Role
 from app.core.security import create_token
 from app.models.profile import Profile
 from app.models.user import User
@@ -149,5 +149,7 @@ async def test_history_never_reaches_a_partner(client, session, user_id):
         json={"organization": "«Anor» doʻkoni", "position": "Sotuvchi"},
         headers=_headers(user_id),
     )
-    payload = minimal_profile_payload(await session.get(User, user_id), profile)
+    payload = minimal_profile_payload(
+        await session.get(User, user_id), profile, system=IntegrationSystem.EDU_JOB
+    )
     assert "Anor" not in repr(payload)
