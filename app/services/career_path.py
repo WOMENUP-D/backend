@@ -175,7 +175,7 @@ async def _anonymous_context(session: AsyncSession) -> engine.LearnerContext:
             await session.execute(
                 select(Program)
                 .where(Program.is_published.is_(True))
-                .order_by(Program.published_at.desc().nullslast())
+                .order_by(Program.published_at.desc().nullslast(), Program.id)
                 .limit(engine.CATALOGUE_LIMIT)
             )
         ).scalars()

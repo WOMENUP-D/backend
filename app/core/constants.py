@@ -190,6 +190,9 @@ class ProgramCategory(StrEnum):
     LEADERSHIP = "leadership"
     LEGAL_LITERACY = "legal_literacy"
     DIGITAL_SAFETY = "digital_safety"
+    #: Programming, data, office tools — digital *skills*. Digital safety is
+    #: only for courses about security (QA audit G-04).
+    DIGITAL_SKILLS = "digital_skills"
     MENTORSHIP_NETWORKING = "mentorship_networking"
     VOLUNTEERING = "volunteering"
 
@@ -510,6 +513,9 @@ class NextStepKind(StrEnum):
     # Diagnostic v2: grounded steps for a priority area that has no course,
     # path or listing to offer — her CV, or the skills the area is built on.
     BUILD_CV = "build_cv"
+    # She said she has a CV, but the portal holds none: add it rather than
+    # write one (QA audit D-05).
+    ADD_CV_TO_PROFILE = "add_cv_to_profile"
     EXPLORE_SKILLS = "explore_skills"
 
 

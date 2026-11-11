@@ -112,6 +112,8 @@ class ProgramRead(ProgramBase, ORMModel):
     id: uuid.UUID
     # The language it is taught in; the catalogue filters and the card show it.
     language: Language | None = None
+    # Not stated by every partner platform: absent, never guessed.
+    format: ProgramFormat | None = None
     cover_url: str | None = None
     is_published: bool
     published_at: datetime | None = None
@@ -151,6 +153,7 @@ class ProgramSuggestion(BaseModel):
     title_i18n: dict[str, str]
     provider: str | None = None
     external_url: str | None = None
+    language: Language | None = None
 
 
 class ProgramFilter(BaseModel):

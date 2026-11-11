@@ -23,7 +23,7 @@ from app.schemas.assessment import (
     ScoreInsightsRead,
     ScoreRead,
 )
-from app.services import learning_profile, questionnaire
+from app.services import learning_profile, plan_service, questionnaire
 from app.services.recommendation import dimension_insights
 from app.services.scoring import (
     composite_score,
@@ -91,6 +91,8 @@ async def read_score(user: CurrentUserDep, session: DbSession) -> DevelopmentSco
         ],
         measured_at=max((s.measured_at for s in scores if s.measured_at), default=None),
         weakest_dimensions=weakest_dimensions(dimension_map),
+        focus_dimensions=(await plan_service.diagnostic_focus(session, uuid.UUID(user.id)))[0]
+        or weakest_dimensions(dimension_map),
     )
 
 

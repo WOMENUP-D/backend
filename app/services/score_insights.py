@@ -49,7 +49,7 @@ DIMENSION_PROGRAM_CATEGORIES: dict[ScoreDimension, tuple[ProgramCategory, ...]] 
         ProgramCategory.LEADERSHIP,
     ),
     ScoreDimension.FINANCIAL_LITERACY: (ProgramCategory.FINANCIAL_LITERACY,),
-    ScoreDimension.DIGITAL_SKILLS: (ProgramCategory.DIGITAL_SAFETY,),
+    ScoreDimension.DIGITAL_SKILLS: (ProgramCategory.DIGITAL_SKILLS, ProgramCategory.DIGITAL_SAFETY),
     ScoreDimension.HEALTHY_LIFESTYLE: (ProgramCategory.HEALTH,),
     ScoreDimension.FAMILY_PARENTING: (
         ProgramCategory.PARENTING,
@@ -124,7 +124,8 @@ def answer_label(options: list, value: float) -> dict:
     for option in options or []:
         try:
             if float(option["value"]) == value:
-                return dict(option.get("label_i18n") or {})
+                # 0039 wrote `label`, everything else `label_i18n`.
+                return dict(option.get("label_i18n") or option.get("label") or {})
         except KeyError, TypeError, ValueError:
             continue
     return {}

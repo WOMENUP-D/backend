@@ -328,7 +328,7 @@ async def load_context(
             await session.execute(
                 select(Program)
                 .where(Program.is_published.is_(True))
-                .order_by(Program.published_at.desc().nullslast())
+                .order_by(Program.published_at.desc().nullslast(), Program.id)
                 .limit(CATALOGUE_LIMIT)
             )
         ).scalars()
@@ -461,6 +461,8 @@ def _program_suggestion(
         slug=program.slug,
         title_i18n=program.title_i18n,
         category=program.category,
+        language=program.language,
+        external_url=program.external_url,
         duration_weeks=program.duration_weeks,
         has_certificate=program.has_certificate,
         skills_taught=ctx.index.refs(program.skills_taught),

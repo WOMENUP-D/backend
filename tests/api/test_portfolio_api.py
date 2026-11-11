@@ -14,7 +14,7 @@ What is pinned here, in order of how badly it would hurt to get wrong:
 """
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -134,6 +134,9 @@ async def _course(session, *, taught: list[str], certificate: bool = True) -> Pr
 async def _finish(session, user_id: uuid.UUID, program: Program) -> Enrollment:
     """Complete a course the way the platform does — through `services.learning`."""
     enrollment = await learning.enroll(session, user_id=user_id, program_id=program.id)
+    # A passed final assessment, a day in: a certificate needs both (QA audit B-06).
+    enrollment.final_score = 85.0
+    enrollment.started_at = datetime.now(UTC) - timedelta(days=1)
     lesson_id = await session.scalar(
         select(ProgramLesson.id)
         .join(ProgramModule, ProgramModule.id == ProgramLesson.module_id)

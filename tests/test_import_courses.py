@@ -36,14 +36,19 @@ COURSE = {
 def test_a_course_becomes_a_row_the_table_accepts():
     row = clean(COURSE, 0)
     assert row["slug"] == "stepik-63054"
-    assert row["category"] is ProgramCategory.DIGITAL_SAFETY
+    # Statistics is a digital skill, not digital safety (QA audit G-04).
+    assert row["category"] is ProgramCategory.DIGITAL_SKILLS
     assert row["language"] is Language.RU
     assert row["external_url"] == COURSE["url"]
     assert row["source"] == "stepik"
     assert row["is_published"] is True
     # The name stays in the language it is taught in: translating it would
     # invent a course that does not exist under that name.
-    assert set(row["title_i18n"].values()) == {"Основы статистики"}
+    # Filed under its own language only, so the Uzbek converter never sees it.
+    assert row["title_i18n"] == {"ru": "Основы статистики"}
+    assert row["description_i18n"] == {"ru": COURSE["summary"]}
+    # The platform does not say video or text: nothing is claimed.
+    assert row["format"] is None
 
 
 @pytest.mark.parametrize(
@@ -160,3 +165,74 @@ def test_the_shipped_file_is_one_the_importer_accepts():
     assert sources <= {"stepik", "ochiqkurs", "direktor", "spbu", "coursera", "khanacademy"}
     assert sum(row["source"] == "coursera" for row in rows) == 14
     assert sum(row["source"] == "khanacademy" for row in rows) == 1
+
+
+# ------------------------------------------------------------ the rules (QA audit)
+
+
+@pytest.mark.parametrize(
+    ("title", "filed", "expected"),
+    [
+        ("Поколение Python", "digital_safety", ProgramCategory.DIGITAL_SKILLS),
+        ("Основы кибербезопасности", "digital_safety", ProgramCategory.DIGITAL_SAFETY),
+        ("Защита персональных данных - базовый курс", "digital_safety", "digital_safety"),
+        ("«Профессия — Белый Хакер»", "vocational_skills", ProgramCategory.DIGITAL_SAFETY),
+        ("Как открыть заведение общественного питания", "health", "entrepreneurship"),
+        ("Юридическая психология", "health", ProgramCategory.LEGAL_LITERACY),
+        ("Python для школьников", "digital_safety", ProgramCategory.DIGITAL_SKILLS),
+        ("Психология", "health", ProgramCategory.HEALTH),
+    ],
+)
+def test_the_category_follows_the_title(title, filed, expected):
+    row = clean({**COURSE, "title": title, "category": filed}, 0)
+    assert row["category"] == ProgramCategory(expected)
+
+
+def test_a_course_without_skills_is_tagged_from_its_title_only():
+    row = clean({**COURSE, "title": "Основы программирования на языке C#", "skills": []}, 0)
+    assert row["skills_taught"] == ["programming"]
+    # The summary is not mined: mentioning a language does not teach it.
+    plain = clean(
+        {**COURSE, "title": "Олимпиадные задачи", "summary": "На русском языке", "skills": []}, 0
+    )
+    assert plain["skills_taught"] == []
+
+
+def test_the_file_s_own_skills_win_over_the_title():
+    row = clean({**COURSE, "title": "Excel и Python", "skills": ["excel"]}, 0)
+    assert row["skills_taught"] == ["excel"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"title": "Подготовка к ЕГЭ по математике"},
+        {"title": "Курс по машинному обучению (архивный курс 2022)"},
+        {"title": "Программирование на С++ (дорабатывается)"},
+        {"available": False, "unavailable_reason": "private"},
+    ],
+)
+def test_a_course_not_on_offer_is_imported_unpublished(change):
+    assert clean({**COURSE, **change}, 0)["is_published"] is False
+
+
+def test_vlookup_is_not_mistaken_for_an_exam():
+    assert clean({**COURSE, "title": "Функция ВПР в Excel"}, 0)["is_published"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_imported_course_gets_a_published_at_for_a_stable_order(session):
+    await load(session, [clean(COURSE, 0)])
+    row = await session.scalar(select(Program).where(Program.slug == "stepik-63054"))
+    assert row.published_at is not None
+
+
+def test_the_shipped_file_hides_the_courses_the_platform_does_not_offer():
+    from pathlib import Path
+
+    records = json.loads(Path("data/partner_courses.json").read_text(encoding="utf-8"))
+    rows = {str(r["external_id"]): clean(r, i) for i, r in enumerate(records)}
+    for private in ("102002", "121172", "213818"):
+        assert rows[private]["is_published"] is False
+    categories = [row["category"] for row in rows.values()]
+    assert categories.count(ProgramCategory.DIGITAL_SAFETY) < 20

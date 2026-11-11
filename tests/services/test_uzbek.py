@@ -83,3 +83,52 @@ def test_detection():
     assert not has_old_digraphs("Toşkent")
     assert not has_old_digraphs("Photoshop")
     assert not has_old_digraphs(None)
+
+
+# --- English stays English (QA audit G-02) -----------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "General English for First-Year Students",
+        "Machine Learning and Data Mining",
+        "Child Nutrition",
+        "Women In Tech",
+        "Business English",
+        "Harvard: Leadership",
+        "Choose",
+        "Search",
+        "ML School by REU Data Science Club",
+        "Information Technology",
+    ],
+)
+def test_english_titles_are_left_alone(text):
+    assert to_new_alphabet(text) == text
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("Shaxsiy maqsadlarni yozish", "Şaxsiy maqsadlarni yoziş"),
+        ("Kichik biznes uchun moliyaviy savodxonlik", "Kiçik biznes uçun moliyaviy savodxonlik"),
+        ("Digital Qashqadaryo", "Digital Qaşqadaryo"),
+        ("Alfa Savdo MChJ", "Alfa Savdo MÇJ"),
+    ],
+)
+def test_uzbek_still_converts_beside_english_words(old, new):
+    assert to_new_alphabet(old) == new
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("tashkilotchi", "taşkilotçi"),
+        ("ruscha", "rusça"),
+        ("uchrashuv", "uçraşuv"),
+        ("kuchni", "kuçni"),
+    ],
+)
+def test_the_english_rules_spare_uzbek_words(old, new):
+    """The shapes uzbek.ts rejected (tch, sch, chr, chn) stay out of the rules."""
+    assert to_new_alphabet(old) == new

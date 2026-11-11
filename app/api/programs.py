@@ -6,7 +6,7 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.sql import operators
 
 from app.api.deps import ContentDep, CurrentUserDep, DbSession, OptionalUserDep, TrackerDep
@@ -35,8 +35,7 @@ from app.schemas.program import (
     ProgramUpdate,
     ProgressUpdate,
 )
-from app.services import learning, skills, telemetry
-from app.services.uzbek import to_new_alphabet, to_old_alphabet
+from app.services import catalogue_search, learning, skills, telemetry
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -69,12 +68,15 @@ async def list_programs(
     skill: str | None = Query(default=None, max_length=80),
     level: ProficiencyLevel | None = None,
     duration: Literal["short", "medium", "long"] | None = None,
+    prefer_language: Language | None = None,
+    sort: Literal["relevance", "newest", "title"] = "relevance",
 ) -> Page[ProgramRead]:
     """Catalogue with the filters the programme screen offers.
 
     Open to visitors: the landing page advertises this catalogue publicly, and
     only published programmes are ever returned. Enrolling still needs an
-    account.
+    account. `prefer_language` puts courses taught in that language first
+    without filtering the others out.
     """
     stmt = select(Program).where(Program.is_published.is_(True))
 
@@ -115,45 +117,34 @@ async def list_programs(
                 Program.target_regions.any(region),
             )
         )
-    if search:
-        # Title, goal and the skills taught, in every locale. Someone hunting
-        # for "excel" or "1c" is describing what she wants to be able to do,
-        # not the name of a course, and a title-only search left her with
-        # nothing.
-        pattern = f"%{search.lower()}%"
-        # Records written before the alphabet reform spell "shahar"; the
-        # keyboard may type "şahar" or the other way round. Match both.
-        other = f"%{to_old_alphabet(to_new_alphabet(search)).lower()}%"
-        reformed = f"%{to_new_alphabet(search).lower()}%"
-        stmt = stmt.where(
-            or_(
-                func.lower(Program.title_i18n.op("->>")("uz")).like(other),
-                func.lower(Program.title_i18n.op("->>")("uz")).like(reformed),
-                func.lower(Program.goal_i18n.op("->>")("uz")).like(other),
-                func.lower(Program.description_i18n.op("->>")("uz")).like(other),
-                func.lower(Program.title_i18n.op("->>")("uz")).like(pattern),
-                func.lower(Program.title_i18n.op("->>")("ru")).like(pattern),
-                func.lower(Program.title_i18n.op("->>")("en")).like(pattern),
-                func.lower(Program.goal_i18n.op("->>")("uz")).like(pattern),
-                func.lower(Program.goal_i18n.op("->>")("ru")).like(pattern),
-                func.lower(Program.goal_i18n.op("->>")("en")).like(pattern),
-                # The description too. A course brought in from another
-                # platform has a title and a description and nothing else, so
-                # without this "здоровье" found two of the forty-seven health
-                # courses and "ребёнок" found none of the ten about children.
-                func.lower(Program.description_i18n.op("->>")("uz")).like(pattern),
-                func.lower(Program.description_i18n.op("->>")("ru")).like(pattern),
-                func.lower(Program.description_i18n.op("->>")("en")).like(pattern),
-                func.lower(func.array_to_string(Program.skills_taught, " ")).like(pattern),
-                func.lower(Program.slug).like(pattern),
-            )
-        )
+    if catalogue_search.is_searchable(search):
+        # Title, goal, description and the skills taught, in every locale and
+        # both Uzbek alphabets, widened through the taxonomy so "ingliz tili"
+        # finds the Russian "английский" courses — see services.catalogue_search.
+        terms = await catalogue_search.expand(session, search)
+        matched = catalogue_search.clause(terms)
+        if matched is not None:
+            stmt = stmt.where(matched)
 
     total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    # The id breaks ties: offset pagination over an order Postgres may shuffle
+    # between requests returned the same course twice and hid others.
+    if sort == "title":
+        title = func.lower(
+            func.coalesce(
+                Program.title_i18n.op("->>")("uz"),
+                Program.title_i18n.op("->>")("ru"),
+                Program.title_i18n.op("->>")("en"),
+            )
+        )
+        order = [title, Program.id]
+    else:
+        order = [Program.published_at.desc().nullslast(), Program.id]
+    if prefer_language is not None and sort == "relevance":
+        # Courses in her own language first, the rest after — none hidden.
+        order.insert(0, case((Program.language == prefer_language, 0), else_=1))
     rows = await session.execute(
-        stmt.order_by(Program.published_at.desc().nullslast())
-        .offset(pagination.offset)
-        .limit(pagination.size)
+        stmt.order_by(*order).offset(pagination.offset).limit(pagination.size)
     )
     return Page[ProgramRead](
         items=[ProgramRead.model_validate(p) for p in rows.scalars()],
@@ -282,22 +273,18 @@ async def suggest_programs(
 ) -> list[ProgramSuggestion]:
     """Course titles that contain what she has typed so far, for the search
     field's suggestions. Published courses only; titles in every locale."""
-    pattern = f"%{q.lower()}%"
-    reformed = f"%{to_new_alphabet(q).lower()}%"
-    old = f"%{to_old_alphabet(to_new_alphabet(q)).lower()}%"
+    titles = [
+        func.translate(func.lower(Program.title_i18n.op("->>")(lang)), "ё", "е")
+        for lang in ("uz", "ru", "en")
+    ]
+    patterns = [f"%{catalogue_search.escape_like(form)}%" for form in catalogue_search.spellings(q)]
     rows = await session.execute(
         select(Program)
         .where(
             Program.is_published.is_(True),
-            or_(
-                *[
-                    func.lower(Program.title_i18n.op("->>")(lang)).like(form)
-                    for lang in ("uz", "ru", "en")
-                    for form in {pattern, reformed, old}
-                ]
-            ),
+            or_(*[title.like(form, escape="\\") for title in titles for form in patterns]),
         )
-        .order_by(Program.published_at.desc().nullslast())
+        .order_by(Program.published_at.desc().nullslast(), Program.id)
         .limit(limit)
     )
     return [ProgramSuggestion.model_validate(p, from_attributes=True) for p in rows.scalars()]
@@ -416,7 +403,7 @@ async def related_programs(
                     ),
                 ),
             )
-            .order_by(Program.published_at.desc().nullslast())
+            .order_by(Program.published_at.desc().nullslast(), Program.id)
             .limit(200)
         )
     ).scalars()
@@ -549,7 +536,15 @@ async def enroll(
     path is still enrollable from here, because a path advises an order rather
     than owning the course.
     """
-    enrollment = await learning.enroll(session, user_id=uuid.UUID(user.id), program_id=program_id)
+    try:
+        enrollment = await learning.enroll(
+            session, user_id=uuid.UUID(user.id), program_id=program_id
+        )
+    except learning.ExternalCourseError:
+        # The card links out to the partner's site; there is nothing to enrol in here.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="external_course"
+        ) from None
     if enrollment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
     # Enrolling twice returns the same row, and the same row is the same key.
@@ -615,12 +610,19 @@ async def update_progress(
             detail="Module does not belong to this programme",
         )
 
-    enrollment = await learning.mark_module(
-        session,
-        enrollment=enrollment,
-        module_id=payload.module_id,
-        completed=payload.completed,
-    )
+    try:
+        enrollment = await learning.mark_module(
+            session,
+            enrollment=enrollment,
+            module_id=payload.module_id,
+            completed=payload.completed,
+        )
+    except learning.TrackedByLessonsError:
+        # Progress there is counted in lessons: a module tick would be stored
+        # and ignored, and a 200 would say it counted.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="tracked_by_lessons"
+        ) from None
     await _after_progress(
         session,
         actor,

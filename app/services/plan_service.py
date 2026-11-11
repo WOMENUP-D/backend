@@ -67,7 +67,7 @@ def due_for(horizon: GoalHorizon, week_offset: object, today: date) -> date:
     """The day a step falls due: the end of its week, never past the horizon."""
     try:
         week = max(0, int(week_offset or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         week = 0
     return today + timedelta(days=min(7 * (week + 1), HORIZON_DAYS[horizon]))
 
@@ -100,7 +100,7 @@ async def diagnostic_focus(
 # when the model is unavailable — the user should not be handed Uzbek because
 # the AI happened to be down.
 FALLBACK_TITLE = {
-    "uz": "Boshlang‘ich rivojlanish rejasi",
+    "uz": "Boşlanğiç rivojlaniş rejasi",
     "ru": "Начальный план развития",
     "en": "Starter development plan",
 }
@@ -110,20 +110,98 @@ FALLBACK_SUMMARY = {
     "en": "A baseline plan built from your diagnostic results.",
 }
 FALLBACK_START = {
-    "uz": "«{program}» dasturini boshlang",
+    "uz": "«{program}» dasturini boşlang",
     "ru": "Начните программу «{program}»",
     "en": "Start the \u201c{program}\u201d programme",
 }
 FALLBACK_PICK = {
-    "uz": "{dimension} yo‘nalishi bo‘yicha dastur tanlang",
-    "ru": "Выберите программу по направлению {dimension}",
+    "uz": "«{dimension}» yönalişi böyiça dastur tanlang",
+    "ru": "Выберите программу по направлению «{dimension}»",
     "en": "Choose a programme in {dimension}",
 }
 FALLBACK_NOTE = {
-    "uz": "Bazaviy tavsiya — AI rejasi tayyor bo‘lganda yangilanadi.",
+    "uz": "Bazaviy tavsiya — AI rejasi tayyor bölganda yangilanadi.",
     "ru": "Базовая рекомендация — обновится, когда план от ИИ будет готов.",
     "en": "A baseline suggestion — it updates once the AI plan is ready.",
 }
+
+
+#: Dimension names for the rule-based plan — the same words as the web app's
+#: `dim.*` messages. Without them a step read "Choose a programme in
+#: financial_literacy" (QA audit D-09).
+DIMENSION_LABELS: dict[ScoreDimension, dict[str, str]] = {
+    ScoreDimension.EDUCATION_SKILLS: {
+        "uz": "Taʼlim va könikmalar",
+        "ru": "Образование и навыки",
+        "en": "Education & Skills",
+    },
+    ScoreDimension.EMPLOYMENT: {
+        "uz": "Karyera va bandlik",
+        "ru": "Карьера и занятость",
+        "en": "Career & Employment",
+    },
+    ScoreDimension.ENTREPRENEURSHIP: {
+        "uz": "Tadbirkorlik",
+        "ru": "Предпринимательство",
+        "en": "Entrepreneurship",
+    },
+    ScoreDimension.FINANCIAL_LITERACY: {
+        "uz": "Moliyaviy savodxonlik",
+        "ru": "Финансовая грамотность",
+        "en": "Financial Literacy",
+    },
+    ScoreDimension.DIGITAL_SKILLS: {
+        "uz": "Raqamli könikmalar",
+        "ru": "Цифровые навыки",
+        "en": "Digital Skills",
+    },
+    ScoreDimension.HEALTHY_LIFESTYLE: {
+        "uz": "Salomatlik va muvozanat",
+        "ru": "Здоровье и баланс",
+        "en": "Health & Balance",
+    },
+    ScoreDimension.FAMILY_PARENTING: {
+        "uz": "Oila va munosabatlar",
+        "ru": "Семья и отношения",
+        "en": "Family & Relationships",
+    },
+    ScoreDimension.LEADERSHIP: {
+        "uz": "Yetakçilik va global imkoniyatlar",
+        "ru": "Лидерство и глобальные возможности",
+        "en": "Leadership & Global Opportunities",
+    },
+}
+#: Courses per focus dimension in the rule-based plan, by horizon: a month
+#: holds one, a quarter two, longer horizons three (QA audit D-09).
+FALLBACK_PER_DIMENSION: dict[GoalHorizon, int] = {
+    GoalHorizon.M1: 1,
+    GoalHorizon.M3: 2,
+    GoalHorizon.M6: 3,
+    GoalHorizon.M12: 3,
+    GoalHorizon.M36: 3,
+}
+
+
+async def discard_drafts(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """Delete her drafts that were never accepted — a new draft replaces them,
+    so "another option" no longer leaves a pile of roadmaps behind (D-17).
+    A plan she once accepted is never touched."""
+    drafts = (
+        await session.execute(
+            select(DevelopmentPlan).where(
+                DevelopmentPlan.user_id == user_id,
+                DevelopmentPlan.is_active.is_(False),
+                DevelopmentPlan.accepted_at.is_(None),
+            )
+        )
+    ).scalars()
+    count = 0
+    for draft in list(drafts):
+        await session.delete(draft)
+        count += 1
+    if count:
+        await session.flush()
+    return count
 
 
 async def generate_plan(
@@ -135,8 +213,12 @@ async def generate_plan(
     language: str | None = None,
     gateway: LlmGateway | None = None,
 ) -> DevelopmentPlan:
-    """Build a draft roadmap. Falls back to a rule-based plan if AI is down."""
+    """Build a draft roadmap. Falls back to a rule-based plan if AI is down.
+
+    Earlier drafts she never accepted are discarded first: one draft at a time.
+    """
     gateway = gateway or llm_gateway
+    await discard_drafts(session, user_id)
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     # Which language to write the roadmap in. The request wins: it carries the
@@ -479,12 +561,25 @@ async def _fallback_plan(
 
     today = date.today()
     used: set[uuid.UUID] = set()
-    for index, (dimension, pool) in enumerate(picks):
-        # Two weak dimensions often share a category; the second one gets the
-        # next course down rather than the same course a second time.
-        match = next((program for program in pool if program.id not in used), None)
-        if match is not None:
-            used.add(match.id)
+    per_dimension = FALLBACK_PER_DIMENSION.get(horizon, 1)
+    steps: list[tuple[ScoreDimension, Program | None]] = []
+    # Round by round — every focus area's first course, then the second ones —
+    # so the start of the horizon covers every area she has to work on.
+    for round_index in range(per_dimension):
+        for dimension, pool in picks:
+            # Two weak dimensions often share a category; the second one gets
+            # the next course down rather than the same course a second time.
+            match = next((program for program in pool if program.id not in used), None)
+            if match is None and round_index > 0:
+                continue  # nothing more for this area: no filler step
+            if match is not None:
+                used.add(match.id)
+            steps.append((dimension, match))
+    steps = steps[: MAX_ITEMS[horizon]]
+    for index, (dimension, match) in enumerate(steps):
+        label = DIMENSION_LABELS.get(dimension, {}).get(lang) or DIMENSION_LABELS.get(
+            dimension, {}
+        ).get("uz", dimension.value)
         session.add(
             PlanItem(
                 plan_id=plan.id,
@@ -494,14 +589,12 @@ async def _fallback_plan(
                         program=_program_title(match, lang)
                     )
                     if match
-                    else FALLBACK_PICK.get(lang, FALLBACK_PICK["uz"]).format(
-                        dimension=dimension.value
-                    )
+                    else FALLBACK_PICK.get(lang, FALLBACK_PICK["uz"]).format(dimension=label)
                 ),
                 description=FALLBACK_NOTE.get(lang, FALLBACK_NOTE["uz"]),
                 dimension=dimension,
                 priority=Priority.HIGH if index == 0 else Priority.MEDIUM,
-                due_date=spread_due(horizon, index, len(picks), today),
+                due_date=spread_due(horizon, index, len(steps), today),
                 program_id=match.id if match else None,
             )
         )

@@ -41,6 +41,7 @@ CAP_PER_DIMENSION = 20.0
 PROGRAM_CATEGORY_DIMENSION: dict[ProgramCategory, ScoreDimension] = {
     ProgramCategory.VOCATIONAL_SKILLS: ScoreDimension.EDUCATION_SKILLS,
     ProgramCategory.DIGITAL_SAFETY: ScoreDimension.DIGITAL_SKILLS,
+    ProgramCategory.DIGITAL_SKILLS: ScoreDimension.DIGITAL_SKILLS,
     ProgramCategory.ENTREPRENEURSHIP: ScoreDimension.ENTREPRENEURSHIP,
     ProgramCategory.FINANCIAL_LITERACY: ScoreDimension.FINANCIAL_LITERACY,
     ProgramCategory.HEALTH: ScoreDimension.HEALTHY_LIFESTYLE,

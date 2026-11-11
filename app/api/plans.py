@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep
+from app.core.constants import PlanItemStatus
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.schemas.common import Message
 from app.schemas.plan import (
@@ -112,14 +114,27 @@ async def update_item(
     if plan is None or plan.user_id != uuid.UUID(user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
-    from datetime import UTC, datetime
+    # A draft is read-only until she accepts it: ticks on a draft carried into
+    # the accepted plan as progress she never made (QA audit D-16).
+    if not plan.is_active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="plan_not_active")
 
-    from app.core.constants import PlanItemStatus
+    changes = payload.model_dump(exclude_unset=True)
+    if "due_date" in changes and changes["due_date"] is not None:
+        start = (plan.accepted_at or plan.created_at).date()
+        last = start + timedelta(days=plan_service.HORIZON_DAYS[plan.horizon])
+        if not date.today() <= changes["due_date"] <= last:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="due_date_out_of_range"
+            )
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in changes.items():
         setattr(item, field, value)
-    if item.status == PlanItemStatus.DONE and item.completed_at is None:
-        item.completed_at = datetime.now(UTC)
+    if item.status == PlanItemStatus.DONE:
+        if item.completed_at is None:
+            item.completed_at = datetime.now(UTC)
+    else:
+        item.completed_at = None
 
     await session.flush()
     return item

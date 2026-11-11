@@ -315,7 +315,9 @@ class ProgramBrief(BaseModel):
     provider: str | None = None
     external_url: str | None = None
     category: str
-    format: str
+    # Not every partner platform says video or text (QA audit G-16).
+    format: str | None = None
+    language: str | None = None
     level: str | None = None
     duration_hours: float | None = None
     has_certificate: bool = False

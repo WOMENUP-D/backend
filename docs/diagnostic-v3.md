@@ -5,6 +5,18 @@ before it measures where she stands, and ends with courses picked from the
 real catalogue for that goal. This note records how it is built so the next
 change starts from the design rather than from the code.
 
+> **Version 4 (migration 0040, `data/diagnostic_v4.json`, QA audit 2026-11)** is
+> the active bank. It keeps everything below and changes: **two** scored
+> questions per dimension (the second taken from version 2: `edu.q3 car.q6
+> ent.q7 fin.q11 dig.q14 hea.q18 fam.q21 lea.q23`), so a dimension moves in steps
+> of 12.5, not 25; an optional "other goals" question `pro.q4` (up to 3, feeds
+> `profile.goals_other`); situations `home` and `maternity` in `pro.q1` (not
+> asked how long she has looked for work, no employment urgency); the
+> employment urgency rule reads `car.q5` (a → 100, b → 75); the
+> "international" goal points at education first; interests say "up to three";
+> grammatical `sit.q15`; no dead `show_if` value. 35 questions, 16 scored;
+> versions 2 and 3 stay stored and their attempts keep their scores.
+
 ## 1. What was wrong with version 2
 
 - 25 questions, all scored, one `goals` question at the end. Every user saw

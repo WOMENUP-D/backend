@@ -373,6 +373,7 @@ def _brief(program: Program) -> ProgramBrief:
         external_url=program.external_url,
         category=getattr(program.category, "value", program.category),
         format=getattr(program.format, "value", program.format),
+        language=getattr(program.language, "value", program.language),
         level=getattr(program.level, "value", program.level) if program.level else None,
         duration_hours=program.duration_hours,
         has_certificate=program.has_certificate,
@@ -384,7 +385,7 @@ async def _catalogue(session: AsyncSession) -> list[Program]:
     rows = await session.execute(
         select(Program)
         .where(Program.is_published.is_(True))
-        .order_by(Program.published_at.desc().nullslast())
+        .order_by(Program.published_at.desc().nullslast(), Program.id)
         .limit(CATALOGUE_LIMIT)
     )
     return list(rows.scalars())

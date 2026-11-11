@@ -14,6 +14,12 @@ Two rules keep the conversion honest:
   (ChatGPT, WomanUP), or a name on the protected list. English and Russian
   text never contains the four digraphs in Uzbek roles, but English contains
   "sh" and "ch" everywhere, so callers pass Uzbek text, not mixed text.
+* **English stays English.** Course titles, organisation names and model
+  output mix in English words that contain "sh" and "ch" without any of the
+  marks above ("English", "Machine", "Child", "Leadership"). A word is also
+  left alone when it ends in -ship, has a doubled e or a y between two
+  consonants, or is on the English list `ENGLISH_WORDS`. The web app's
+  `uzbek.ts` applies the same rules and the same list.
 * **Case follows the word.** "Shahar" → "Şahar", "SHAHAR" → "ŞAHAR",
   "Oʻzbekiston" → "Özbekiston".
 
@@ -37,6 +43,131 @@ OKINA_LIKE = OKINA + "‘’'"
 _FOREIGN = re.compile(r"[wW]|[cC](?![hH])|[pP][hH]|[tT][hH]|[cC][kK]|(?<=[a-z])[A-Z]")
 #: Names the heuristics would not catch.
 PROTECTED = frozenset({"charpentier", "shopify", "chrome", "chanel", "porsche", "bosch"})
+#: English shapes that also contain sh/ch (QA audit G-02), as in the web
+#: app's `uzbek.ts`: a final -ship, a doubled e, a y between two consonants
+#: ("psychology"). Not tch / sch / chr / chn / oo — Uzbek has those too
+#: (taşkilotçi, rusça, uçraşuv, kuçni, koordinator); such English words are
+#: listed in `ENGLISH_WORDS` instead.
+_ENGLISH_SHAPE = re.compile(r"ship$|ee|[bcdfghjklmnpqrstvxz]y[bcdfghjklmnpqrstvxz]")
+#: English words with sh / ch that look Uzbek to the letter test — the same
+#: list as `PROTECTED` in the web app's `uzbek.ts`, plus four found in the
+#: partner catalogue (michigan, bash, show, technical). Keep the two in step.
+ENGLISH_WORDS = frozenset(
+    [
+        "english",
+        "machine",
+        "machines",
+        "child",
+        "children",
+        "fashion",
+        "research",
+        "search",
+        "coach",
+        "coaching",
+        "teach",
+        "teacher",
+        "teachers",
+        "teaching",
+        "approach",
+        "chain",
+        "change",
+        "changes",
+        "challenge",
+        "challenges",
+        "chance",
+        "channel",
+        "chapter",
+        "character",
+        "chart",
+        "charts",
+        "chat",
+        "chef",
+        "chess",
+        "china",
+        "chinese",
+        "choice",
+        "march",
+        "much",
+        "rich",
+        "such",
+        "each",
+        "branch",
+        "launch",
+        "lunch",
+        "dashboard",
+        "fresh",
+        "flash",
+        "push",
+        "crash",
+        "smash",
+        "hash",
+        "hashtag",
+        "fish",
+        "polish",
+        "spanish",
+        "british",
+        "irish",
+        "turkish",
+        "chemistry",
+        "chemical",
+        "archive",
+        "architecture",
+        "mechanic",
+        "mechanics",
+        "mechanical",
+        "merchant",
+        "shell",
+        "shift",
+        "ship",
+        "shop",
+        "shops",
+        "shopping",
+        "short",
+        "sharp",
+        "share",
+        "shared",
+        "sharing",
+        "finish",
+        "publish",
+        "publishing",
+        "establish",
+        "bachelor",
+        "leadership",
+        "ownership",
+        "internship",
+        "scholarship",
+        "partnership",
+        "membership",
+        "championship",
+        "mentorship",
+        "speech",
+        "school",
+        "schools",
+        "choose",
+        "technology",
+        "technologies",
+        "tech",
+        "match",
+        "kitchen",
+        "sketch",
+        "switch",
+        "watch",
+        "schedule",
+        "scheme",
+        "psychology",
+        "christmas",
+        "sheet",
+        "sheets",
+        "headhunter",
+        "punch",
+        "brunch",
+        "michigan",
+        "bash",
+        "show",
+        "technical",
+    ]
+)
+
 
 _WORD = re.compile(r"[A-Za-zÖöĞğŞşÇç][A-Za-z0-9ÖöĞğŞşÇçʻʼ‘’'-]*")
 #: Addresses survive untouched: converting "womanup.uz/dasturlar" breaks it.
@@ -63,7 +194,13 @@ _NEW = re.compile("[ÖöĞğŞşÇç]")
 
 
 def is_foreign(word: str) -> bool:
-    return word.lower().strip("'’") in PROTECTED or _FOREIGN.search(word) is not None
+    bare = word.lower().strip("'’")
+    return (
+        bare in PROTECTED
+        or bare in ENGLISH_WORDS
+        or _FOREIGN.search(word) is not None
+        or _ENGLISH_SHAPE.search(word) is not None
+    )
 
 
 #: Uzbek abbreviations the foreign-word heuristic would mistake for brands.

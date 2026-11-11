@@ -186,6 +186,7 @@ async def test_finishing_every_lesson_completes_the_course_and_issues_the_certif
         level=ProficiencyLevel.INTERMEDIATE,
     )
     enrollment = await _enrol(session, user_id, program)
+    _assessed(enrollment)
 
     for lesson in await _lessons(session, program):
         await learning.mark_lesson(session, enrollment=enrollment, lesson_id=lesson.id)
@@ -250,6 +251,7 @@ async def test_finishing_twice_costs_nothing_extra(session):
     await _skill(session)
     program = await _course(session, modules=1, lessons_per_module=1, certificate=True)
     enrollment = await _enrol(session, user_id, program)
+    _assessed(enrollment)
     [lesson] = await _lessons(session, program)
 
     for completed in (True, False, True, True):
@@ -408,3 +410,60 @@ async def test_adding_lessons_later_does_not_reset_her(session):
     assert enrollment.progress_percent == 0
     assert enrollment.completed_at == completed_at
     assert await skills.skill_keys(session, user_id) == {"excel"}
+
+
+# --- the certificate needs real completion (QA audit B-06) ------------------
+
+
+def _assessed(enrollment: Enrollment) -> None:
+    """A passed final assessment, a day after she started."""
+    from datetime import UTC, datetime, timedelta
+
+    enrollment.final_score = 85.0
+    enrollment.started_at = datetime.now(UTC) - timedelta(days=1)
+
+
+async def _certificates(session, enrollment) -> int:
+    rows = await session.execute(
+        select(Certificate).where(Certificate.enrollment_id == enrollment.id)
+    )
+    return len(list(rows.scalars()))
+
+
+@pytest.mark.asyncio
+async def test_ticking_every_lesson_without_an_assessment_issues_no_certificate(session):
+    user_id = await _user(session)
+    program = await _course(session, modules=1, lessons_per_module=2, certificate=True)
+    enrollment = await _enrol(session, user_id, program)
+    for lesson in await _lessons(session, program):
+        await learning.mark_lesson(session, enrollment=enrollment, lesson_id=lesson.id)
+    assert enrollment.status is EnrollmentStatus.COMPLETED
+    assert await _certificates(session, enrollment) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_course_finished_in_seconds_issues_no_certificate(session):
+    user_id = await _user(session)
+    program = await _course(session, modules=1, lessons_per_module=2, certificate=True)
+    enrollment = await _enrol(session, user_id, program)
+    enrollment.final_score = 95.0  # passed, but 40 declared minutes took no time
+    for lesson in await _lessons(session, program):
+        await learning.mark_lesson(session, enrollment=enrollment, lesson_id=lesson.id)
+    assert await _certificates(session, enrollment) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_failed_assessment_issues_no_certificate(session):
+    user_id = await _user(session)
+    program = await _course(session, modules=1, lessons_per_module=1, certificate=True)
+    enrollment = await _enrol(session, user_id, program)
+    _assessed(enrollment)
+    enrollment.final_score = learning.CERTIFICATE_PASS_MARK - 1
+    [lesson] = await _lessons(session, program)
+    await learning.mark_lesson(session, enrollment=enrollment, lesson_id=lesson.id)
+    assert await _certificates(session, enrollment) == 0
+    # Recorded later, a pass issues it once.
+    enrollment.final_score = 90.0
+    await learning.issue_certificate_if_earned(session, enrollment=enrollment)
+    await learning.issue_certificate_if_earned(session, enrollment=enrollment)
+    assert await _certificates(session, enrollment) == 1
