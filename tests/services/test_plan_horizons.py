@@ -177,3 +177,37 @@ async def test_the_api_accepts_a_one_month_horizon(client, session, auth_headers
     )
     assert response.status_code in (200, 201)
     assert response.json()["horizon"] == "1m"
+
+
+# --- Uzbek alphabet ---------------------------------------------------------
+
+
+async def test_an_uzbek_plan_keeps_every_dimension_value(session: AsyncSession):
+    """Only prose is converted to the reformed alphabet: ``leadership`` must not
+    become ``leaderşip`` on its way into the enum column."""
+    user = _user(session)
+    await session.flush()
+    steps = [_step(i, d.value) for i, d in enumerate(ScoreDimension)]
+    steps[0]["action"] = "Shaxsiy maqsadlarni yozish"
+    model = _Model(steps)
+
+    plan = await generate_plan(
+        session, user_id=user.id, horizon=GoalHorizon.M12, language="uz", gateway=model
+    )
+    await session.refresh(plan, ["items"])
+
+    assert {item.dimension for item in plan.items} == set(ScoreDimension)
+    assert plan.items[0].action == "Şaxsiy maqsadlarni yoziş"
+
+
+async def test_an_unknown_dimension_drops_the_step_not_the_plan(session: AsyncSession):
+    user = _user(session)
+    await session.flush()
+    model = _Model([_step(0, "leaderşip"), _step(1, "leadership")])
+
+    plan = await generate_plan(
+        session, user_id=user.id, horizon=GoalHorizon.M3, language="uz", gateway=model
+    )
+    await session.refresh(plan, ["items"])
+
+    assert [item.dimension for item in plan.items] == [ScoreDimension.LEADERSHIP]

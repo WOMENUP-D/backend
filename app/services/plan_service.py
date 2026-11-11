@@ -209,7 +209,11 @@ async def generate_plan(
     if not payload:
         return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
     if lang == "uz":
-        payload = _reformed(payload)
+        payload = _reformed_text(payload)
+    items = _valid_items(payload.get("items"))
+    if not items:
+        logger.warning("roadmap response had no usable items — using fallback")
+        return await _fallback_plan(session, user_id, horizon, focus, picks, lang)
 
     plan = DevelopmentPlan(
         user_id=user_id,
@@ -238,7 +242,7 @@ async def generate_plan(
 
     # Same reason as the navigator: the schema carries shape only, so the
     # roadmap length and the month offsets are bounded here.
-    for index, item in enumerate(list(payload.get("items") or [])[: MAX_ITEMS[horizon]]):
+    for index, item in enumerate(items[: MAX_ITEMS[horizon]]):
         raw_program_id = item.get("program_id")
         # Guard against a hallucinated id pointing at nothing.
         program_id = (
@@ -252,8 +256,8 @@ async def generate_plan(
                 order_index=index,
                 action=item["action"][:500],
                 description=item.get("description"),
-                dimension=ScoreDimension(item["dimension"]),
-                priority=Priority(item.get("priority", "medium")),
+                dimension=item["dimension"],
+                priority=item["priority"],
                 due_date=due_for(horizon, item.get("week_offset"), today),
                 program_id=program_id,
             )
@@ -629,12 +633,47 @@ async def close_diagnostic_items(session: AsyncSession, user_id: uuid.UUID) -> l
     return items
 
 
-def _reformed(value):
-    """Every string the model wrote for an Uzbek plan, in the reformed alphabet."""
-    if isinstance(value, str):
-        return to_new_alphabet(value)
-    if isinstance(value, list):
-        return [_reformed(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _reformed(item) for key, item in value.items()}
-    return value
+# Only the prose the model wrote is converted. Converting the whole payload
+# turned the enum values ``leadership`` / ``entrepreneurship`` into
+# ``leaderşip`` / ``entrepreneurşip`` and every Uzbek plan failed with a 500.
+_TEXT_FIELDS = ("title", "summary")
+_ITEM_TEXT_FIELDS = ("action", "description")
+
+
+def _reformed_text(payload: dict) -> dict:
+    """The Uzbek plan payload with its human-readable fields converted."""
+    out = dict(payload)
+    for key in _TEXT_FIELDS:
+        if isinstance(out.get(key), str):
+            out[key] = to_new_alphabet(out[key])
+    items = []
+    for item in out.get("items") or []:
+        if not isinstance(item, dict):
+            items.append(item)
+            continue
+        copy = dict(item)
+        for key in _ITEM_TEXT_FIELDS:
+            if isinstance(copy.get(key), str):
+                copy[key] = to_new_alphabet(copy[key])
+        items.append(copy)
+    out["items"] = items
+    return out
+
+
+def _valid_items(raw) -> list[dict]:
+    """Items whose machine fields parse; a bad one is dropped, not a 500."""
+    items: list[dict] = []
+    for item in raw or []:
+        if not isinstance(item, dict) or not isinstance(item.get("action"), str):
+            continue
+        try:
+            dimension = ScoreDimension(item.get("dimension"))
+        except ValueError:
+            logger.warning("roadmap item with unknown dimension %r dropped", item.get("dimension"))
+            continue
+        try:
+            priority = Priority(item.get("priority") or "medium")
+        except ValueError:
+            priority = Priority.MEDIUM
+        items.append({**item, "dimension": dimension, "priority": priority})
+    return items
