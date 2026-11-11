@@ -15,90 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.services import safety
 from app.services.uzbek import to_new_alphabet, to_old_alphabet
-
-
-# Safety topics that bypass the model entirely and go straight to a human.
-# Apostrophes in Uzbek Latin are typed as any of ʻ ʼ ‘ ’ ' — and often omitted
-# entirely. Matching is done on a form with all of them stripped, so a single
-# spelling below covers every variant a user might type.
-def _fold(text: str) -> str:
-    """Lowercase, fold the reformed letters back to their base form and remove
-    apostrophes, so o'zimni / oʻzimni / ozimni / özimni all agree.
-
-    The keyword list below is written in the old spelling without apostrophes;
-    a disclosure typed in the reformed alphabet (ö ğ ş ç) must reach the same
-    words, or the safety gate would depend on which keyboard she has.
-    """
-    lowered = text.lower()
-    for new, old in (("ö", "o"), ("ğ", "g"), ("ş", "sh"), ("ç", "ch")):
-        lowered = lowered.replace(new, old)
-    for mark in ("\u02bb", "\u02bc", "\u2018", "\u2019", "\u0027", "`"):
-        lowered = lowered.replace(mark, "")
-    return lowered
-
-
-# High-risk topics that must reach a human without passing through the model.
-# Written in folded form (no apostrophes) to match `_fold` output. Uzbek verbs
-# appear in several tenses on purpose: a disclosure is far more often made in
-# the present tense ("uradi") than the past, and the past-only list this
-# started as let the most common phrasing straight through to the model.
-ESCALATION_KEYWORDS: tuple[str, ...] = (
-    # --- uz: physical violence ---
-    "zoravonlik",
-    "kaltakla",
-    "meni uradi",
-    "meni urdi",
-    "meni uryapti",
-    "urib turadi",
-    "doppasla",
-    "bolamni urdi",
-    "bolamni uradi",
-    "oiladagi zorav",
-    # --- uz: coercion and threat ---
-    "majburlayapti",
-    "majburlamoqda",
-    "tahdid qilyapti",
-    "tahdid qilmoqda",
-    "qorqityapti",
-    # --- uz: sexual violence ---
-    "jinsiy tazyiq",
-    "jinsiy zorav",
-    "tajovuz",
-    # --- uz: self-harm ---
-    "ozimni oldir",
-    "oz joniga qasd",
-    "yashagim kelmayapti",
-    "olib qoysam",
-    # --- uz: fraud ---
-    "firibgar",
-    # --- ru ---
-    "насилие",
-    "насилует",
-    "избил",
-    "избивает",
-    "бьет",
-    "бьёт",
-    "ударил",
-    "угрожает",
-    "изнасилов",
-    "принуждает",
-    "покончить с собой",
-    "суицид",
-    "не хочу жить",
-    "мошенник",
-    # --- en ---
-    "violence",
-    "abuse",
-    "beats me",
-    "hits me",
-    "threatens me",
-    "rape",
-    "suicide",
-    "kill myself",
-    "self-harm",
-    "want to die",
-)
 
 
 @dataclass(slots=True)
@@ -115,13 +33,19 @@ class RetrievedChunk:
 
 
 def needs_human_escalation(text: str) -> bool:
-    """Keyword pre-filter for high-risk topics.
+    """Model-free pre-filter for disclosures of violence or self-harm.
 
     Deliberately runs before the model: a user disclosing violence should reach
-    a human without her message being sent to a generative system first.
+    a human without her message being sent to a generative system first. The
+    lexicons, normalisation and the regression corpus live in `safety`.
     """
-    folded = _fold(text)
-    return any(keyword in folded for keyword in ESCALATION_KEYWORDS)
+    return safety.detect(text) is not None
+
+
+def mentions_safety_topic(text: str) -> bool:
+    """Broader screen for editorial material (news): any mention of the
+    subjects, not only a first-person disclosure."""
+    return safety.mentions_safety_topic(text)
 
 
 async def retrieve(

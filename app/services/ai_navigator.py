@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.audit import AiInteraction
 from app.schemas.ai import NavigatorAnswer, SourceRef
-from app.services import rag
+from app.services import rag, safety
 from app.services.llm_gateway import (
     LlmGateway,
     LlmResponse,
@@ -21,23 +21,9 @@ from app.services.prompts import NAVIGATOR_SCHEMA, NAVIGATOR_SYSTEM
 
 logger = logging.getLogger(__name__)
 
-HUMAN_HANDOFF_TEXT = {
-    "uz": (
-        "Bu savol böyiça sizga tirik mutaxassis yordam berişi kerak. "
-        "Murojaatingizni koordinatorga yubordim — u siz bilan boğlanadi. "
-        "Agar xavf ostida bölsangiz, zudlik bilan 1146 işonç telefoniga murojaat qiling."
-    ),
-    "ru": (
-        "По этому вопросу вам должен помочь живой специалист. "
-        "Я передала обращение координатору — он свяжется с вами. "
-        "Если вы в опасности, немедленно позвоните на телефон доверия 1146."
-    ),
-    "en": (
-        "This question needs a human specialist. I have passed your request to a "
-        "coordinator who will contact you. If you are in danger, call the 1146 "
-        "helpline immediately."
-    ),
-}
+#: The model's own "this needs a person" — not the safety filter. Honest: it
+#: claims nothing was forwarded, and it is not a crisis text (I-15).
+HUMAN_HANDOFF_TEXT = safety.HANDOFF_TEXT
 
 EXTRACTIVE_PREFIX = {
     "uz": (
@@ -80,28 +66,11 @@ async def answer(
     gateway = gateway or llm_gateway
     lang = language if language in HUMAN_HANDOFF_TEXT else "uz"
 
-    if rag.needs_human_escalation(question):
-        result = NavigatorAnswer(
-            answer=HUMAN_HANDOFF_TEXT[lang],
-            confidence=1.0,
-            escalated_to_human=True,
-            escalation_reason="safety_topic_detected",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+    category = safety.detect(question)
+    if category is not None:
+        return await _safety_reply(
+            session, user_id=user_id, category=category, lang=lang, conversation_id=conversation_id
         )
-        await _record(
-            session,
-            user_id=user_id,
-            trace_id=result.trace_id,
-            model="guardrail",
-            prompt_version="safety-filter",
-            question=question,
-            answer=result.answer,
-            sources=[],
-            confidence=1.0,
-            escalated=True,
-        )
-        return result
 
     chunks = await rag.retrieve(session, question, language=lang)
 
@@ -176,6 +145,19 @@ async def answer(
     except TypeError, ValueError:
         confidence = 0.0
     needs_human = bool(payload.get("needs_human")) or response.refused
+    # The model's free-text reason never reaches the client (it once echoed
+    # "the user reports physical violence…" back to her). It is only read here,
+    # model-free, to tell a missed disclosure from an ordinary hand-off.
+    human_reason = str(payload.get("human_reason") or "")
+    if needs_human and safety.mentions_safety_topic(human_reason):
+        return await _safety_reply(
+            session,
+            user_id=user_id,
+            category=safety.detect(human_reason) or safety.SafetyCategory.PHYSICAL_VIOLENCE,
+            lang=lang,
+            conversation_id=conversation_id,
+            response=response,
+        )
     text = payload.get("answer") or UNCERTAIN_TEXT[lang]
 
     # Below the confidence floor the assistant says it does not know rather
@@ -203,7 +185,7 @@ async def answer(
         confidence=confidence,
         is_uncertain=is_uncertain,
         escalated_to_human=needs_human,
-        escalation_reason=payload.get("human_reason") if needs_human else None,
+        escalation_reason="needs_human" if needs_human else None,
         suggested_actions=list(payload.get("suggested_actions") or [])[:3],
         trace_id=response.trace_id,
         conversation_id=conversation_id,
@@ -224,6 +206,53 @@ async def answer(
         latency_ms=response.latency_ms,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
+    )
+    return result
+
+
+async def _safety_reply(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None,
+    category: safety.SafetyCategory,
+    lang: str,
+    conversation_id: uuid.UUID | None,
+    response: LlmResponse | None = None,
+) -> NavigatorAnswer:
+    """Fixed safety text, a coordinator signal for a signed-in user, and a
+    trace that keeps the category rather than her words."""
+    trace_id = response.trace_id if response else uuid.uuid4().hex
+    outcome = await safety.escalate(
+        session,
+        user_id=user_id,
+        category=category,
+        surface="navigator",
+        language=lang,
+        trace_id=trace_id,
+    )
+    result = NavigatorAnswer(
+        answer=outcome.text,
+        confidence=1.0,
+        escalated_to_human=True,
+        escalation_reason="safety_topic_detected",
+        trace_id=trace_id,
+        conversation_id=conversation_id,
+        resources=outcome.resources,
+    )
+    await _record(
+        session,
+        user_id=user_id,
+        trace_id=trace_id,
+        model=response.model if response else "guardrail",
+        prompt_version=response.prompt_version if response else "safety-filter",
+        question=safety.redacted(category),
+        answer=result.answer,
+        sources=[],
+        confidence=1.0,
+        escalated=True,
+        latency_ms=response.latency_ms if response else None,
+        input_tokens=response.input_tokens if response else None,
+        output_tokens=response.output_tokens if response else None,
     )
     return result
 

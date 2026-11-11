@@ -322,6 +322,9 @@ class Settings(BaseSettings):
     # (the trace — model, prompt version, id — stays); spent one-time codes
     # and expired throttle rows go after a day.
     ai_trace_retention_days: int = 180
+    # Health questions are sensitive data: their excerpts go sooner (I-16).
+    # Safety rows never hold her words at all — only a category code.
+    ai_sensitive_trace_retention_days: int = 30
     otp_retention_hours: int = 24
     # The largest request body the API accepts. Nothing here uploads files;
     # the biggest legitimate body is a partner's listing batch.

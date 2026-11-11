@@ -94,6 +94,21 @@ TEMPLATES: dict[NotificationTrigger, dict[str, tuple[str, str]]] = {
         "ru": ("План обновлён", "Для вас готов следующий шаг на 5 минут."),
         "en": ("Your plan was updated", "A five-minute next step is ready for you."),
     },
+    # No words of hers and no identifiers: the coordinator opens the risk flag.
+    NotificationTrigger.SAFETY_ESCALATION: {
+        "uz": (
+            "Xavfsizlik signali",
+            "Yordamçiga xavfsizlik böyiça murojaat keldi. Risk signallarini tekşiring.",
+        ),
+        "ru": (
+            "Сигнал безопасности",
+            "В помощник поступило обращение по безопасности. Проверьте сигналы риска.",
+        ),
+        "en": (
+            "Safety signal",
+            "The assistant received a safety disclosure. Please review the risk flags.",
+        ),
+    },
 }
 
 

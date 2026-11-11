@@ -780,6 +780,9 @@ class NotificationTrigger(StrEnum):
     # A reminder she asked for, about one event. Its words are built from the
     # event record, not from a template.
     EVENT_REMINDER = "event_reminder"
+    # A safety disclosure to the assistant, for her coordinator. Carries no
+    # words of hers — only a pointer to the risk flag.
+    SAFETY_ESCALATION = "safety_escalation"
 
 
 class DataClassification(StrEnum):

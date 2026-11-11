@@ -36,7 +36,14 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
-from app.services import ai_assistant, ai_coach, ai_limits, profile_completeness, telemetry
+from app.services import (
+    ai_assistant,
+    ai_coach,
+    ai_limits,
+    profile_completeness,
+    safety,
+    telemetry,
+)
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
@@ -119,6 +126,25 @@ def _guest_left(key: str) -> int:
     return max(0, ai_assistant.guest_allowance() - len(hits))
 
 
+async def _spend(
+    session, request: Request, user_id: uuid.UUID | None, guest_id: str | None, *texts: str
+) -> int | None:
+    """Take the AI limits and the guest allowance — unless this is a safety
+    disclosure.
+
+    A safety reply never calls the model, and a woman disclosing violence must
+    get the help text whatever her quota says: she is not refused with "your
+    trial questions are over" (I-02). So the gate runs first, here, before
+    anything is counted.
+    """
+    if safety.is_disclosure(*texts):
+        return None if user_id is not None else _guest_left(_guest_key(request, guest_id))
+    await ai_limits.take(session, request, user_id)
+    if user_id is None:
+        return _guest_take(_guest_key(request, guest_id))
+    return None
+
+
 def _reply(
     answer: AssistantAnswer, guest_left: int | None, language: str | None = None
 ) -> AssistantReply:
@@ -141,6 +167,7 @@ def _reply(
         is_uncertain=answer.is_uncertain,
         route=answer.route,
         guest_questions_left=guest_left,
+        resources=answer.resources,
     )
 
 
@@ -154,10 +181,7 @@ async def ask(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """The one door. Portal documentation, career advice or health — routed."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask(
         session,
@@ -212,7 +236,8 @@ async def coach_ask(
     the model is called and resolved again afterwards, so a reference that
     reaches the browser is one the database holds.
     """
-    await ai_limits.take(session, request, uuid.UUID(user.id))
+    if not safety.is_disclosure(payload.message):
+        await ai_limits.take(session, request, uuid.UUID(user.id))
     reply = await ai_coach.answer(
         session,
         user_id=uuid.UUID(user.id),
@@ -238,10 +263,7 @@ async def education(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Choosing a profession, learning one, or picking up a craft."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_education(
         session, user_id=user_id, question=payload.message, language=payload.language
@@ -265,7 +287,8 @@ async def education_detail(
     A second call rather than a bigger first one: the cards are most of the
     output tokens, and folding them in made the visible reply four times slower.
     """
-    await ai_limits.take(session, request, user_id)
+    if not safety.is_disclosure(payload.message, payload.answer):
+        await ai_limits.take(session, request, user_id)
     answer = await ai_assistant.education_detail(
         session,
         user_id=user_id,
@@ -288,10 +311,7 @@ async def health(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Age-appropriate health information. Never a diagnosis."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_health(
         session, user_id=user_id, question=payload.message, language=payload.language
