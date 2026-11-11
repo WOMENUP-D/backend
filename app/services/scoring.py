@@ -132,7 +132,9 @@ async def persist_scores(
             record.current = value
             record.assessment_id = assessment_id
             record.measured_at = now
-            if record.target is None:
+            # A reached target is replaced by the next one (a third of the gap
+            # that is left); kept, it read "75 → 33" (QA audit D-13).
+            if record.target is None or value >= record.target:
                 record.target = default_target(value)
         else:
             record = DevelopmentScore(

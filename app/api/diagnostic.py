@@ -34,6 +34,7 @@ from app.schemas.diagnostic import (
 from app.schemas.program import ProgramRead
 from app.schemas.skill import SkillRef
 from app.services import ai_limits, course_match, diagnostic, telemetry
+from app.services.scoring import composite_score
 
 router = APIRouter(prefix="/diagnostic", tags=["diagnostic"])
 
@@ -59,7 +60,7 @@ async def questions(user: CurrentUserDep, session: DbSession) -> DiagnosticQuest
                 show_if=(q.meta or {}).get("show_if"),
                 max_length=(q.meta or {}).get("max_length"),
                 options=[
-                    DiagnosticOption(id=o["id"], label_i18n=o.get("label_i18n") or {})
+                    DiagnosticOption(id=o["id"], label_i18n=diagnostic.option_label(o))
                     for o in q.options
                     if "id" in o
                 ],
@@ -174,6 +175,7 @@ async def _result(session: DbSession, user_id: uuid.UUID, attempt: Assessment) -
         completed_at=attempt.completed_at,
         is_baseline=attempt.is_baseline,
         overall=overall,
+        current_overall=round(composite_score(current)) if current else None,
         level=diagnostic.level_for(overall),
         dimensions=[
             DimensionResult(
@@ -263,6 +265,18 @@ async def _recommendation(
         ).scalars()
     }
     gap_names = {g["slug"]: g.get("name_i18n") or {} for g in stored.get("gaps") or []}
+    # A covered skill is always named in three languages: from the stored gaps,
+    # else from the taxonomy — never the bare slug (QA audit G-10).
+    unnamed = sorted(
+        {
+            slug
+            for item in stored.get("courses") or []
+            for slug in item.get("covers") or []
+            if not gap_names.get(slug)
+        }
+    )
+    if unnamed:
+        gap_names.update(await course_match.skill_names(session, unnamed))
     courses = []
     for item in stored.get("courses") or []:
         program = programs.get(item["program_id"])

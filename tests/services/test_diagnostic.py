@@ -47,13 +47,14 @@ def _scores(answers) -> dict[ScoreDimension, int]:
 # --- the instrument ---------------------------------------------------------------
 
 
-def test_the_bank_opens_with_the_profile_and_scores_one_question_per_dimension():
-    # Short on purpose: a run is 3–4 minutes, about twenty screens.
-    assert len(QUESTIONS) == 26
+def test_the_bank_opens_with_the_profile_and_scores_two_questions_per_dimension():
+    # Version 4 (QA audit D-07): two self-ratings per dimension, the second
+    # taken from version 2, plus the "other goals" question (D-04).
+    assert len(QUESTIONS) == 35
     scored = [q for q in QUESTIONS if q.question_type == "single_choice" and q.dimension]
-    assert len(scored) == 8
+    assert len(scored) == 16
     for dimension in ScoreDimension:
-        assert sum(q.dimension == dimension for q in scored) == 1
+        assert sum(q.dimension == dimension for q in scored) == 2
     assert BY_CODE["fam.q19"].question_type == "routing"
     assert BY_CODE["fam.q19"].weight == 0
     # The profile block: her situation, her goals, her interests — no score.
@@ -65,7 +66,7 @@ def test_the_bank_opens_with_the_profile_and_scores_one_question_per_dimension()
     assert BY_CODE["pro.q5"].question_type == "text" and BY_CODE["pro.q5"].meta["optional"]
     # Twelve questions depend on earlier answers; the profile comes first.
     assert sum(1 for q in QUESTIONS if q.meta.get("show_if")) == 12
-    assert [q.code for q in QUESTIONS][:4] == ["pro.q1", "pro.q3", "pro.q5", "pro.q6"]
+    assert [q.code for q in QUESTIONS][:5] == ["pro.q1", "pro.q3", "pro.q4", "pro.q5", "pro.q6"]
 
 
 def test_every_question_and_option_is_written_in_every_language():
@@ -107,28 +108,30 @@ def test_an_average_run_scores_50():
 
 
 @pytest.mark.parametrize(
-    ("dimension", "code"),
+    ("dimension", "code", "second"),
     [
-        (D.EDUCATION_SKILLS, "edu.q1"),
-        (D.EMPLOYMENT, "car.q5"),
-        (D.ENTREPRENEURSHIP, "ent.q8"),
-        (D.FINANCIAL_LITERACY, "fin.q10"),
-        (D.DIGITAL_SKILLS, "dig.q13"),
-        (D.HEALTHY_LIFESTYLE, "hea.q17"),
-        (D.LEADERSHIP, "lea.q22"),
+        (D.EDUCATION_SKILLS, "edu.q1", "edu.q3"),
+        (D.EMPLOYMENT, "car.q5", "car.q6"),
+        (D.ENTREPRENEURSHIP, "ent.q8", "ent.q7"),
+        (D.FINANCIAL_LITERACY, "fin.q10", "fin.q11"),
+        (D.DIGITAL_SKILLS, "dig.q13", "dig.q14"),
+        (D.HEALTHY_LIFESTYLE, "hea.q17", "hea.q18"),
+        (D.LEADERSHIP, "lea.q22", "lea.q23"),
     ],
 )
-def test_each_dimension_is_its_one_answer_over_4(dimension, code):
-    # b (1) → 1 / 4 * 100 = 25; e (4) → 100
-    assert _scores(_answers({code: "b"}))[dimension] == 25
-    scores = _scores(_answers({code: "e"}))
+def test_each_dimension_is_its_two_answers_over_8(dimension, code, second):
+    # Version 4 (QA audit D-07): two self-ratings per dimension, so one
+    # click moves it 12.5 points, not 25. b (1) + c (2) → 3 / 8 → 37.5 → 38.
+    assert _scores(_answers({code: "b"}))[dimension] == 38
+    assert _scores(_answers({code: "b", second: "b"}))[dimension] == 25
+    scores = _scores(_answers({code: "e", second: "e"}))
     assert scores[dimension] == 100
     assert all(v == 50 for d, v in scores.items() if d != dimension)
 
 
 def test_family_is_scored_on_its_question_and_ignores_the_routing_one():
     for family in "abcdef":
-        scores = _scores(_answers({"fam.q20": "d"}, family=family))
+        scores = _scores(_answers({"fam.q20": "d", "fam.q21": "d"}, family=family))
         assert scores[D.FAMILY_PARENTING] == 75
 
 
@@ -238,8 +241,10 @@ def test_goal_match_is_direct_indirect_or_none():
 
 
 def test_urgency_reads_only_explicit_status_answers():
-    assert diagnostic.urgency(D.EMPLOYMENT, {"car.q4": ["a"]}) == 100
-    assert diagnostic.urgency(D.EMPLOYMENT, {"car.q4": ["e"]}) == 50
+    # car.q5 since version 3 asks no car.q4 (QA audit D-07).
+    assert diagnostic.urgency(D.EMPLOYMENT, {"car.q5": ["a"]}) == 100
+    assert diagnostic.urgency(D.EMPLOYMENT, {"car.q5": ["e"]}) == 50
+    assert diagnostic.urgency(D.EMPLOYMENT, {"car.q4": ["a"]}) == 50
     assert diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q10": ["a"]}) == 75
     # Nothing medical or sensitive is ever made urgent.
     assert diagnostic.urgency(D.HEALTHY_LIFESTYLE, {"hea.q17": ["a"]}) == 50
@@ -250,7 +255,7 @@ def test_priority_is_the_weighted_sum_of_its_four_parts():
     scores = dict.fromkeys(ScoreDimension, 50)
     scores[D.EMPLOYMENT] = 25
     ranked = diagnostic.priorities(
-        scores, ["find_job"], {"car.q4": ["a"]}, {D.EMPLOYMENT: 80.0}, family_focus="a"
+        scores, ["find_job"], {"car.q5": ["a"]}, {D.EMPLOYMENT: 80.0}, family_focus="a"
     )
     career = next(p for p in ranked if p.dimension == D.EMPLOYMENT)
     # 0.4 * 75 + 0.3 * 100 + 0.2 * 80 + 0.1 * 100 = 30 + 30 + 16 + 10
@@ -296,7 +301,7 @@ def test_strongest_are_the_two_highest_in_canonical_order_on_ties():
 
 
 def test_a_growth_area_is_never_also_listed_as_a_strength():
-    scores = dict.fromkeys(ScoreDimension, 25)
+    scores = dict.fromkeys(ScoreDimension, 50)
     growth = {D.EMPLOYMENT, D.EDUCATION_SKILLS, D.LEADERSHIP}
     assert diagnostic.strongest(scores, exclude=growth) == [
         D.ENTREPRENEURSHIP,
@@ -377,3 +382,63 @@ def test_the_situation_sets_how_pressing_employment_is():
         diagnostic.urgency(D.FINANCIAL_LITERACY, {"fin.q10": ["a"]}, {"situation": "job_seeker"})
         == 75
     )
+
+
+# --- QA audit -------------------------------------------------------------------
+
+
+def test_a_zero_is_never_a_strength():
+    """D-03: with every dimension at 0 there is no strength to show."""
+    assert diagnostic.strongest(dict.fromkeys(ScoreDimension, 0)) == []
+    scores = dict.fromkeys(ScoreDimension, 25)
+    scores[D.HEALTHY_LIFESTYLE] = 50
+    assert diagnostic.strongest(scores) == [D.HEALTHY_LIFESTYLE]
+
+
+def test_other_goals_are_collected_without_the_main_one():
+    """D-04: the hint promised a question about further goals; now it exists."""
+    answers = _answers(
+        goals=["start_business"],
+        profile={"pro.q4": ["start_business", "financial_independence"]},
+    )
+    profile = diagnostic.profile_from(diagnostic.validate(QUESTIONS, answers))
+    assert profile["goals"] == ["start_business", "financial_independence"]
+    assert profile["goals_other"] == ["financial_independence"]
+
+
+def test_a_mother_at_home_is_not_asked_how_long_she_has_looked_for_work():
+    """D-08: "at home" and "on maternity leave" are situations of their own."""
+    options = {o["id"] for o in BY_CODE["pro.q1"].options}
+    assert {"home", "maternity"} <= options
+    for situation in ("home", "maternity"):
+        by_code = {"pro.q1": [situation]}
+        assert not diagnostic.visible(BY_CODE["sit.q15"], by_code)
+        profile = {"situation": situation}
+        assert diagnostic.urgency(D.EMPLOYMENT, {}, profile) == diagnostic.NEUTRAL
+
+
+def test_the_texts_promise_what_the_bank_does():
+    """D-10, D-15: three interests, not four; grammatical Uzbek; no dead show_if."""
+    assert BY_CODE["pro.q6"].meta["max_choices"] == 3
+    assert "3" in BY_CODE["pro.q6"].text_i18n["uz"]
+    assert "three" in BY_CODE["pro.q6"].text_i18n["en"]
+    assert BY_CODE["sit.q15"].text_i18n["uz"] == "Qança vaqtdan beri iş qidiryapsiz?"
+    interests = {o["id"] for o in BY_CODE["pro.q6"].options}
+    for rule in BY_CODE["skl.q19"].meta["show_if"]["any"]:
+        if rule["question"] == "pro.q6":
+            assert set(rule["in"]) <= interests
+
+
+def test_every_uzbek_text_is_in_the_reformed_alphabet():
+    from app.services.uzbek import to_new_alphabet
+
+    for q in QUESTIONS:
+        assert to_new_alphabet(q.text_i18n["uz"]) == q.text_i18n["uz"]
+        for option in q.options:
+            assert to_new_alphabet(option["label_i18n"]["uz"]) == option["label_i18n"]["uz"]
+
+
+def test_an_international_goal_points_at_education_not_leadership():
+    """D-15c."""
+    assert diagnostic.goal_match(D.EDUCATION_SKILLS, ["international"]) == 100
+    assert diagnostic.goal_match(D.LEADERSHIP, ["international"]) == 50

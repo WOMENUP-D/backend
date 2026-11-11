@@ -192,6 +192,7 @@ async def test_finishing_every_lesson_certifies_her_and_records_the_skill(
     program = await _course(session, lessons=2, certificate=True)
     await session.flush()
     enrollment_id = await _enrol(client, program, auth_headers)
+    await _assessed(session, enrollment_id)
     lessons = list(
         (
             await session.execute(
@@ -285,6 +286,7 @@ async def test_ticking_the_last_lesson_twice_issues_one_certificate(
     program = await _course(session, lessons=1, certificate=True)
     await session.flush()
     enrollment_id = await _enrol(client, program, auth_headers)
+    await _assessed(session, enrollment_id)
     lesson = await session.scalar(
         select(ProgramLesson)
         .join(ProgramModule, ProgramModule.id == ProgramLesson.module_id)
@@ -327,3 +329,55 @@ async def test_a_module_tick_still_works_for_a_course_without_lessons(
     assert response.status_code == 200
     assert response.json()["progress_percent"] == 100
     assert response.json()["status"] == "completed"
+
+
+async def _assessed(session, enrollment_id: str) -> None:
+    """A passed final assessment, a day after she started (QA audit B-06)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.program import Enrollment
+
+    enrollment = await session.get(Enrollment, uuid.UUID(enrollment_id))
+    enrollment.final_score = 85.0
+    enrollment.started_at = datetime.now(UTC) - timedelta(days=1)
+    await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_a_partner_course_cannot_be_enrolled_in(client, session, auth_headers, user_id):
+    """QA audit B-13: an enrollment on a course hosted elsewhere stays at 0 % forever."""
+    session.add(User(id=user_id, phone=_phone()))
+    program = Program(
+        slug="stepik-102",
+        title_i18n={"ru": "Курс"},
+        category=ProgramCategory.DIGITAL_SKILLS,
+        is_published=True,
+        external_url="https://stepik.org/course/102",
+        source="stepik",
+    )
+    session.add(program)
+    await session.flush()
+    response = await client.post(f"{PROGRAMS}/{program.id}/enroll", headers=auth_headers)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "external_course"
+
+
+@pytest.mark.asyncio
+async def test_a_module_tick_on_a_course_with_lessons_is_refused(
+    client, session, auth_headers, user_id
+):
+    """QA audit B-26: the tick used to be stored, ignored and answered with 200."""
+    session.add(User(id=user_id, phone=_phone()))
+    program = await _course(session, lessons=2)
+    await session.flush()
+    enrollment_id = await _enrol(client, program, auth_headers)
+    module = await session.scalar(
+        select(ProgramModule).where(ProgramModule.program_id == program.id)
+    )
+    response = await client.post(
+        f"{PROGRAMS}/enrollments/{enrollment_id}/progress",
+        json={"module_id": str(module.id), "completed": True},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "tracked_by_lessons"

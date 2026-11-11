@@ -999,7 +999,9 @@
   "skills": [
    "маркетинг",
    "предпринимательство"
-  ]
+  ],
+  "available": false,
+  "unavailable_reason": "private"
  },
  {
   "source": "stepik",
@@ -1581,7 +1583,9 @@
   "summary": "В этом курсе вас ожидает неформальное путешествие в мир системного администрирования на базе GNU/Linux. Основным нашим инструментом станет Bash — мы не просто освоим его возможности, но и подружимся с ним на практике. Вместе разберём ключевые задачи, стоящие перед системными и сетевыми администратор",
   "skills": [
    "linux"
-  ]
+  ],
+  "available": false,
+  "unavailable_reason": "paid"
  },
  {
   "source": "stepik",
@@ -4621,7 +4625,9 @@
   "summary": "Курс для подготовки Middle Java Developer",
   "skills": [
    "java"
-  ]
+  ],
+  "available": false,
+  "unavailable_reason": "private"
  },
  {
   "source": "stepik",
@@ -5996,7 +6002,9 @@
   "language": "ru",
   "provider": "Stepik",
   "summary": "Это инструментальный курс, который научит вас работать с инструментом DataLens и упростить аналитику и визуализацию данных. Вы будете изучать инструмент на примере реальных кейсов BI-аналитики.",
-  "skills": []
+  "skills": [],
+  "available": false,
+  "unavailable_reason": "private"
  },
  {
   "source": "stepik",
@@ -10190,7 +10198,9 @@
   "skills": [
    "финансовая грамотность",
    "предпринимательство"
-  ]
+  ],
+  "available": false,
+  "unavailable_reason": "landing_page"
  },
  {
   "source": "spbu",

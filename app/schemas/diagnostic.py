@@ -90,6 +90,10 @@ class DiagnosticResult(BaseModel):
     completed_at: datetime | None
     is_baseline: bool
     overall: int = Field(ge=0, le=100)
+    #: Her score now — the attempt plus what finished courses and tasks have
+    #: added since (`/assessments/score` composite, rounded). The cabinet shows
+    #: this one; `overall` is what the diagnostic itself measured (D-20).
+    current_overall: int | None = Field(default=None, ge=0, le=100)
     level: Level
     dimensions: list[DimensionResult]
     strongest: list[ScoreDimension]

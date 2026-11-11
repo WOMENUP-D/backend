@@ -500,5 +500,12 @@ def required_ids() -> set[str]:
 
 
 def payload() -> dict[str, Any]:
-    """What the client renders."""
-    return {"version": VERSION, "sections": SECTIONS, "questions": QUESTIONS}
+    """What the client renders. `total` is how many questions there are, so
+    the lead text quotes the bank instead of a number typed into the
+    messages ("18 ta savol" over a 17-question bank, QA audit D-21)."""
+    return {
+        "version": VERSION,
+        "sections": SECTIONS,
+        "questions": QUESTIONS,
+        "total": len(QUESTIONS),
+    }

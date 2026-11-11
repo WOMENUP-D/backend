@@ -1,10 +1,19 @@
-"""Diagnostic v2: the 25-question instrument, its scoring and its priorities.
+"""The diagnostic: its question bank, scoring and priorities.
+
+Version 4 (`data/diagnostic_v4.json`, migration 0040) is the active bank: the
+version-3 profile block (situation — now with "at home" and "on maternity
+leave" —, main goal, other goals, interests, situation follow-ups, field
+levels, difficulties) and **two** self-rated questions per Development Score
+dimension, sixteen in all, so a dimension moves in steps of 12.5 rather than
+25. Versions 2 and 3 stay in the database inactive; their attempts keep the
+scores they were given and stay readable.
 
 The flow, every step on the server:
 
     answers (question id + option id, nothing else)
       → validated against the active question set
-      → dimension scores: (q1 + q2 + q3) / 12 * 100, rounded, within 0-100
+      → dimension scores: (sum of its answers) / (4 × its questions) * 100,
+        rounded, within 0-100
       → overall score: the mean of the eight, rounded
       → priorities: 0.4 need + 0.3 goal match + 0.2 skill gap + 0.1 urgency
       → three next steps grounded in the real catalogue
@@ -38,13 +47,15 @@ from app.models.assessment import Assessment, AssessmentAnswer, AssessmentQuesti
 from app.models.career import EducationEntry, WorkExperience
 from app.models.skill import Skill
 from app.schemas.recommendation import NextStep
-from app.services import plan_service
+from app.services import catalogue_rules, plan_service
 from app.services import recommendation as engine
 from app.services import skills as skill_service
 from app.services.scoring import is_baseline_assessment, persist_scores
 
-VERSION = 3
-DATA = Path(__file__).resolve().parents[2] / "data" / "diagnostic_v3.json"
+VERSION = 4
+#: For the seed and the tests only; the API reads the question rows that the
+#: migration loaded. The repository layout, not the installed package.
+DATA = Path(__file__).resolve().parents[2] / "data" / "diagnostic_v4.json"
 
 SCORED = "single_choice"
 ROUTING = "routing"
@@ -69,7 +80,8 @@ GOAL_DIRECT: dict[str, tuple[ScoreDimension, ...]] = {
     "personal_skills": (D.EDUCATION_SKILLS,),
     "wellbeing": (D.HEALTHY_LIFESTYLE,),
     "family": (D.FAMILY_PARENTING,),
-    "international": (D.LEADERSHIP,),
+    # Preparing to study or work abroad is education first (QA audit D-15).
+    "international": (D.EDUCATION_SKILLS,),
     "leadership": (D.LEADERSHIP,),
 }
 #: Dimensions a goal leans on without naming them. GoalMatch = 50.
@@ -83,7 +95,7 @@ GOAL_INDIRECT: dict[str, tuple[ScoreDimension, ...]] = {
     "personal_skills": (D.LEADERSHIP, D.HEALTHY_LIFESTYLE),
     "wellbeing": (D.FAMILY_PARENTING,),
     "family": (D.HEALTHY_LIFESTYLE,),
-    "international": (D.EDUCATION_SKILLS, D.EMPLOYMENT),
+    "international": (D.EMPLOYMENT, D.LEADERSHIP),
     "leadership": (D.EMPLOYMENT, D.ENTREPRENEURSHIP),
 }
 
@@ -108,7 +120,8 @@ GOAL_LEGACY: dict[str, tuple[str, ...]] = {
     "discover": ("personal_skills",),
 }
 #: Her situation says how pressing employment is; version 2 read it off a
-#: self-rating. Not listed: neutral.
+#: self-rating. Not listed: neutral — including "at home" and "on maternity
+#: leave", which say nothing about wanting a job now.
 SITUATION_URGENCY: dict[str, float] = {
     "job_seeker": 100.0,
     "not_working": 75.0,
@@ -118,8 +131,10 @@ SITUATION_URGENCY: dict[str, float] = {
 #: family are deliberately absent: the instrument asks nothing medical, and a
 #: sensitive area is never made "urgent" by inference.
 URGENCY_ANSWERS: dict[ScoreDimension, tuple[str, dict[str, float]]] = {
-    # "Not working and no direction" is the most pressing career situation.
-    D.EMPLOYMENT: ("car.q4", {"a": 100.0, "b": 75.0}),
+    # Not knowing where to start the job search, or not being ready for it,
+    # is the most pressing career situation. (Version 2 read car.q4, which
+    # versions 3 and 4 do not ask.)
+    D.EMPLOYMENT: ("car.q5", {"a": 100.0, "b": 75.0}),
     # Not tracking the budget at all leaves no buffer.
     D.FINANCIAL_LITERACY: ("fin.q10", {"a": 75.0}),
 }
@@ -143,9 +158,13 @@ FAMILY_DEFAULT = (ProgramCategory.ETHICS_CULTURE, ProgramCategory.PARENTING)
 WEIGHTS = {"need": 0.4, "goal_match": 0.3, "skill_gap": 0.2, "urgency": 0.1}
 TOP_PRIORITIES = 3
 STRONGEST = 2
-#: A career priority starts from her CV when there is none yet, or when she
-#: said she has none (Q5 "don't know where to start" / "not prepared yet").
+#: The lowest score shown as a strength: "good foundation" (QA audit D-03).
+STRENGTH_FROM = 50
+#: A career priority starts from her CV when she said she has none (car.q5
+#: "don't know where to start" / "not prepared yet").
 CV_MISSING_ANSWERS = {"a", "b"}
+#: car.q5 answers that say she has a CV already.
+CV_HELD_ANSWERS = {"c", "d", "e"}
 
 
 class DiagnosticError(ValueError):
@@ -311,6 +330,13 @@ def is_optional(question: AssessmentQuestion) -> bool:
     return bool(_meta(question).get("optional"))
 
 
+def option_label(option: dict) -> dict:
+    """An option's words. Migration 0039 stored them under `label`, the seed
+    and every later bank under `label_i18n`; both are read (QA audit: v3
+    options came back blank on databases built by migrations)."""
+    return dict(option.get("label_i18n") or option.get("label") or {})
+
+
 def _option(question: AssessmentQuestion, option_id: str) -> dict:
     return next(option for option in question.options if option.get("id") == option_id)
 
@@ -395,6 +421,7 @@ def validate(
 PROFILE_FIELDS: dict[str, str] = {
     "pro.q1": "situation",
     "pro.q3": "goal_primary",
+    "pro.q4": "goals_other",
     "pro.q5": "goal_text",
     "pro.q6": "interests",
     "sit.q7": "study_field",
@@ -406,7 +433,7 @@ PROFILE_FIELDS: dict[str, str] = {
     "sit.q15": "job_search_duration",
     "pro.q21": "difficulties",
 }
-MULTI_FIELDS = {"interests", "business_challenges", "difficulties"}
+MULTI_FIELDS = {"interests", "business_challenges", "difficulties", "goals_other"}
 
 
 def profile_from(submission: Submission) -> dict | None:
@@ -781,7 +808,9 @@ def strongest(
     area cannot be both her strength and what she should work on next, which
     is what equal scores would otherwise produce."""
     ranked = sorted(scores.items(), key=lambda kv: (-kv[1], _CANONICAL.index(kv[0])))
-    return [d for d, _ in ranked if d not in exclude][:limit]
+    # A strength is a dimension with a good foundation (50+, `level_for`);
+    # a 0 is never offered as one, and an empty list is the honest answer.
+    return [d for d, v in ranked if d not in exclude and v >= STRENGTH_FROM][:limit]
 
 
 @dataclass(slots=True)
@@ -837,16 +866,24 @@ async def next_steps(
         params = {"score": scores.get(dimension, 0), "priority": round(item.priority)}
         step: NextStep | None = None
 
-        if dimension == D.EMPLOYMENT and (
-            (by_code.get("car.q5") or [""])[0] in CV_MISSING_ANSWERS
-            or not await _has_cv(session, user_id)
-        ):
-            step = NextStep(
-                kind=NextStepKind.BUILD_CV,
-                reason=RecommendationReason.DIAGNOSTIC_PRIORITY,
-                dimension=dimension,
-                params=params,
-            )
+        if dimension == D.EMPLOYMENT:
+            # Her answer is believed (QA audit D-05): a woman who said she has
+            # a CV is not told to write one. If the portal holds none, she is
+            # asked to add hers; otherwise the career step comes from below.
+            readiness = (by_code.get("car.q5") or [""])[0]
+            on_portal = await _has_cv(session, user_id)
+            kind = None
+            if readiness in CV_MISSING_ANSWERS or (not readiness and not on_portal):
+                kind = NextStepKind.BUILD_CV
+            elif readiness in CV_HELD_ANSWERS and not on_portal:
+                kind = NextStepKind.ADD_CV_TO_PROFILE
+            if kind is not None:
+                step = NextStep(
+                    kind=kind,
+                    reason=RecommendationReason.DIAGNOSTIC_PRIORITY,
+                    dimension=dimension,
+                    params=params,
+                )
 
         if step is None and dimension == D.FAMILY_PARENTING:
             fresh = next(
@@ -864,6 +901,10 @@ async def next_steps(
             for action in engine.dimension_actions(ctx, dimension):
                 program = action.program
                 if program is not None and program.id in picked.program_ids:
+                    continue
+                # The same filter the course recommendation applies: interview
+                # drills and middle/senior tracks are not a first step.
+                if program is not None and catalogue_rules.professional_only(program):
                     continue
                 step = action
                 break
