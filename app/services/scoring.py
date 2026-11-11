@@ -47,6 +47,31 @@ def weakest_dimensions(
     return [d for d, _ in sorted(dimension_scores.items(), key=lambda kv: kv[1])[:limit]]
 
 
+#: Points by which a dimension must trail the others before it is called weak.
+#: Below this the scores are a tie, and naming one "her weakest" is invented.
+WEAKEST_MARGIN = 10.0
+
+
+def distinctly_weakest(
+    dimension_scores: dict[ScoreDimension, float], limit: int = 3, margin: float = WEAKEST_MARGIN
+) -> list[ScoreDimension]:
+    """The weakest dimensions, but only those that really are weaker.
+
+    `weakest_dimensions` always returns three, so a woman with eight equal
+    scores was told one at random was her weakest. Here a spread under
+    `margin` returns nothing, and otherwise only dimensions in the lower half
+    of her own range are named.
+    """
+    if not dimension_scores:
+        return []
+    low, high = min(dimension_scores.values()), max(dimension_scores.values())
+    if high - low < margin:
+        return []
+    ceiling = low + (high - low) / 2
+    weakest = weakest_dimensions(dimension_scores, limit=limit)
+    return [d for d in weakest if dimension_scores[d] <= ceiling]
+
+
 def default_target(current: float) -> float:
     """A first target: close roughly a third of the remaining gap, capped at 100.
 

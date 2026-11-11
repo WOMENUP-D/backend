@@ -54,11 +54,12 @@ from app.services import skills as skill_service
 from app.services.age_gate import age_from_profile
 from app.services.diagnostic import GOAL_LEGACY
 from app.services.llm_gateway import LlmGateway, LlmUnavailableError, llm_gateway
+from app.services.uzbek import to_new_alphabet
 
 logger = logging.getLogger(__name__)
 
 FEATURE = "diagnostic_courses"
-PROMPT_VERSION = "course-match-1"
+PROMPT_VERSION = "course-match-2"
 RECOMMENDATION_VERSION = 1
 MAX_CANDIDATES = 24
 MAX_COURSES = 8
@@ -492,6 +493,11 @@ Rules you must follow:
 - Write every text in all three languages: Uzbek in the reformed Latin
   alphabet (ö, ğ, ş, ç), Russian, English. Warm, concrete, second person,
   no flattery, no promises about jobs or income. Keep each text short.
+- Address her formally in every language: "Siz" in Uzbek, "Вы" in Russian —
+  never "sen" or "ты". Every letter of an Uzbek word is Latin (no Cyrillic
+  letter, no ü, ı or ñ).
+- Do not assume which languages she can read: say what language a course is
+  taught in, never that it "is accessible to you".
 """
 
 SCHEMA: dict[str, Any] = {
@@ -630,7 +636,11 @@ LANGS = ("uz", "ru", "en")
 
 
 def _i18n(payload: dict, prefix: str) -> dict[str, str]:
-    return {lang: str(payload.get(f"{prefix}_{lang}") or "").strip() for lang in LANGS}
+    """The model's three texts; the Uzbek one repaired into the reformed
+    alphabet, whatever the model actually wrote (G-14)."""
+    out = {lang: str(payload.get(f"{prefix}_{lang}") or "").strip() for lang in LANGS}
+    out["uz"] = to_new_alphabet(out["uz"])
+    return out
 
 
 def _program_line(candidate: Candidate) -> str:

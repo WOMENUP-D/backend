@@ -47,7 +47,7 @@ from app.services import (
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
-from app.services.uzbek import convert_if_uzbek
+from app.services.uzbek import convert_if_uzbek, question_language
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -145,12 +145,34 @@ async def _spend(
     return None
 
 
+def _uz(value, language: str | None):
+    """Every text a reply carries, in the reformed alphabet when it is Uzbek —
+    not only `answer`: the chips, cards and roadmap are model text too (G-14)."""
+    if isinstance(value, str):
+        return convert_if_uzbek(value, language)
+    if isinstance(value, list):
+        return [_uz(item, language) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: (item if key in _VERBATIM_KEYS else _uz(item, language))
+            for key, item in value.items()
+        }
+    return value
+
+
+#: Identifiers inside card dicts that must never be transliterated.
+_VERBATIM_KEYS = frozenset({"id", "slug", "category", "program_ids", "chunk_id"})
+
+
 def _reply(
     answer: AssistantAnswer, guest_left: int | None, language: str | None = None
 ) -> AssistantReply:
     # Uzbek leaves in the reformed alphabet, whichever one the model wrote.
+    # The answer may be in the question's language rather than the page's;
+    # an undeclared language is converted only when the text is evidently Uzbek.
+    language = None if language and _declared_other(answer.answer, language) else language
     return AssistantReply(
-        answer=convert_if_uzbek(answer.answer, language),
+        answer=_uz(answer.answer, language),
         section=answer.section,
         kind=answer.kind,
         trace_id=answer.trace_id,
@@ -158,17 +180,26 @@ def _reply(
         escalated=answer.escalated,
         escalation_reason=answer.escalation_reason,
         see_a_doctor=answer.see_a_doctor,
-        professions=answer.professions,
-        roadmap=answer.roadmap,
-        next_actions=answer.next_actions,
-        programs=answer.programs,
-        sources=answer.sources,
+        professions=_uz(answer.professions, language),
+        roadmap=_uz(answer.roadmap, language),
+        next_actions=_uz(answer.next_actions, language),
+        programs=_uz(answer.programs, language),
+        sources=_uz(answer.sources, language),
         confidence=answer.confidence,
         is_uncertain=answer.is_uncertain,
         route=answer.route,
         guest_questions_left=guest_left,
         resources=answer.resources,
+        degraded=answer.degraded,
     )
+
+
+def _declared_other(text: str, language: str) -> bool:
+    """Whether a reply is plainly in another language than the page's — a
+    Russian or English question on the Uzbek site is now answered in its own
+    language, and English must not be run through the Uzbek converter."""
+    spoken = question_language(text)
+    return spoken is not None and spoken != language.lower().split("-", 1)[0]
 
 
 @router.post("/ask", response_model=AssistantReply)
@@ -189,6 +220,7 @@ async def ask(
         question=payload.message,
         language=payload.language,
         route=payload.route,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "ask"}
@@ -244,11 +276,15 @@ async def coach_ask(
         question=payload.message,
         language=payload.language,
         opportunity_id=payload.opportunity_id,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "coach"}
     )
-    reply.message = convert_if_uzbek(reply.message, payload.language)
+    language = payload.language
+    if language and _declared_other(reply.message, language):
+        language = None
+    reply.message = convert_if_uzbek(reply.message, language)
     await session.commit()
     return reply
 
@@ -266,7 +302,11 @@ async def education(
     guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_education(
-        session, user_id=user_id, question=payload.message, language=payload.language
+        session,
+        user_id=user_id,
+        question=payload.message,
+        language=payload.language,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "education"}
@@ -296,6 +336,7 @@ async def education_detail(
         answer_so_far=payload.answer,
         kind=payload.kind,
         language=payload.language,
+        history=payload.history,
     )
     await session.commit()
     return _reply(answer, None, payload.language)
@@ -314,7 +355,11 @@ async def health(
     guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_health(
-        session, user_id=user_id, question=payload.message, language=payload.language
+        session,
+        user_id=user_id,
+        question=payload.message,
+        language=payload.language,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "health"}

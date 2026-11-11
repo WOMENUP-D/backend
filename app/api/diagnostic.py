@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -33,7 +33,7 @@ from app.schemas.diagnostic import (
 )
 from app.schemas.program import ProgramRead
 from app.schemas.skill import SkillRef
-from app.services import course_match, diagnostic, telemetry
+from app.services import ai_limits, course_match, diagnostic, telemetry
 
 router = APIRouter(prefix="/diagnostic", tags=["diagnostic"])
 
@@ -222,12 +222,16 @@ async def read_recommendations(
 
 @router.post("/recommendations/refresh", response_model=DiagnosticRecommendation)
 async def refresh_recommendations(
-    user: CurrentUserDep, session: DbSession, attempt_id: uuid.UUID | None = None
+    user: CurrentUserDep,
+    session: DbSession,
+    request: Request,
+    attempt_id: uuid.UUID | None = None,
 ) -> DiagnosticRecommendation:
     """Build the recommendation again — after she enrolled, finished a course,
     or added skills to her profile. Counted as an expensive request, since
-    it queues another turn of the model."""
+    it queues another turn of the model, and it spends the hourly AI quota."""
     user_id = uuid.UUID(user.id)
+    await ai_limits.take(session, request, user_id)
     attempt = await _attempt_of(session, user_id, attempt_id)
     await course_match.recommend(session, attempt)
     await session.commit()

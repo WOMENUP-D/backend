@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.services import safety
-from app.services.uzbek import to_new_alphabet, to_old_alphabet
+from app.services.uzbek import fold, to_new_alphabet, to_old_alphabet
 
 
 @dataclass(slots=True)
@@ -84,21 +84,25 @@ async def retrieve(
         )
     else:
         ts_vector = func.to_tsvector("simple", KnowledgeChunk.content)
+        # The document's title is what it is about; a match there counts more
+        # than one more passing mention in a long body.
+        title_vector = func.to_tsvector("simple", KnowledgeDocument.title)
         ts_query = func.to_tsquery("simple", _or_query(query))
+        score = func.ts_rank(ts_vector, ts_query) + func.ts_rank(title_vector, ts_query)
         stmt = (
             select(
                 KnowledgeChunk.id,
                 KnowledgeChunk.document_id,
                 KnowledgeDocument.title,
                 KnowledgeChunk.content,
-                func.ts_rank(ts_vector, ts_query).label("score"),
+                score.label("score"),
             )
             .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
             .where(
                 KnowledgeDocument.is_approved.is_(True),
-                ts_vector.op("@@")(ts_query),
+                ts_vector.op("@@")(ts_query) | title_vector.op("@@")(ts_query),
             )
-            .order_by(func.ts_rank(ts_vector, ts_query).desc())
+            .order_by(score.desc())
             .limit(limit)
         )
 
@@ -118,25 +122,101 @@ async def retrieve(
     ]
 
 
+#: Words every question is made of and no document is about. Left in, "qanday"
+#: outranked "sertifikat": the one matching word in a privacy page beat the
+#: page about certificates. Folded, as `uzbek.fold` writes them.
+_QUESTION_WORDS = frozenset(
+    # uz
+    "qanday qanaqa qaysi qayerda qayerdan qachon nima nimaga nega necha kim men menga "  # noqa: SIM905
+    "mening meni bilan uchun kerak mumkin bormi yoki ham haqida qilib qilsam boladi "
+    "bolsa iltimos portalda portal womanup "
+    # ru
+    "как что где когда какие какой какая каких можно нужно ли для это мне меня мой моя "
+    "мои после есть или чтобы если про на портале портал womanup "
+    # en
+    "how what which where when why who the and for can could does did will would should "
+    "with from about there this that your you my any get"
+    "".split()
+)
+
+#: Uzbek is agglutinative: "sertifikatni", "sertifikatga" and "sertifikatlar"
+#: are one word to her and three to an exact-token search. Longest first.
+_UZ_SUFFIXES = tuple(
+    sorted(
+        (  # noqa: SIM905
+            "laringiz larimiz larning larni larga larda lardan lari lar "
+            "ingizni ingizga ingiz imizni imiz imni imga im sini mni ning si ni ga ka qa m "
+            "dagi dan da ta mi man aman yapman yapti moqda miz siz "
+            "ish iş gan"
+        ).split(),
+        key=len,
+        reverse=True,
+    )
+)
+_RU_ENDINGS = re.compile(
+    r"(?:иями|ями|ами|ого|его|ому|ему|ыми|ими|ией|ов|ев|ей|ам|ям|ах|ях|ом|ем|ой|ий|ый|ая|ое|"
+    r"ые|ую|ию|ия|ие|ии|ть|а|я|у|ю|ы|и|е|о)$"
+)
+_EN_ENDINGS = re.compile(r"(?:ing|ed|es|s)$")
+_MIN_STEM = 4
+
+
+def _stem(word: str) -> str:
+    """A light stem, so a prefix query reaches the other forms of the word.
+
+    Deliberately crude — a handful of endings per language, never below four
+    letters — because it only widens a keyword fallback that ranking then
+    orders; it is not a morphological analyser.
+    """
+    if re.search("[\u0400-\u04ff]", word):
+        stemmed = _RU_ENDINGS.sub("", word)
+        return stemmed if len(stemmed) >= _MIN_STEM else word
+    stemmed = word
+    for _ in range(3):
+        for suffix in _UZ_SUFFIXES:
+            if stemmed.endswith(suffix) and len(stemmed) - len(suffix) >= _MIN_STEM:
+                stemmed = stemmed[: -len(suffix)]
+                break
+        else:
+            break
+    if stemmed == word:
+        english = _EN_ENDINGS.sub("", word)
+        if len(english) >= _MIN_STEM:
+            stemmed = english
+    return stemmed
+
+
 def _or_query(query: str) -> str:
     """Turn free text into an OR-joined tsquery.
 
     `plainto_tsquery` ANDs every term, so one word absent from a chunk drops the
     whole match. For a keyword fallback recall matters far more than precision —
-    ranking sorts the rest out.
+    ranking sorts the rest out. Each word is searched as written and, through
+    a light stem, as a prefix (`sertifikat:*`), so "sertifikatni" finds the
+    page that says "sertifikat". Question words are dropped unless nothing else
+    is left.
     """
     words = [
-        re.sub(r"[^\w\u0400-\u04ff\u02bb\u2018\u2019-]", "", word) for word in query.lower().split()
+        re.sub(r"[^\w\u0400-\u04ff\u02bb\u2018\u2019]", "", part)
+        for word in query.lower().split()
+        for part in word.split("-")
     ]
+    words = [word for word in words if len(word) > 2]
+    content = [word for word in words if fold(word) not in _QUESTION_WORDS]
     terms: list[str] = []
-    for word in words:
-        if len(word) <= 2:
-            continue
+
+    def add(term: str) -> None:
+        if term and term not in terms:
+            terms.append(term)
+
+    for word in content or words:
         # Uzbek is stored in the reformed alphabet but typed in either; a term
         # is searched in both spellings so neither keyboard loses recall.
         for spelling in (word, to_new_alphabet(word), to_old_alphabet(word)):
-            if spelling and spelling not in terms:
-                terms.append(spelling)
+            add(spelling)
+            stem = _stem(spelling)
+            if stem != spelling or len(spelling) >= _MIN_STEM + 2:
+                add(f"{stem}:*")
     return " | ".join(terms) if terms else "''"
 
 

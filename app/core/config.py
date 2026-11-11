@@ -123,6 +123,13 @@ class Settings(BaseSettings):
     ai_model: str = "claude-opus-5"
     ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     ai_max_tokens: int = 16000
+    # The SDK default is a ten-minute timeout with two retries, so one stuck
+    # call could hold a request for half an hour. Every call is now bounded;
+    # interactive answers (assistant, coach, navigator) by the tighter figure,
+    # after which they degrade to rules or quoted sources instead of spinning.
+    ai_timeout_seconds: float = 120.0
+    ai_interactive_timeout_seconds: float = 50.0
+    ai_max_retries: int = 1
     # How many assistant questions someone gets before signing up. Enough to
     # see what it is, not enough to use it as a free service.
     assistant_guest_questions: int = 3

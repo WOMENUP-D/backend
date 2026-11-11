@@ -600,15 +600,17 @@ async def test_when_the_provider_is_down_the_answer_is_real_and_says_so(
     await _score(session, user_id, {ScoreDimension.FINANCIAL_LITERACY: 0.0})
 
     response = await client.post(
-        COACH, json={"message": "Nima qilishim kerak?", "language": "en"}, headers=auth_headers
+        COACH, json={"message": "What should I do next?", "language": "en"}, headers=auth_headers
     )
 
     assert response.status_code == 200
     body = response.json()
+    # `generated: false` is what the page shows its limited-mode notice from;
+    # the message no longer says it a second time.
     assert body["generated"] is False
     # Not an error card: it quotes her real score and a real course.
     assert "Development Score" in body["message"]
-    assert "unavailable" in body["message"]
+    assert "unavailable" not in body["message"]
     assert body["next_step"] is not None
     assert body["next_step"]["id"] == str(program.id)
 

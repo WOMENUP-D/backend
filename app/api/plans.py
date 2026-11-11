@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep
@@ -17,7 +17,7 @@ from app.schemas.plan import (
     PlanItemUpdate,
     PlanRead,
 )
-from app.services import plan_service, telemetry
+from app.services import ai_limits, plan_service, telemetry
 from app.services.plan_service import accept_plan, generate_plan
 from app.services.scoring import is_baseline_assessment
 
@@ -26,9 +26,18 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 
 @router.post("/generate", response_model=PlanRead, status_code=status.HTTP_201_CREATED)
 async def generate(
-    payload: PlanGenerateRequest, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+    payload: PlanGenerateRequest,
+    user: CurrentUserDep,
+    session: DbSession,
+    actor: TrackerDep,
+    request: Request,
 ) -> DevelopmentPlan:
-    """Draft a roadmap. It stays inactive until the user accepts it."""
+    """Draft a roadmap. It stays inactive until the user accepts it.
+
+    Each draft is a long model call, so it spends the same hourly AI quota as
+    the assistant (I-05) — taken first, because the counter commits.
+    """
+    await ai_limits.take(session, request, uuid.UUID(user.id))
     plan = await generate_plan(
         session,
         user_id=uuid.UUID(user.id),
