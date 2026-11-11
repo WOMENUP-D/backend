@@ -100,6 +100,9 @@ class DiagnosticResult(BaseModel):
     # Version 3: what she told us about herself — situation, goals (primary
     # first), interests, self-rated skills, difficulties, learning preferences.
     profile: dict | None = None
+    # True when an answer (hea.q17 "often unable to cope") calls for a gentle
+    # support card with approved resources. Not a verdict, not a flag.
+    support_suggested: bool = False
 
 
 class DiagnosticHistoryItem(BaseModel):

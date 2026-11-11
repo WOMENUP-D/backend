@@ -43,7 +43,7 @@ from app.models.plan import DevelopmentPlan
 from app.models.profile import Goal, Profile
 from app.models.program import Enrollment, Program
 from app.models.user import User
-from app.services import ai_navigator, rag
+from app.services import ai_navigator, rag, safety
 from app.services import skills as skill_service
 from app.services.age_gate import (
     HEALTH_SCOPE,
@@ -107,6 +107,9 @@ class Persona:
     completed: list[str] = field(default_factory=list)
     plan_progress: int | None = None
     personalised: bool = False
+    #: Signed in, whether or not she consented to personalisation. A woman who
+    #: is signed in must never be told to sign in (C-28).
+    signed_in: bool = False
 
     @property
     def is_minor(self) -> bool:
@@ -114,12 +117,20 @@ class Persona:
 
     def as_prompt(self) -> str:
         """The persona block handed to the model. No direct identifiers."""
+        if not self.personalised and self.signed_in:
+            return (
+                "READER PROFILE: not available — she IS signed in, but has not "
+                "turned on AI personalisation, so you may not use her profile. "
+                "Answer generally. Never ask her to sign in or to create an "
+                "account. You may mention once that she can turn on "
+                'personalisation in the assistant settings ("Yordamchini '
+                'sozlash") to get advice specific to her.'
+            )
         if not self.personalised:
             return (
-                "READER PROFILE: not available — she is either not signed in or "
-                "has not consented to AI personalisation. Answer generally, and "
-                "mention once that signing in and completing her profile makes "
-                "the advice specific to her."
+                "READER PROFILE: not available — she is a guest who has not "
+                "signed in. Answer generally, and mention once that signing up "
+                "and completing her profile makes the advice specific to her."
             )
 
         lines = [
@@ -185,6 +196,9 @@ class AssistantAnswer:
     is_uncertain: bool = False
     route: str = "education"
     guest_questions_left: int | None = None
+    #: Approved help lines, set only on a safety reply — rendered as a
+    #: separate call card rather than buried in the text.
+    resources: list[dict] = field(default_factory=list)
 
 
 async def build_persona(
@@ -217,7 +231,7 @@ async def build_persona(
     # The age band is a safety input, so it is derived even without consent —
     # it decides what may be *withheld*, never what is disclosed to anyone.
     if not await has_consent(session, user_id, ConsentScope.AI_PERSONALISATION):
-        return Persona(band=band, language=language)
+        return Persona(band=band, language=language, signed_in=True)
 
     goals = list(
         (
@@ -274,6 +288,7 @@ async def build_persona(
         completed=[title(p) for e, p in enrolments if e.status is EnrollmentStatus.COMPLETED],
         plan_progress=plan.progress_percent if plan else None,
         personalised=True,
+        signed_in=True,
     )
 
 
@@ -368,6 +383,13 @@ async def education_detail(
     gateway = gateway or llm_gateway
     persona = persona or await build_persona(session, user_id, language=language)
     lang = language or persona.language
+
+    # Both strings come from the client and both would reach the prompt, so
+    # both pass the safety gate before anything else (I-03).
+    if safety.is_disclosure(question, answer_so_far):
+        return await _escalate(
+            session, user_id, AssistantSection.EDUCATION, persona, f"{question}\n{answer_so_far}"
+        )
 
     catalogue, index = await _catalogue(session, lang)
     content = (
@@ -619,6 +641,7 @@ async def ask(
             next_actions=list(found.suggested_actions)[:3],
             confidence=found.confidence,
             is_uncertain=found.is_uncertain,
+            resources=list(found.resources),
             sources=[
                 {
                     "document_title": source.document_title,
@@ -705,19 +728,37 @@ async def _escalate(
     persona: Persona,
     question: str,
 ) -> AssistantAnswer:
+    """The safety reply. No model, no routing, no retrieval.
+
+    A signed-in woman gets a coordinator signal (risk flag, notification,
+    audit row) and is told so; a guest is told honestly that nothing was
+    passed on. The trace keeps the category, never her words (I-16).
+    """
+    category = safety.detect(question) or safety.SafetyCategory.PHYSICAL_VIOLENCE
+    trace_id = uuid.uuid4().hex
+    outcome = await safety.escalate(
+        session,
+        user_id=user_id,
+        category=category,
+        surface=_feature(section),
+        language=persona.language,
+        trace_id=trace_id,
+        minor=persona.is_minor and persona.band is not AgeBand.UNKNOWN,
+    )
     answer = AssistantAnswer(
-        answer=_ESCALATION[persona.language if persona.language in _ESCALATION else "uz"],
+        answer=outcome.text,
         section=section,
-        trace_id=uuid.uuid4().hex,
+        trace_id=trace_id,
         personalised=persona.personalised,
         escalated=True,
         escalation_reason="safety_topic_detected",
+        resources=outcome.resources,
     )
     await _record(
         session,
         user_id,
         section,
-        question,
+        safety.redacted(category),
         answer,
         None,
         model="guardrail",
@@ -775,23 +816,6 @@ _OUT_OF_SCOPE = {
         "This topic is not meant for your age. Please talk to a parent, an adult "
         "you trust, or a doctor — they can answer it properly. I can help with "
         "healthy habits, sleep, food and how you are feeling."
-    ),
-}
-
-_ESCALATION = {
-    "uz": (
-        "Bu savol bo'yicha sizga tirik mutaxassis yordam berishi kerak. "
-        "Murojaatingizni koordinatorga yubordim. Agar xavf ostida bo'lsangiz, "
-        "zudlik bilan 1146 ishonch telefoniga murojaat qiling."
-    ),
-    "ru": (
-        "С этим вопросом вам должен помочь живой специалист. Я передала "
-        "обращение координатору. Если вы в опасности, срочно позвоните на "
-        "телефон доверия 1146."
-    ),
-    "en": (
-        "A real specialist should help you with this. I have passed your message "
-        "to a coordinator. If you are in danger, call the 1146 helpline now."
     ),
 }
 

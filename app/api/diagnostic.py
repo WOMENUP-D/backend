@@ -200,6 +200,7 @@ async def _result(session: DbSession, user_id: uuid.UUID, attempt: Assessment) -
         goals=list(attempt.goals or []),
         family_focus=attempt.family_focus,
         profile=attempt.profile,
+        support_suggested=await diagnostic.support_suggested(session, attempt),
     )
 
 

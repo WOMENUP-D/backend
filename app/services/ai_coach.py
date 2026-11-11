@@ -85,8 +85,8 @@ from app.services import events as event_service
 from app.services import opportunities as opportunity_service
 from app.services import portfolio as portfolio_service
 from app.services import practice as practice_service
-from app.services import rag
 from app.services import recommendation as engine
+from app.services import safety
 from app.services import skills as skill_service
 from app.services.audit_service import has_consent
 from app.services.llm_gateway import LlmResponse, LlmUnavailableError, llm_gateway
@@ -1247,16 +1247,36 @@ async def answer(
 
     # Safety before the model, as everywhere else in the AI layer: a disclosure
     # of violence or self-harm goes to a person and is never a prompt.
-    if rag.needs_human_escalation(question):
+    category = safety.detect(question)
+    if category is not None:
+        trace_id = uuid.uuid4().hex
+        outcome = await safety.escalate(
+            session,
+            user_id=user_id,
+            category=category,
+            surface=f"assistant_{AssistantSection.COACH.value}",
+            language=context.language,
+            trace_id=trace_id,
+        )
         reply = CoachReply(
-            message=_ESCALATION.get(context.language, _ESCALATION["uz"]),
-            trace_id=uuid.uuid4().hex,
+            message=outcome.text,
+            trace_id=trace_id,
             personalised=context.personalised,
             escalated=True,
             escalation_reason="safety_topic_detected",
             generated=False,
+            resources=outcome.resources,
         )
-        await _record(session, user_id, question, reply, None, model="guardrail")
+        # Her words are not kept for a safety row — only the category (I-16).
+        await _record(
+            session,
+            user_id,
+            safety.redacted(category),
+            reply,
+            None,
+            model="guardrail",
+            prompt_version="safety-filter",
+        )
         return reply
 
     content = (
@@ -1376,6 +1396,7 @@ async def _record(
     response: LlmResponse | None,
     *,
     model: str | None = None,
+    prompt_version: str | None = None,
 ) -> None:
     """Persist the trace, as section 06 requires of every AI answer."""
     session.add(
@@ -1383,7 +1404,8 @@ async def _record(
             user_id=user_id,
             feature=f"assistant_{AssistantSection.COACH.value}",
             model_version=model or (response.model if response else "unavailable"),
-            prompt_version=(response.prompt_version if response else "coach-fallback"),
+            prompt_version=prompt_version
+            or (response.prompt_version if response else "coach-fallback"),
             trace_id=reply.trace_id,
             prompt_excerpt=llm_gateway.sanitise(question)[:500],
             response_excerpt=llm_gateway.sanitise(reply.message)[:2000],
@@ -1399,23 +1421,6 @@ async def _record(
     )
     await session.flush()
 
-
-_ESCALATION = {
-    "uz": (
-        "Bu savol bo'yicha sizga tirik mutaxassis yordam berishi kerak. "
-        "Murojaatingizni koordinatorga yubordim. Agar xavf ostida bo'lsangiz, "
-        "zudlik bilan 1146 ishonch telefoniga murojaat qiling."
-    ),
-    "ru": (
-        "С этим вопросом вам должен помочь живой специалист. Я передала "
-        "обращение координатору. Если вы в опасности, срочно позвоните на "
-        "телефон доверия 1146."
-    ),
-    "en": (
-        "A real specialist should help you with this. I have passed your message "
-        "to a coordinator. If you are in danger, call the 1146 helpline now."
-    ),
-}
 
 #: The deterministic answer, sentence by sentence. Kept here rather than in the
 #: message catalogue because it is composed server-side from her records; the

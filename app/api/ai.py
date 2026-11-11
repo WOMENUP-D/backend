@@ -33,7 +33,7 @@ from app.schemas.ai import (
 from app.schemas.common import Message
 from app.schemas.recommendation import RecommendationsRead
 from app.schemas.week import WeekRead
-from app.services import ai_limits, plan_service, rag, telemetry
+from app.services import ai_limits, plan_service, rag, safety, telemetry
 from app.services.ai_navigator import answer as navigator_answer
 from app.services.recommendation import recommendations_for
 from app.services.scoring import is_baseline_assessment
@@ -56,7 +56,9 @@ async def ask_navigator(
     Answers come only from approved sources. High-risk topics are routed to a
     human without reaching the model.
     """
-    await ai_limits.take(session, request, uuid.UUID(user.id))
+    # Safety before quotas: a disclosure is answered whatever the limit says.
+    if not safety.is_disclosure(payload.message):
+        await ai_limits.take(session, request, uuid.UUID(user.id))
     answer = await navigator_answer(
         session,
         question=payload.message,

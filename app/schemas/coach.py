@@ -243,6 +243,8 @@ class CoachReply(BaseModel):
     generated: bool = True
     next_step: CoachReference | None = None
     references: list[CoachReference] = []
+    # Approved help lines on a safety reply: {id, phone, tel, label}.
+    resources: list[dict] = []
 
 
 class CoachAsk(BaseModel):

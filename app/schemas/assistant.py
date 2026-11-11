@@ -85,6 +85,9 @@ class AssistantReply(BaseModel):
     is_uncertain: bool = False
     route: str = "education"
     guest_questions_left: int | None = None
+    # Approved help lines on a safety reply: {id, phone, tel, label}. Empty
+    # on every other answer. Rendered as a call card (tel: link).
+    resources: list[dict] = []
 
 
 class AssistantProfile(BaseModel):

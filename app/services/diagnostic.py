@@ -124,6 +124,14 @@ URGENCY_ANSWERS: dict[ScoreDimension, tuple[str, dict[str, float]]] = {
     D.FINANCIAL_LITERACY: ("fin.q10", {"a": 75.0}),
 }
 
+#: Answers after which the result shows a gentle, non-diagnostic support card
+#: (D-23). Only a pointer to help — it never changes a score, a priority or her
+#: access, and raises no flag: an answer about stress is not a disclosure.
+SUPPORT_ANSWERS: dict[str, frozenset[str]] = {
+    # "I often feel unable to cope" with stress and overload.
+    "hea.q17": frozenset({"a"}),
+}
+
 #: Q19 options. "f" — the topic is not relevant to her right now.
 FAMILY_NOT_RELEVANT = "f"
 #: Which family programmes to put first for the topic she chose.
@@ -878,3 +886,16 @@ async def next_steps(
         )
         picked.steps.append(step)
     return picked.steps
+
+
+async def support_suggested(session: AsyncSession, attempt: Assessment) -> bool:
+    """Whether her answers call for the support card on the result page."""
+    rows = await session.execute(
+        select(AssessmentQuestion.code, AssessmentAnswer.raw_answer)
+        .join(AssessmentQuestion, AssessmentAnswer.question_id == AssessmentQuestion.id)
+        .where(
+            AssessmentAnswer.assessment_id == attempt.id,
+            AssessmentQuestion.code.in_(list(SUPPORT_ANSWERS)),
+        )
+    )
+    return any(set((raw or "").split(",")) & SUPPORT_ANSWERS[code] for code, raw in rows if code)
