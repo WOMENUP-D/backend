@@ -2,6 +2,6 @@
 useDefault = true
 
 [[allowlists]]
-description = "Known non-secret password used only by password-auth tests"
+description = "Known non-secret passwords used only by password-auth and password-reset tests"
 regexTarget = "match"
-regexes = ['''olma-daraxti-2026''']
+regexes = ['''olma-daraxti-2026''', '''yangi-parol-2026''']

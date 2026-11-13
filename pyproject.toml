@@ -65,6 +65,8 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 
 [tool.uv]
+# Wait a week before taking newly published releases (semgrep uv-missing-dependency-cooldown).
+exclude-newer = "7 days"
 # Transitive (firebase-admin -> google-api-core). 1.44.0 carries
 # GHSA-xcq7-p3pf-p88h; held at the patched release.
 constraint-dependencies = ["opentelemetry-api>=1.45.1"]
