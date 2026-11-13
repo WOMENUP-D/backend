@@ -44,10 +44,12 @@ class Program(UUIDMixin, TimestampMixin, Base):
     category: Mapped[ProgramCategory] = mapped_column(
         str_enum(ProgramCategory, 40), nullable=False, index=True
     )
-    format: Mapped[ProgramFormat] = mapped_column(
+    #: How the course is delivered. Nullable: a partner platform that does not
+    #: say leaves it empty rather than the card claiming "video".
+    format: Mapped[ProgramFormat | None] = mapped_column(
         str_enum(ProgramFormat, 20),
         default=ProgramFormat.VIDEO,
-        nullable=False,
+        nullable=True,
     )
     language: Mapped[Language] = mapped_column(
         str_enum(Language, 5),

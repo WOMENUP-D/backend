@@ -36,11 +36,18 @@ from app.schemas.assistant import (
     OnboardingIn,
 )
 from app.schemas.coach import CoachAsk, CoachContextRead, CoachReply
-from app.services import ai_assistant, ai_coach, ai_limits, profile_completeness, telemetry
+from app.services import (
+    ai_assistant,
+    ai_coach,
+    ai_limits,
+    profile_completeness,
+    safety,
+    telemetry,
+)
 from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
-from app.services.uzbek import convert_if_uzbek
+from app.services.uzbek import convert_if_uzbek, question_language
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -119,12 +126,53 @@ def _guest_left(key: str) -> int:
     return max(0, ai_assistant.guest_allowance() - len(hits))
 
 
+async def _spend(
+    session, request: Request, user_id: uuid.UUID | None, guest_id: str | None, *texts: str
+) -> int | None:
+    """Take the AI limits and the guest allowance — unless this is a safety
+    disclosure.
+
+    A safety reply never calls the model, and a woman disclosing violence must
+    get the help text whatever her quota says: she is not refused with "your
+    trial questions are over" (I-02). So the gate runs first, here, before
+    anything is counted.
+    """
+    if safety.is_disclosure(*texts):
+        return None if user_id is not None else _guest_left(_guest_key(request, guest_id))
+    await ai_limits.take(session, request, user_id)
+    if user_id is None:
+        return _guest_take(_guest_key(request, guest_id))
+    return None
+
+
+def _uz(value, language: str | None):
+    """Every text a reply carries, in the reformed alphabet when it is Uzbek —
+    not only `answer`: the chips, cards and roadmap are model text too (G-14)."""
+    if isinstance(value, str):
+        return convert_if_uzbek(value, language)
+    if isinstance(value, list):
+        return [_uz(item, language) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: (item if key in _VERBATIM_KEYS else _uz(item, language))
+            for key, item in value.items()
+        }
+    return value
+
+
+#: Identifiers inside card dicts that must never be transliterated.
+_VERBATIM_KEYS = frozenset({"id", "slug", "category", "program_ids", "chunk_id"})
+
+
 def _reply(
     answer: AssistantAnswer, guest_left: int | None, language: str | None = None
 ) -> AssistantReply:
     # Uzbek leaves in the reformed alphabet, whichever one the model wrote.
+    # The answer may be in the question's language rather than the page's;
+    # an undeclared language is converted only when the text is evidently Uzbek.
+    language = None if language and _declared_other(answer.answer, language) else language
     return AssistantReply(
-        answer=convert_if_uzbek(answer.answer, language),
+        answer=_uz(answer.answer, language),
         section=answer.section,
         kind=answer.kind,
         trace_id=answer.trace_id,
@@ -132,16 +180,26 @@ def _reply(
         escalated=answer.escalated,
         escalation_reason=answer.escalation_reason,
         see_a_doctor=answer.see_a_doctor,
-        professions=answer.professions,
-        roadmap=answer.roadmap,
-        next_actions=answer.next_actions,
-        programs=answer.programs,
-        sources=answer.sources,
+        professions=_uz(answer.professions, language),
+        roadmap=_uz(answer.roadmap, language),
+        next_actions=_uz(answer.next_actions, language),
+        programs=_uz(answer.programs, language),
+        sources=_uz(answer.sources, language),
         confidence=answer.confidence,
         is_uncertain=answer.is_uncertain,
         route=answer.route,
         guest_questions_left=guest_left,
+        resources=answer.resources,
+        degraded=answer.degraded,
     )
+
+
+def _declared_other(text: str, language: str) -> bool:
+    """Whether a reply is plainly in another language than the page's — a
+    Russian or English question on the Uzbek site is now answered in its own
+    language, and English must not be run through the Uzbek converter."""
+    spoken = question_language(text)
+    return spoken is not None and spoken != language.lower().split("-", 1)[0]
 
 
 @router.post("/ask", response_model=AssistantReply)
@@ -154,10 +212,7 @@ async def ask(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """The one door. Portal documentation, career advice or health — routed."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask(
         session,
@@ -165,6 +220,7 @@ async def ask(
         question=payload.message,
         language=payload.language,
         route=payload.route,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "ask"}
@@ -212,18 +268,23 @@ async def coach_ask(
     the model is called and resolved again afterwards, so a reference that
     reaches the browser is one the database holds.
     """
-    await ai_limits.take(session, request, uuid.UUID(user.id))
+    if not safety.is_disclosure(payload.message):
+        await ai_limits.take(session, request, uuid.UUID(user.id))
     reply = await ai_coach.answer(
         session,
         user_id=uuid.UUID(user.id),
         question=payload.message,
         language=payload.language,
         opportunity_id=payload.opportunity_id,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "coach"}
     )
-    reply.message = convert_if_uzbek(reply.message, payload.language)
+    language = payload.language
+    if language and _declared_other(reply.message, language):
+        language = None
+    reply.message = convert_if_uzbek(reply.message, language)
     await session.commit()
     return reply
 
@@ -238,13 +299,14 @@ async def education(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Choosing a profession, learning one, or picking up a craft."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_education(
-        session, user_id=user_id, question=payload.message, language=payload.language
+        session,
+        user_id=user_id,
+        question=payload.message,
+        language=payload.language,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "education"}
@@ -265,7 +327,8 @@ async def education_detail(
     A second call rather than a bigger first one: the cards are most of the
     output tokens, and folding them in made the visible reply four times slower.
     """
-    await ai_limits.take(session, request, user_id)
+    if not safety.is_disclosure(payload.message, payload.answer):
+        await ai_limits.take(session, request, user_id)
     answer = await ai_assistant.education_detail(
         session,
         user_id=user_id,
@@ -273,6 +336,7 @@ async def education_detail(
         answer_so_far=payload.answer,
         kind=payload.kind,
         language=payload.language,
+        history=payload.history,
     )
     await session.commit()
     return _reply(answer, None, payload.language)
@@ -288,13 +352,14 @@ async def health(
     x_guest_id: Annotated[str | None, Header()] = None,
 ) -> AssistantReply:
     """Age-appropriate health information. Never a diagnosis."""
-    await ai_limits.take(session, request, user_id)
-    guest_left = None
-    if user_id is None:
-        guest_left = _guest_take(_guest_key(request, x_guest_id))
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
 
     answer = await ai_assistant.ask_health(
-        session, user_id=user_id, question=payload.message, language=payload.language
+        session,
+        user_id=user_id,
+        question=payload.message,
+        language=payload.language,
+        history=payload.history,
     )
     await telemetry.record_event(
         session, name="ai_assistant_used", actor=actor, properties={"section": "health"}

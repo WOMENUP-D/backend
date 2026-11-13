@@ -90,6 +90,10 @@ class DiagnosticResult(BaseModel):
     completed_at: datetime | None
     is_baseline: bool
     overall: int = Field(ge=0, le=100)
+    #: Her score now — the attempt plus what finished courses and tasks have
+    #: added since (`/assessments/score` composite, rounded). The cabinet shows
+    #: this one; `overall` is what the diagnostic itself measured (D-20).
+    current_overall: int | None = Field(default=None, ge=0, le=100)
     level: Level
     dimensions: list[DimensionResult]
     strongest: list[ScoreDimension]
@@ -100,6 +104,9 @@ class DiagnosticResult(BaseModel):
     # Version 3: what she told us about herself — situation, goals (primary
     # first), interests, self-rated skills, difficulties, learning preferences.
     profile: dict | None = None
+    # True when an answer (hea.q17 "often unable to cope") calls for a gentle
+    # support card with approved resources. Not a verdict, not a flag.
+    support_suggested: bool = False
 
 
 class DiagnosticHistoryItem(BaseModel):

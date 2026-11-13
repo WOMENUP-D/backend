@@ -204,14 +204,14 @@ async def record_event(
     """Record one step the browser saw. Names outside the list are refused."""
     if payload.name not in telemetry.CLIENT_EVENTS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"reason": "unknown_event"},
         )
     try:
         entity_type, entity_id = telemetry.clean_entity(payload.entity_type, payload.entity_id)
     except telemetry.EventRejected:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"reason": "invalid_entity"}
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"reason": "invalid_entity"}
         ) from None
 
     visitor_id = _visitor(response, wu_vid)

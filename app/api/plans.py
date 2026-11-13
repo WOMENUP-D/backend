@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep
+from app.core.constants import PlanItemStatus
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.schemas.common import Message
 from app.schemas.plan import (
@@ -17,18 +19,26 @@ from app.schemas.plan import (
     PlanItemUpdate,
     PlanRead,
 )
-from app.services import plan_service, telemetry
+from app.services import ai_limits, plan_service, telemetry
 from app.services.plan_service import accept_plan, generate_plan
-from app.services.scoring import is_baseline_assessment
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
 
 @router.post("/generate", response_model=PlanRead, status_code=status.HTTP_201_CREATED)
 async def generate(
-    payload: PlanGenerateRequest, user: CurrentUserDep, session: DbSession, actor: TrackerDep
+    payload: PlanGenerateRequest,
+    user: CurrentUserDep,
+    session: DbSession,
+    actor: TrackerDep,
+    request: Request,
 ) -> DevelopmentPlan:
-    """Draft a roadmap. It stays inactive until the user accepts it."""
+    """Draft a roadmap. It stays inactive until the user accepts it.
+
+    Each draft is a long model call, so it spends the same hourly AI quota as
+    the assistant (I-05) — taken first, because the counter commits.
+    """
+    await ai_limits.take(session, request, uuid.UUID(user.id))
     plan = await generate_plan(
         session,
         user_id=uuid.UUID(user.id),
@@ -54,11 +64,8 @@ async def read_active(user: CurrentUserDep, session: DbSession) -> DevelopmentPl
     )
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active plan")
-    # Plans drafted before this rule existed may still carry an open "sit the
-    # diagnostic" step for a woman who has long since sat it; reading the plan
-    # settles it, so the roadmap she sees is the one the records support.
-    if not await is_baseline_assessment(session, uuid.UUID(user.id)):
-        await plan_service.close_diagnostic_items(session, uuid.UUID(user.id))
+    # Read-only: a "sit the diagnostic" step is settled when the diagnostic
+    # is submitted and when a plan is accepted (`plan_service.accept_plan`).
     return plan
 
 
@@ -112,14 +119,27 @@ async def update_item(
     if plan is None or plan.user_id != uuid.UUID(user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
-    from datetime import UTC, datetime
+    # A draft is read-only until she accepts it: ticks on a draft carried into
+    # the accepted plan as progress she never made (QA audit D-16).
+    if not plan.is_active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="plan_not_active")
 
-    from app.core.constants import PlanItemStatus
+    changes = payload.model_dump(exclude_unset=True)
+    if "due_date" in changes and changes["due_date"] is not None:
+        start = (plan.accepted_at or plan.created_at).date()
+        last = start + timedelta(days=plan_service.HORIZON_DAYS[plan.horizon])
+        if not date.today() <= changes["due_date"] <= last:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="due_date_out_of_range"
+            )
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in changes.items():
         setattr(item, field, value)
-    if item.status == PlanItemStatus.DONE and item.completed_at is None:
-        item.completed_at = datetime.now(UTC)
+    if item.status == PlanItemStatus.DONE:
+        if item.completed_at is None:
+            item.completed_at = datetime.now(UTC)
+    else:
+        item.completed_at = None
 
     await session.flush()
     return item

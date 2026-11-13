@@ -8,9 +8,13 @@ session of the account; "sign out everywhere" does the same on request.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
+from sqlalchemy import update
 
 from app.core.config import settings
+from app.models.auth_token import RevokedToken
 
 API = "/api/v1"
 REGISTER = {
@@ -57,7 +61,7 @@ async def test_a_client_that_cannot_hold_cookies_may_ask_for_the_body(client):
 
 
 @pytest.mark.asyncio
-async def test_the_cookie_alone_refreshes_and_rotates(client):
+async def test_the_cookie_alone_refreshes_and_rotates(client, session):
     await client.post(f"{API}/auth/register", json={"email": "rotate@example.uz", **REGISTER})
     first_cookie = client.cookies.get(settings.auth_cookie_name)
     assert first_cookie
@@ -72,6 +76,11 @@ async def test_the_cookie_alone_refreshes_and_rotates(client):
     # The spent cookie is refused — and, because a token used twice has been
     # in two hands, so is the new one: every session of the account ends.
     client.cookies.clear()
+    # Past the reuse grace (C-01) — two tabs within it both get a pair.
+    await session.execute(
+        update(RevokedToken).values(created_at=datetime.now(UTC) - timedelta(seconds=120))
+    )
+    await session.commit()
 
     def present(value: str) -> dict[str, str]:
         return {"Cookie": f"{settings.auth_cookie_name}={value}"}
@@ -100,7 +109,7 @@ async def test_signing_out_clears_the_cookie_and_kills_the_session(client):
     headers = {"Authorization": f"Bearer {access}"}
 
     out = await client.post(f"{API}/auth/logout", headers=headers)
-    assert out.status_code == 200
+    assert out.status_code == 204
     cleared = _cookie_header(out)
     assert cleared.startswith(f"{settings.auth_cookie_name}=")
     assert "Max-Age=0" in cleared or "expires=" in cleared.lower()
@@ -167,15 +176,17 @@ async def test_an_account_is_held_after_too_many_wrong_passwords_from_anywhere(c
             )
         ).status_code == 401
     # The third attempt — with the *right* password — is held: the account,
-    # not the address, has used up its allowance. Same message as a wrong
-    # password, so the hold does not confirm the account exists.
+    # not the address, has used up its allowance. She is told so (C-08); the
+    # counter is per address whether or not an account exists, so the answer
+    # confirms nothing.
     held = await client.post(
         f"{API}/auth/login",
         json={"email": "held@example.uz", "password": REGISTER["password"]},
         headers={"X-Forwarded-For": "203.0.113.99"},
     )
-    assert held.status_code == 401
-    assert held.json()["detail"] == "invalid email or password"
+    assert held.status_code == 429
+    assert held.json()["detail"] == "account_locked"
+    assert int(held.headers["Retry-After"]) > 0
 
 
 @pytest.mark.asyncio

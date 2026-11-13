@@ -376,12 +376,17 @@ async def applications(
     user: CurrentUserDep,
     session: DbSession,
     listing_id: uuid.UUID | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[OrgApplicationRead]:
-    """Applications to its own listings, and to no others."""
+    """Applications to its own listings, and to no others — newest first,
+    a page at a time (`limit`, `offset`)."""
     org, _ = await _member(session, user, org_id)
     return [
         _application_read(found)
-        for found in await employer.applications(session, org, opportunity_id=listing_id)
+        for found in await employer.applications(
+            session, org, opportunity_id=listing_id, limit=limit, offset=offset
+        )
     ]
 
 

@@ -113,6 +113,44 @@ class Settings(BaseSettings):
     # whatever addresses the guesses come from. Desk accounts tighter.
     login_failures_per_hour: int = 20
     staff_login_failures_per_hour: int = 10
+    # Per address, counted in the database. Password sign-in and the desk
+    # door count failures, Google sign-in counts failures, registration counts
+    # every attempt — six accounts per address per five minutes, so the
+    # endpoint cannot farm accounts while a class registering together in one
+    # room is only slowed, not stopped.
+    login_ip_failures_per_minute: int = 8
+    staff_login_ip_failures_per_minute: int = 5
+    google_ip_failures_per_minute: int = 15
+    register_ip_limit: int = 6
+    register_ip_window_seconds: int = 300
+    # Password reset by e-mail: requests per address and per mailbox an hour.
+    password_reset_ip_per_hour: int = 20
+    password_reset_identifier_per_hour: int = 3
+    password_reset_ttl_minutes: int = 60
+    # A refresh token presented again within this many seconds of being
+    # rotated gets a fresh pair instead of ending every session: two tabs
+    # loading at once both present the same cookie. Outside the window a
+    # reuse is a replay and still revokes the whole account.
+    refresh_reuse_grace_seconds: int = 30
+    # Where the web app lives, for links in messages (the password-reset
+    # link). Empty falls back to the first CORS origin.
+    frontend_url: str | None = None
+    # Proxies whose `X-Forwarded-For` is believed: the connecting peer must be
+    # one of these networks before any forwarded address is read. Loopback and
+    # private ranges by default — the ingress reaches the API over a private
+    # network. A request from anywhere else is keyed on its own address.
+    trusted_proxies: Annotated[list[str], NoDecode] = [
+        "127.0.0.0/8",
+        "::1/128",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "fc00::/7",
+    ]
+    # A header the edge sets with the visitor's address (`CF-Connecting-IP`
+    # behind Cloudflare). Read only from a trusted proxy; empty uses
+    # `X-Forwarded-For`.
+    client_ip_header: str | None = None
 
     # --- Localisation --------------------------------------------------
     default_language: Literal["uz", "ru", "en"] = "uz"
@@ -123,6 +161,13 @@ class Settings(BaseSettings):
     ai_model: str = "claude-opus-5"
     ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     ai_max_tokens: int = 16000
+    # The SDK default is a ten-minute timeout with two retries, so one stuck
+    # call could hold a request for half an hour. Every call is now bounded;
+    # interactive answers (assistant, coach, navigator) by the tighter figure,
+    # after which they degrade to rules or quoted sources instead of spinning.
+    ai_timeout_seconds: float = 120.0
+    ai_interactive_timeout_seconds: float = 50.0
+    ai_max_retries: int = 1
     # How many assistant questions someone gets before signing up. Enough to
     # see what it is, not enough to use it as a free service.
     assistant_guest_questions: int = 3
@@ -199,6 +244,10 @@ class Settings(BaseSettings):
     commerce_base_url: str | None = None
     commerce_client_id: str | None = None
     commerce_client_secret: str | None = None
+
+    # Key for the per-partner pseudonymous ids (`womanup_id`). Optional: it is
+    # derived from JWT_SECRET_KEY when empty, which ties the ids to that key.
+    partner_pseudonym_key: str | None = None
 
     integration_timeout_seconds: float = 15.0
     integration_max_retries: int = 3
@@ -322,6 +371,9 @@ class Settings(BaseSettings):
     # (the trace — model, prompt version, id — stays); spent one-time codes
     # and expired throttle rows go after a day.
     ai_trace_retention_days: int = 180
+    # Health questions are sensitive data: their excerpts go sooner (I-16).
+    # Safety rows never hold her words at all — only a category code.
+    ai_sensitive_trace_retention_days: int = 30
     otp_retention_hours: int = 24
     # The largest request body the API accepts. Nothing here uploads files;
     # the biggest legitimate body is a partner's listing batch.
@@ -360,6 +412,7 @@ class Settings(BaseSettings):
         "news_ingest_allowed_domains",
         "hh_search_queries",
         "allowed_hosts",
+        "trusted_proxies",
         mode="before",
     )
     @classmethod
@@ -382,6 +435,12 @@ class Settings(BaseSettings):
         return bool(
             self.firebase_project_id and self.firebase_client_email and self.firebase_private_key
         )
+
+    @property
+    def public_web_url(self) -> str:
+        """The web app's origin, without a trailing slash."""
+        base = self.frontend_url or (self.cors_origins[0] if self.cors_origins else "")
+        return (base or "http://localhost:3000").rstrip("/")
 
     @property
     def is_production(self) -> bool:

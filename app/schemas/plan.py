@@ -24,6 +24,10 @@ class PlanItemRead(ORMModel):
     # Set only for a course hosted elsewhere; the step links straight to it.
     program_url: str | None = None
     opportunity_id: uuid.UUID | None = None
+    # True when she marks the step done herself ("Bajardim" / "Ötkazib
+    # yuboraman"); false for a step on one of our courses, which closes itself.
+    self_report: bool = True
+    completed_at: datetime | None = None
 
 
 class PlanItemUpdate(BaseModel):

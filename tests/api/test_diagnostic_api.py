@@ -69,9 +69,9 @@ async def test_questions_come_in_order_without_their_scores(client, session, aut
     response = await client.get(f"{BASE}/questions", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == 3
+    assert body["version"] == 4
     codes = [q["code"] for q in body["questions"]]
-    assert codes[0] == "pro.q1" and codes[-1] == "lea.q22" and len(codes) == 26
+    assert codes[0] == "pro.q1" and codes[-1] == "lea.q23" and len(codes) == 35
     for question in body["questions"]:
         for option in question["options"]:
             assert set(option) == {"id", "label_i18n"}
@@ -105,7 +105,8 @@ async def test_an_attempt_is_scored_on_the_server(client, session, auth_headers,
     }
     assert body["is_baseline"] is True
     assert len(body["growth"]) == 3
-    assert len(body["strongest"]) == 2
+    # Every dimension at 0: no strength is claimed (QA audit D-03).
+    assert body["strongest"] == []
     assert not set(body["strongest"]) & {g["dimension"] for g in body["growth"]}
     assert 1 <= len(body["next_steps"]) <= 3
     assert body["goals"] == ["find_job"]
@@ -287,3 +288,103 @@ async def test_a_new_diagnostic_starts_from_its_own_measurement(
     assert await _current(session, user_id, ScoreDimension.EMPLOYMENT) == 50.0
     # …and the CV can count again on top of the new reading.
     assert await score_progress.on_cv_updated(session, user_id=user_id)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("readiness", "kind"), [("a", "build_cv"), ("d", "add_cv_to_profile")])
+async def test_her_answer_about_a_cv_is_believed(
+    client, session, auth_headers, user_id, readiness, kind
+):
+    """QA audit D-05: "I have a CV" no longer leads to "write a CV"."""
+    session.add(User(id=user_id, phone=_phone()))
+    questions = await _instrument(session)
+    by_id = {q.id: q.code for q in questions}
+    payload = _payload(questions, "a")
+    for answer in payload["answers"]:
+        if by_id[uuid.UUID(answer["question_id"])] == "car.q5":
+            answer["option_ids"] = [readiness]
+    response = await client.post(f"{BASE}/attempt", json=payload, headers=auth_headers)
+    assert response.status_code == 201
+    career = [s for s in response.json()["next_steps"] if s["dimension"] == "employment"]
+    assert career and career[0]["kind"] == kind
+
+
+@pytest.mark.asyncio
+async def test_the_result_carries_the_current_score_beside_the_measured_one(
+    client, session, auth_headers, user_id
+):
+    """QA audit D-20: the cabinet's 26 and the result's 25 are two numbers."""
+    session.add(User(id=user_id, phone=_phone()))
+    questions = await _instrument(session)
+    response = await client.post(
+        f"{BASE}/attempt", json=_payload(questions, "c"), headers=auth_headers
+    )
+    body = response.json()
+    assert body["overall"] == 50
+    assert body["current_overall"] == 50
+    score = (await client.get("/api/v1/assessments/score", headers=auth_headers)).json()
+    # The plan starts from the diagnostic's priorities, and the score says so.
+    assert score["focus_dimensions"] == [g["dimension"] for g in body["growth"]]
+
+
+@pytest.mark.asyncio
+async def test_options_stored_the_way_migration_0039_wrote_them_still_have_words(
+    client, session, auth_headers
+):
+    """0039 stored v3 option words under `label`; the API read `label_i18n`,
+    so every database built by migrations served blank options."""
+    for row in diagnostic.question_rows(diagnostic.load_bank()):
+        row["options"] = [
+            {("label" if k == "label_i18n" else k): v for k, v in o.items()} for o in row["options"]
+        ]
+        session.add(AssessmentQuestion(**row))
+    await session.flush()
+    body = (await client.get(f"{BASE}/questions", headers=auth_headers)).json()
+    options = [o for q in body["questions"] for o in q["options"]]
+    assert options and all(o["label_i18n"].get("uz") for o in options)
+
+
+@pytest.mark.asyncio
+async def test_the_0040_label_rename_fixes_the_rows_and_is_idempotent(session):
+    """The migration's data fix, run on rows as 0039 wrote them — twice."""
+    import importlib.util
+    from pathlib import Path
+
+    from sqlalchemy import text
+
+    spec = importlib.util.spec_from_file_location(
+        "m0040", Path("alembic/versions/0040_qa_catalogue_diagnostic.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    old = AssessmentQuestion(
+        version=3,
+        code="edu.q1",
+        order_index=1,
+        question_type="single_choice",
+        text_i18n={"uz": "Savol"},
+        options=[{"id": "a", "score": 0, "value": 0, "label": {"uz": "Javob"}}],
+        meta={},
+        weight=1.0,
+        is_active=True,
+    )
+    new = AssessmentQuestion(
+        version=4,
+        code="edu.q1",
+        order_index=1,
+        question_type="single_choice",
+        text_i18n={"uz": "Savol"},
+        options=[{"id": "a", "value": 0, "label_i18n": {"uz": "Yangi"}}],
+        meta={},
+        weight=1.0,
+        is_active=True,
+    )
+    session.add_all([old, new])
+    await session.flush()
+    for _ in range(2):
+        await session.execute(text(module.RENAME_LABELS))
+    await session.refresh(old)
+    await session.refresh(new)
+    assert old.options == [{"id": "a", "score": 0, "value": 0, "label_i18n": {"uz": "Javob"}}]
+    assert new.options == [{"id": "a", "value": 0, "label_i18n": {"uz": "Yangi"}}]

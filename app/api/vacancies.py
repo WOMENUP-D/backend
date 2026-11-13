@@ -60,7 +60,7 @@ def _one_of(value: str | None, allowed: tuple[str, ...], name: str) -> str | Non
         return None
     if value not in allowed:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"{name} must be one of {', '.join(allowed)}",
         )
     return value
@@ -118,7 +118,7 @@ async def search(
     provider = get_provider()
     if len(category) > 10 or len(pick) > len(PICKS):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="too many categories or picks",
         )
     role_ids: list[str] = []
@@ -131,7 +131,7 @@ async def search(
             group = groups.get(category_id)
             if group is None:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=f"unknown category {category_id!r}",
                 )
             role_ids.extend(group.role_ids)

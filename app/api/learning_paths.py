@@ -173,7 +173,12 @@ async def enroll_through_path(
             detail="Finish the earlier required programmes in this path first",
         )
 
-    enrollment = await learning.enroll(session, user_id=user_id, program_id=program_id)
+    try:
+        enrollment = await learning.enroll(session, user_id=user_id, program_id=program_id)
+    except learning.ExternalCourseError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="external_course"
+        ) from None
     if enrollment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
 

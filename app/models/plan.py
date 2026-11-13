@@ -62,10 +62,13 @@ class DevelopmentPlan(UUIDMixin, TimestampMixin, Base):
 
     @property
     def progress_percent(self) -> int:
-        if not self.items:
+        """Done over the steps she kept: a step she removed (skipped) is not
+        one she failed to do, so it never holds the plan below 100 % (D-16)."""
+        kept = [item for item in self.items if item.status != PlanItemStatus.SKIPPED]
+        if not kept:
             return 0
-        done = sum(1 for item in self.items if item.status == PlanItemStatus.DONE)
-        return round(done * 100 / len(self.items))
+        done = sum(1 for item in kept if item.status == PlanItemStatus.DONE)
+        return round(done * 100 / len(kept))
 
 
 class PlanItem(UUIDMixin, TimestampMixin, Base):
@@ -106,6 +109,14 @@ class PlanItem(UUIDMixin, TimestampMixin, Base):
     # Loaded with the item, so a step can link straight to the course's own
     # site without a second round trip from the page.
     program: Mapped[Program | None] = relationship(lazy="selectin", viewonly=True)
+
+    @property
+    def self_report(self) -> bool:
+        """Whether she marks this step done herself. A step on one of our own
+        courses closes when the course is finished; everything else — a step
+        with no course, a course on another site — has no other way to close
+        (QA audit D-02)."""
+        return self.program is None or self.program.external_url is not None
 
     @property
     def program_url(self) -> str | None:

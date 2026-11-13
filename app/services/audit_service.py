@@ -44,6 +44,31 @@ async def record_audit(
     )
 
 
+async def record_staff_action(
+    session: AsyncSession,
+    actor,
+    *,
+    action: str,
+    entity_type: str,
+    entity_id: str | None = None,
+    changes: dict | None = None,
+    classification: DataClassification = DataClassification.INTERNAL,
+) -> None:
+    """The audit row for something a desk account did — who, in which role,
+    to what. `actor` is the request's `CurrentUser`. Insert-only, like every
+    audit row; `changes` names what changed, never personal values."""
+    await record_audit(
+        session,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        actor_id=uuid.UUID(str(actor.id)),
+        actor_role=actor.role.value,
+        classification=classification,
+        changes=changes,
+    )
+
+
 async def record_consent(
     session: AsyncSession,
     *,

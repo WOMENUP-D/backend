@@ -17,6 +17,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.constants import Language, Role, UserStatus
@@ -124,11 +125,25 @@ async def app_client() -> AsyncIterator[AsyncClient]:
 
 
 @pytest_asyncio.fixture
-async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
-    """Database-backed client sharing the test's transaction."""
+async def client(session: AsyncSession, request) -> AsyncIterator[AsyncClient]:
+    """Database-backed client sharing the test's transaction.
+
+    A token authenticates only an account that exists, so a test using the
+    `auth_headers` fixture gets a row for `user_id` before its first request
+    — unless the test opened that account itself.
+    """
     app = create_app()
+    fixture_user = (
+        request.getfixturevalue("user_id") if "auth_headers" in request.fixturenames else None
+    )
 
     async def override_session() -> AsyncIterator[AsyncSession]:
+        if fixture_user is not None and await session.get(User, fixture_user) is None:
+            await session.execute(
+                pg_insert(User)
+                .values(id=fixture_user, language=Language.UZ, status=UserStatus.PENDING)
+                .on_conflict_do_nothing()
+            )
         yield session
 
     app.dependency_overrides[get_session] = override_session

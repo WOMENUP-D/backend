@@ -23,7 +23,7 @@ failure a reader would see.
 
 What this is not: a guarantee. `VERDICT_MARKERS` is keyword matching across
 three languages and will both miss and over-trigger, exactly as
-`age_gate.ADULT_HEALTH_TOPICS` and `rag.ESCALATION_KEYWORDS` already do.
+`age_gate.ADULT_HEALTH_TOPICS` and `safety` lexicons already do.
 Over-triggering costs a post that waits for an editor. Missing costs more. It
 is a floor under the prompt, not a substitute for one.
 """
@@ -353,7 +353,7 @@ def publication_gate(post: NewsPost, analysis: Analysis) -> list[str]:
         # Uzbek is the primary locale. A post the portal cannot show in it is
         # not finished, whatever else it got right.
         blocked.append("missing_primary_locale")
-    if rag.needs_human_escalation(text):
+    if rag.mentions_safety_topic(text):
         blocked.append("safety_topic")
     if any(marker in folded for marker in VERDICT_MARKERS):
         blocked.append("reads_as_a_verdict")
@@ -683,7 +683,7 @@ async def ingest_news(
         # the drafting prompt is filtered first — the same keyword filter the
         # navigator runs before retrieval — so a story about violence never
         # becomes a generative prompt.
-        if rag.needs_human_escalation(f"{hit.title}\n{page.title}\n{page.text}"):
+        if rag.mentions_safety_topic(f"{hit.title}\n{page.title}\n{page.text}"):
             logger.info("news ingest: candidate trips the escalation filter; dropped")
             continue
 

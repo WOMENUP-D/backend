@@ -112,3 +112,9 @@ def test_where_she_studies_or_works_is_asked_beside_her_education():
     # Kept apart from the question ids, so it can never become required.
     assert detail["id"] not in {q["id"] for q in questionnaire.QUESTIONS}
     assert derive({"workplace": " 45-maktab "})["workplace"] == "45-maktab"
+
+
+def test_the_payload_states_how_many_questions_there_are():
+    """QA audit D-21: the lead quoted 18 over a 17-question bank."""
+    body = questionnaire.payload()
+    assert body["total"] == len(body["questions"])

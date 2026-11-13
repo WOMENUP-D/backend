@@ -389,7 +389,7 @@ async def programmes(session: AsyncSession, org: Organization) -> list[Program]:
     rows = await session.execute(
         select(Program)
         .where(Program.organization_id == org.id, Program.is_published.is_(True))
-        .order_by(Program.published_at.desc().nullslast())
+        .order_by(Program.published_at.desc().nullslast(), Program.id)
     )
     return list(rows.scalars())
 

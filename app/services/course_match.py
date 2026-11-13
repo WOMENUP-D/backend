@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import operators
 
@@ -49,16 +49,18 @@ from app.models.profile import Profile
 from app.models.program import Enrollment, Program
 from app.models.skill import Skill
 from app.models.user import User
+from app.services import catalogue_rules
 from app.services import recommendation as engine
 from app.services import skills as skill_service
 from app.services.age_gate import age_from_profile
 from app.services.diagnostic import GOAL_LEGACY
 from app.services.llm_gateway import LlmGateway, LlmUnavailableError, llm_gateway
+from app.services.uzbek import to_new_alphabet
 
 logger = logging.getLogger(__name__)
 
 FEATURE = "diagnostic_courses"
-PROMPT_VERSION = "course-match-1"
+PROMPT_VERSION = "course-match-2"
 RECOMMENDATION_VERSION = 1
 MAX_CANDIDATES = 24
 MAX_COURSES = 8
@@ -395,6 +397,19 @@ def spread(
     return chosen
 
 
+def suits(program: Program, learner: Learner, covers: list[Need]) -> bool:
+    """Whether a course is a fair offer for her level.
+
+    A course for working professionals is offered only when she rated
+    herself at work level (3 of 0–4) in the field it belongs to.
+    """
+    title = " ".join(str(t) for t in (program.title_i18n or {}).values())
+    if not catalogue_rules.PROFESSIONAL_ONLY.search(title):
+        return True
+    bands = [level_band(learner, need) for need in covers]
+    return any(band is not None and band >= HELD_LEVEL for band in bands)
+
+
 async def candidates_for(session: AsyncSession, learner: Learner) -> list[Candidate]:
     gaps = learner.gaps
     if not gaps:
@@ -407,10 +422,17 @@ async def candidates_for(session: AsyncSession, learner: Learner) -> list[Candid
     ]
     if not clauses:
         return []
+    # Her language first, then a stable order: the pool is capped, and an
+    # order Postgres may shuffle made the cap an arbitrary sample.
+    language_first = (
+        case((Program.language == learner.language, 0), else_=1)
+        if learner.language is not None
+        else literal(0)
+    )
     rows = await session.execute(
         select(Program)
         .where(Program.is_published.is_(True), or_(*clauses))
-        .order_by(Program.published_at.desc().nullslast())
+        .order_by(language_first, Program.published_at.desc().nullslast(), Program.id)
         .limit(CANDIDATE_POOL)
     )
     programs = [
@@ -429,7 +451,7 @@ async def candidates_for(session: AsyncSession, learner: Learner) -> list[Candid
     for program in programs:
         keys = {index.key(t) for t in (program.skills_taught or []) if t and t.strip()}
         covers = [by_slug[k] for k in keys if k in by_slug]
-        if not covers:
+        if not covers or not suits(program, learner, covers):
             continue
         off_topic = sum(1 for k in keys if not k.startswith("label:") and k not in on_topic)
         # The same course under two spellings of its title is one course.
@@ -492,6 +514,11 @@ Rules you must follow:
 - Write every text in all three languages: Uzbek in the reformed Latin
   alphabet (ö, ğ, ş, ç), Russian, English. Warm, concrete, second person,
   no flattery, no promises about jobs or income. Keep each text short.
+- Address her formally in every language: "Siz" in Uzbek, "Вы" in Russian —
+  never "sen" or "ты". Every letter of an Uzbek word is Latin (no Cyrillic
+  letter, no ü, ı or ñ).
+- Do not assume which languages she can read: say what language a course is
+  taught in, never that it "is accessible to you".
 """
 
 SCHEMA: dict[str, Any] = {
@@ -630,7 +657,11 @@ LANGS = ("uz", "ru", "en")
 
 
 def _i18n(payload: dict, prefix: str) -> dict[str, str]:
-    return {lang: str(payload.get(f"{prefix}_{lang}") or "").strip() for lang in LANGS}
+    """The model's three texts; the Uzbek one repaired into the reformed
+    alphabet, whatever the model actually wrote (G-14)."""
+    out = {lang: str(payload.get(f"{prefix}_{lang}") or "").strip() for lang in LANGS}
+    out["uz"] = to_new_alphabet(out["uz"])
+    return out
 
 
 def _program_line(candidate: Candidate) -> str:

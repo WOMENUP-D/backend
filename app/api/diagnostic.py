@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -33,7 +33,8 @@ from app.schemas.diagnostic import (
 )
 from app.schemas.program import ProgramRead
 from app.schemas.skill import SkillRef
-from app.services import course_match, diagnostic, telemetry
+from app.services import ai_limits, course_match, diagnostic, telemetry
+from app.services.scoring import composite_score
 
 router = APIRouter(prefix="/diagnostic", tags=["diagnostic"])
 
@@ -59,7 +60,7 @@ async def questions(user: CurrentUserDep, session: DbSession) -> DiagnosticQuest
                 show_if=(q.meta or {}).get("show_if"),
                 max_length=(q.meta or {}).get("max_length"),
                 options=[
-                    DiagnosticOption(id=o["id"], label_i18n=o.get("label_i18n") or {})
+                    DiagnosticOption(id=o["id"], label_i18n=diagnostic.option_label(o))
                     for o in q.options
                     if "id" in o
                 ],
@@ -93,7 +94,7 @@ async def submit_attempt(
         )
     except diagnostic.DiagnosticError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": error.code, "message": error.detail, "items": error.items},
         ) from None
     if created:
@@ -174,6 +175,7 @@ async def _result(session: DbSession, user_id: uuid.UUID, attempt: Assessment) -
         completed_at=attempt.completed_at,
         is_baseline=attempt.is_baseline,
         overall=overall,
+        current_overall=round(composite_score(current)) if current else None,
         level=diagnostic.level_for(overall),
         dimensions=[
             DimensionResult(
@@ -200,6 +202,7 @@ async def _result(session: DbSession, user_id: uuid.UUID, attempt: Assessment) -
         goals=list(attempt.goals or []),
         family_focus=attempt.family_focus,
         profile=attempt.profile,
+        support_suggested=await diagnostic.support_suggested(session, attempt),
     )
 
 
@@ -221,12 +224,16 @@ async def read_recommendations(
 
 @router.post("/recommendations/refresh", response_model=DiagnosticRecommendation)
 async def refresh_recommendations(
-    user: CurrentUserDep, session: DbSession, attempt_id: uuid.UUID | None = None
+    user: CurrentUserDep,
+    session: DbSession,
+    request: Request,
+    attempt_id: uuid.UUID | None = None,
 ) -> DiagnosticRecommendation:
     """Build the recommendation again — after she enrolled, finished a course,
     or added skills to her profile. Counted as an expensive request, since
-    it queues another turn of the model."""
+    it queues another turn of the model, and it spends the hourly AI quota."""
     user_id = uuid.UUID(user.id)
+    await ai_limits.take(session, request, user_id)
     attempt = await _attempt_of(session, user_id, attempt_id)
     await course_match.recommend(session, attempt)
     await session.commit()
@@ -258,6 +265,18 @@ async def _recommendation(
         ).scalars()
     }
     gap_names = {g["slug"]: g.get("name_i18n") or {} for g in stored.get("gaps") or []}
+    # A covered skill is always named in three languages: from the stored gaps,
+    # else from the taxonomy — never the bare slug (QA audit G-10).
+    unnamed = sorted(
+        {
+            slug
+            for item in stored.get("courses") or []
+            for slug in item.get("covers") or []
+            if not gap_names.get(slug)
+        }
+    )
+    if unnamed:
+        gap_names.update(await course_match.skill_names(session, unnamed))
     courses = []
     for item in stored.get("courses") or []:
         program = programs.get(item["program_id"])

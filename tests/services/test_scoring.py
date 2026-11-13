@@ -43,3 +43,28 @@ def test_target_closes_part_of_the_gap_and_never_exceeds_100():
     assert default_target(40.0) == 60.0
     assert default_target(100.0) == 100.0
     assert default_target(99.0) <= 100.0
+
+
+async def test_a_reached_target_is_replaced_by_the_next_one(session):
+    """QA audit D-13: the target froze at the first reading and read "75 → 33"."""
+    import uuid
+
+    from app.models.assessment import Assessment
+    from app.models.user import User
+    from app.services.scoring import persist_scores
+
+    user_id = uuid.uuid4()
+    session.add(User(id=user_id, email=f"{user_id.hex[:10]}@example.com"))
+    await session.flush()
+    attempt = Assessment(user_id=user_id, version=4)
+    session.add(attempt)
+    await session.flush()
+    first = attempt.id
+    [record] = await persist_scores(session, user_id, first, {ScoreDimension.EMPLOYMENT: 0.0})
+    assert record.target == default_target(0.0)
+    [record] = await persist_scores(session, user_id, first, {ScoreDimension.EMPLOYMENT: 75.0})
+    assert record.baseline == 0.0
+    assert record.target == default_target(75.0) > 75.0
+    # A reading below the target leaves it where it is.
+    [record] = await persist_scores(session, user_id, first, {ScoreDimension.EMPLOYMENT: 60.0})
+    assert record.target == default_target(75.0)

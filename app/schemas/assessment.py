@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.constants import DimensionBand, ScoreDimension
 from app.schemas.common import ORMModel
@@ -22,6 +22,17 @@ class QuestionRead(ORMModel):
     question_type: str
     text_i18n: dict
     options: list
+
+    @field_validator("options")
+    @classmethod
+    def options_carry_label_i18n(cls, value: list) -> list:
+        """Rows written by migration 0039 call the words `label`."""
+        return [
+            {**o, "label_i18n": o.get("label_i18n") or o.get("label") or {}}
+            if isinstance(o, dict)
+            else o
+            for o in value or []
+        ]
 
 
 class AnswerSubmit(BaseModel):
@@ -50,6 +61,11 @@ class DevelopmentScoreRead(BaseModel):
     assessment_id: uuid.UUID | None = None
     measured_at: datetime | None = None
     weakest_dimensions: list[ScoreDimension] = []
+    #: Where her plan starts: the top priorities of her latest diagnostic —
+    #: need, goals, skill gaps and urgency — which is what the plan uses.
+    #: Not the same as the lowest scores; say "the plan starts here" only of
+    #: these (QA audit D-14).
+    focus_dimensions: list[ScoreDimension] = []
 
 
 class AnswerInsight(BaseModel):

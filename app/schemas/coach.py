@@ -23,6 +23,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from app.core.constants import ProficiencyLevel, ScoreDimension, SkillStatus
+from app.schemas.assistant import HistoryTurn
 from app.schemas.event import EventCard
 from app.schemas.recommendation import NextStep, OpportunitySuggestion
 from app.schemas.skill import SkillGapRead, SkillRef
@@ -243,6 +244,8 @@ class CoachReply(BaseModel):
     generated: bool = True
     next_step: CoachReference | None = None
     references: list[CoachReference] = []
+    # Approved help lines on a safety reply: {id, phone, tel, label}.
+    resources: list[dict] = []
 
 
 class CoachAsk(BaseModel):
@@ -256,3 +259,5 @@ class CoachAsk(BaseModel):
     message: str = Field(min_length=2, max_length=1000)
     language: str | None = Field(default=None, max_length=8)
     opportunity_id: uuid.UUID | None = None
+    #: The recent turns, trimmed on the server (see `services.conversation`).
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=50)

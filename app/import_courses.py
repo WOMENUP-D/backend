@@ -22,6 +22,7 @@ import asyncio
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.constants import Language, ProgramCategory, ProgramFormat
 from app.db import SessionLocal, engine
 from app.models.program import Program
+from app.services import catalogue_rules
 
 #: Anything else in a record is ignored; these five have to be there.
 REQUIRED = ("source", "external_id", "title", "url", "category")
@@ -69,27 +71,39 @@ def clean(record: dict, index: int) -> dict:
     title = record["title"].strip()[:300]
     summary = (record.get("summary") or "").strip()[:600]
 
-    # Only skills the course names outright. The recommender ranks on "how much
-    # of this she does not know yet", so an invented skill sends her somewhere
-    # she did not ask to go — an empty list is the honest answer.
+    # Only skills the course names outright: the file's own list, or — when
+    # it gives none — the taxonomy skills the title names word for word. The
+    # recommender ranks on "how much of this she does not know yet", so an
+    # invented skill sends her somewhere she did not ask to go.
     skills = [
         str(skill).strip()[:80] for skill in (record.get("skills") or []) if str(skill).strip()
-    ]
+    ] or catalogue_rules.tags_for(title)
+
+    excluded = catalogue_rules.exclusion_for(record, title)
+    stated_format = record.get("format")
+    try:
+        program_format = ProgramFormat(stated_format) if stated_format else None
+    except ValueError as exc:
+        raise ImportError_(f"record {index}: unknown format {stated_format!r}") from exc
 
     return {
         "slug": slug_for(record["source"], str(record["external_id"])),
-        # The title stays in the language it is taught in — translating a course
-        # name would invent a course that does not exist under that name.
-        "title_i18n": {"uz": title, "ru": title, "en": title},
-        "description_i18n": ({"uz": summary, "ru": summary, "en": summary} if summary else {}),
-        "category": category,
+        # The title stays in the language it is taught in, under that
+        # language only: translating a course name would invent a course,
+        # and filing a Russian or English title under "uz" had the Uzbek
+        # alphabet converter rewrite it ("Engliş", "Maçine Learning").
+        "title_i18n": {language.value: title},
+        "description_i18n": ({language.value: summary} if summary else {}),
+        "category": catalogue_rules.category_for(category, title),
         "language": language,
-        "format": ProgramFormat.VIDEO,
+        # The platforms do not say whether a course is video or text; the
+        # card says nothing rather than claim "video".
+        "format": program_format,
         "provider": (record.get("provider") or record["source"]).strip()[:200],
         "skills_taught": skills[:8],
         "external_url": url,
         "source": record["source"].strip()[:40],
-        "is_published": True,
+        "is_published": excluded is None,
     }
 
 
@@ -99,7 +113,11 @@ async def load(session: AsyncSession, records: list[dict]) -> tuple[int, int]:
     for row in records:
         existing = await session.scalar(select(Program).where(Program.slug == row["slug"]))
         if existing is None:
-            session.add(Program(**row))
+            # Published "now" for ordering: a NULL published_at left the
+            # catalogue order to chance (QA audit B-07).
+            session.add(
+                Program(**row, published_at=datetime.now(UTC) if row["is_published"] else None)
+            )
             added += 1
             continue
         if existing.source is None:
@@ -108,6 +126,8 @@ async def load(session: AsyncSession, records: list[dict]) -> tuple[int, int]:
             continue
         for field, value in row.items():
             setattr(existing, field, value)
+        if existing.is_published and existing.published_at is None:
+            existing.published_at = existing.created_at or datetime.now(UTC)
         updated += 1
     await session.flush()
     return added, updated

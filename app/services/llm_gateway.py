@@ -29,7 +29,7 @@ from app.core.logging import scrub_pii
 logger = logging.getLogger(__name__)
 
 # Bump when any system prompt below changes — persisted with every interaction.
-PROMPT_VERSION = "2026.10.2"
+PROMPT_VERSION = "2026.11.2"
 
 # Pinned tool versions. Both are the _20260209 generation, which carries its
 # own dynamic filtering: `code_execution` must NOT be declared beside them, or
@@ -128,7 +128,11 @@ class LlmGateway:
                 "ANTHROPIC_API_KEY is not configured; the AI layer is disabled"
             )
         if self._client is None:
-            self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
+            self._client = anthropic.AsyncAnthropic(
+                api_key=self._api_key,
+                timeout=settings.ai_timeout_seconds,
+                max_retries=settings.ai_max_retries,
+            )
         return self._client
 
     async def _send(self, request: dict[str, Any], trace_id: str) -> Any:
@@ -162,6 +166,7 @@ class LlmGateway:
         cache_system: bool = True,
         tools: list[dict[str, Any]] | None = None,
         max_resumes: int = 0,
+        timeout: float | None = None,
     ) -> LlmResponse:
         """One request/response round-trip.
 
@@ -178,6 +183,10 @@ class LlmGateway:
 
         The system prompt is marked cacheable: it is long, identical across
         users, and sits before the volatile per-user content in the prefix.
+
+        `timeout` (seconds) bounds this one call below the client-wide
+        `ai_timeout_seconds`; a timeout surfaces as `LlmUnavailableError`, so
+        every caller's degraded path covers it.
         """
         if json_schema is not None and _tools_emit_citations(tools):
             raise ValueError(
@@ -209,6 +218,8 @@ class LlmGateway:
             }
         if tools:
             request["tools"] = tools
+        if timeout is not None:
+            request["timeout"] = timeout
 
         turns: list[dict[str, Any]] = list(messages)
         blocks: list[Any] = []

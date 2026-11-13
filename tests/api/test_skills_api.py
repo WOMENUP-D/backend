@@ -202,7 +202,11 @@ async def test_finishing_a_course_puts_a_learned_skill_on_her_profile(
     module = ProgramModule(program_id=program.id, order_index=0, title_i18n={"uz": "Modul"})
     session.add(module)
     enrollment = Enrollment(
-        user_id=user_id, program_id=program.id, status=EnrollmentStatus.IN_PROGRESS
+        user_id=user_id,
+        program_id=program.id,
+        status=EnrollmentStatus.IN_PROGRESS,
+        # A passed final assessment: a certificate needs one (QA audit B-06).
+        final_score=85.0,
     )
     session.add(enrollment)
     await session.flush()

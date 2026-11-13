@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.audit import AiInteraction
 from app.schemas.ai import NavigatorAnswer, SourceRef
-from app.services import rag
+from app.services import conversation, rag, safety
 from app.services.llm_gateway import (
     LlmGateway,
     LlmResponse,
@@ -18,39 +18,28 @@ from app.services.llm_gateway import (
     llm_gateway,
 )
 from app.services.prompts import NAVIGATOR_SCHEMA, NAVIGATOR_SYSTEM
+from app.services.uzbek import question_language
 
 logger = logging.getLogger(__name__)
 
-HUMAN_HANDOFF_TEXT = {
-    "uz": (
-        "Bu savol böyiça sizga tirik mutaxassis yordam berişi kerak. "
-        "Murojaatingizni koordinatorga yubordim — u siz bilan boğlanadi. "
-        "Agar xavf ostida bölsangiz, zudlik bilan 1146 işonç telefoniga murojaat qiling."
-    ),
-    "ru": (
-        "По этому вопросу вам должен помочь живой специалист. "
-        "Я передала обращение координатору — он свяжется с вами. "
-        "Если вы в опасности, немедленно позвоните на телефон доверия 1146."
-    ),
-    "en": (
-        "This question needs a human specialist. I have passed your request to a "
-        "coordinator who will contact you. If you are in danger, call the 1146 "
-        "helpline immediately."
-    ),
-}
+#: The model's own "this needs a person" — not the safety filter. Honest: it
+#: claims nothing was forwarded, and it is not a crisis text (I-15).
+HUMAN_HANDOFF_TEXT = safety.HANDOFF_TEXT
 
+#: Said whenever the answer is a quotation rather than a generated reply —
+#: because the key is off, the provider failed, or its reply was unusable.
 EXTRACTIVE_PREFIX = {
     "uz": (
-        "AI generatsiya rejimi yoqilmagan, şuning uçun tasdiqlangan manbadan "
-        "töğridan-töğri parça keltiraman:"
+        "AI yordamçi hozir cheklangan rejimda işlayapti, şuning uçun tasdiqlangan "
+        "manbadan töğridan-töğri parça keltiraman:"
     ),
     "ru": (
-        "Режим генерации ИИ не подключён, поэтому привожу фрагмент из "
-        "проверённого источника напрямую:"
+        "AI-помощник сейчас работает в ограниченном режиме, поэтому привожу "
+        "фрагмент из проверенного источника напрямую:"
     ),
     "en": (
-        "AI generation is not enabled, so here is the relevant passage from an "
-        "approved source, quoted directly:"
+        "The AI assistant is in limited mode right now, so here is the relevant "
+        "passage from an approved source, quoted directly:"
     ),
 }
 
@@ -71,6 +60,7 @@ async def answer(
     language: str = "uz",
     conversation_id: uuid.UUID | None = None,
     gateway: LlmGateway | None = None,
+    history: list | None = None,
 ) -> NavigatorAnswer:
     """Answer a portal question from approved sources only.
 
@@ -80,38 +70,31 @@ async def answer(
     gateway = gateway or llm_gateway
     lang = language if language in HUMAN_HANDOFF_TEXT else "uz"
 
-    if rag.needs_human_escalation(question):
-        result = NavigatorAnswer(
-            answer=HUMAN_HANDOFF_TEXT[lang],
-            confidence=1.0,
-            escalated_to_human=True,
-            escalation_reason="safety_topic_detected",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+    category = safety.detect(question)
+    if category is not None:
+        return await _safety_reply(
+            session, user_id=user_id, category=category, lang=lang, conversation_id=conversation_id
         )
-        await _record(
-            session,
-            user_id=user_id,
-            trace_id=result.trace_id,
-            model="guardrail",
-            prompt_version="safety-filter",
-            question=question,
-            answer=result.answer,
-            sources=[],
-            confidence=1.0,
-            escalated=True,
-        )
-        return result
+
+    # The question's own language, not the interface's: a Russian question
+    # typed on the Uzbek site is answered in Russian, from Russian sources.
+    lang = question_language(question) or lang
+    turns = conversation.clean(history)
 
     chunks = await rag.retrieve(session, question, language=lang)
-
-    if not chunks and lang != "uz":
-        # The knowledge base is authored in Uzbek, the primary locale. Rather
-        # than tell a Russian- or English-speaking user that nothing exists,
-        # fall back to the sources that do — the model is instructed to answer
-        # in her language regardless of the language of the source. Degrade,
+    if not chunks:
+        # Every edition of the knowledge base, in any language — the model is
+        # instructed to answer in her language regardless of the source's.
+        # This used to apply to ru/en only, so an Uzbek question whose answer
+        # existed only in another edition was told nothing exists. Degrade,
         # do not fail.
         chunks = await rag.retrieve(session, question, language=None)
+    if not chunks and turns:
+        # A bare follow-up ("and the certificate?") carries few words of its
+        # own; her previous question supplies the topic.
+        chunks = await rag.retrieve(
+            session, f"{conversation.last_user_text(turns)} {question}", language=None
+        )
 
     if not chunks:
         return NavigatorAnswer(
@@ -124,31 +107,15 @@ async def answer(
         )
 
     if not gateway.enabled:
-        # Extractive degradation: quote the best-matching approved source
-        # verbatim instead of generating. Nothing is invented, and the user
-        # still gets the information.
-        best = chunks[0]
-        return NavigatorAnswer(
-            answer=f"{EXTRACTIVE_PREFIX[lang]}\n\n{best.content.strip()}",
-            sources=[
-                SourceRef(
-                    document_id=chunk.document_id,
-                    document_title=chunk.document_title,
-                    chunk_id=chunk.chunk_id,
-                    score=chunk.score,
-                    excerpt=chunk.excerpt,
-                )
-                for chunk in chunks[:3]
-            ],
-            confidence=0.0,
-            is_uncertain=True,
-            escalation_reason="ai_disabled",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+        return await _extractive(
+            session, chunks, lang, question, user_id, conversation_id, reason="ai_disabled"
         )
 
     context = rag.build_context(chunks)
-    user_content = f"{context}\n\nUSER LANGUAGE: {lang}\nQUESTION: {gateway.sanitise(question)}"
+    user_content = (
+        f"{context}\n\n{conversation.as_prompt(turns)}"
+        f"USER LANGUAGE: {lang}\nQUESTION: {gateway.sanitise(question)}"
+    )
 
     try:
         response: LlmResponse = await gateway.complete(
@@ -156,16 +123,27 @@ async def answer(
             messages=[{"role": "user", "content": user_content}],
             json_schema=NAVIGATOR_SCHEMA,
             max_tokens=4000,
+            timeout=settings.ai_interactive_timeout_seconds,
         )
     except LlmUnavailableError as exc:
-        logger.warning("navigator fell back to uncertain: %s", exc)
-        return NavigatorAnswer(
-            answer=UNCERTAIN_TEXT[lang],
-            confidence=0.0,
-            is_uncertain=True,
-            escalation_reason="model_unavailable",
-            trace_id=uuid.uuid4().hex,
-            conversation_id=conversation_id,
+        # The sources were found; only the writer is missing. Quote them
+        # rather than claim nothing exists (which is what this used to say).
+        logger.warning("navigator fell back to extractive: %s", exc)
+        return await _extractive(
+            session, chunks, lang, question, user_id, conversation_id, reason="model_unavailable"
+        )
+
+    if response.parsed is None and not response.refused:
+        logger.warning("navigator produced no usable payload; quoting the source")
+        return await _extractive(
+            session,
+            chunks,
+            lang,
+            question,
+            user_id,
+            conversation_id,
+            reason="model_unavailable",
+            response=response,
         )
 
     payload = response.parsed or {}
@@ -176,6 +154,19 @@ async def answer(
     except TypeError, ValueError:
         confidence = 0.0
     needs_human = bool(payload.get("needs_human")) or response.refused
+    # The model's free-text reason never reaches the client (it once echoed
+    # "the user reports physical violence…" back to her). It is only read here,
+    # model-free, to tell a missed disclosure from an ordinary hand-off.
+    human_reason = str(payload.get("human_reason") or "")
+    if needs_human and safety.mentions_safety_topic(human_reason):
+        return await _safety_reply(
+            session,
+            user_id=user_id,
+            category=safety.detect(human_reason) or safety.SafetyCategory.PHYSICAL_VIOLENCE,
+            lang=lang,
+            conversation_id=conversation_id,
+            response=response,
+        )
     text = payload.get("answer") or UNCERTAIN_TEXT[lang]
 
     # Below the confidence floor the assistant says it does not know rather
@@ -203,7 +194,7 @@ async def answer(
         confidence=confidence,
         is_uncertain=is_uncertain,
         escalated_to_human=needs_human,
-        escalation_reason=payload.get("human_reason") if needs_human else None,
+        escalation_reason="needs_human" if needs_human else None,
         suggested_actions=list(payload.get("suggested_actions") or [])[:3],
         trace_id=response.trace_id,
         conversation_id=conversation_id,
@@ -224,6 +215,103 @@ async def answer(
         latency_ms=response.latency_ms,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
+    )
+    return result
+
+
+async def _safety_reply(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None,
+    category: safety.SafetyCategory,
+    lang: str,
+    conversation_id: uuid.UUID | None,
+    response: LlmResponse | None = None,
+) -> NavigatorAnswer:
+    """Fixed safety text, a coordinator signal for a signed-in user, and a
+    trace that keeps the category rather than her words."""
+    trace_id = response.trace_id if response else uuid.uuid4().hex
+    outcome = await safety.escalate(
+        session,
+        user_id=user_id,
+        category=category,
+        surface="navigator",
+        language=lang,
+        trace_id=trace_id,
+    )
+    result = NavigatorAnswer(
+        answer=outcome.text,
+        confidence=1.0,
+        escalated_to_human=True,
+        escalation_reason="safety_topic_detected",
+        trace_id=trace_id,
+        conversation_id=conversation_id,
+        resources=outcome.resources,
+    )
+    await _record(
+        session,
+        user_id=user_id,
+        trace_id=trace_id,
+        model=response.model if response else "guardrail",
+        prompt_version=response.prompt_version if response else "safety-filter",
+        question=safety.redacted(category),
+        answer=result.answer,
+        sources=[],
+        confidence=1.0,
+        escalated=True,
+        latency_ms=response.latency_ms if response else None,
+        input_tokens=response.input_tokens if response else None,
+        output_tokens=response.output_tokens if response else None,
+    )
+    return result
+
+
+async def _extractive(
+    session: AsyncSession,
+    chunks: list[rag.RetrievedChunk],
+    lang: str,
+    question: str,
+    user_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
+    *,
+    reason: str,
+    response: LlmResponse | None = None,
+) -> NavigatorAnswer:
+    """Extractive degradation: quote the best-matching approved source verbatim
+    instead of generating. Nothing is invented, and the user still gets the
+    information."""
+    best = chunks[0]
+    result = NavigatorAnswer(
+        answer=f"{EXTRACTIVE_PREFIX[lang]}\n\n{best.content.strip()}",
+        sources=[
+            SourceRef(
+                document_id=chunk.document_id,
+                document_title=chunk.document_title,
+                chunk_id=chunk.chunk_id,
+                score=chunk.score,
+                excerpt=chunk.excerpt,
+            )
+            for chunk in chunks[:3]
+        ],
+        confidence=0.0,
+        is_uncertain=True,
+        escalation_reason=reason,
+        trace_id=response.trace_id if response else uuid.uuid4().hex,
+        conversation_id=conversation_id,
+    )
+    await _record(
+        session,
+        user_id=user_id,
+        trace_id=result.trace_id,
+        model=response.model if response else "extractive",
+        prompt_version="navigator-extractive",
+        question=question,
+        answer=result.answer,
+        sources=[str(chunk.chunk_id) for chunk in chunks[:3]],
+        confidence=0.0,
+        latency_ms=response.latency_ms if response else None,
+        input_tokens=response.input_tokens if response else None,
+        output_tokens=response.output_tokens if response else None,
     )
     return result
 

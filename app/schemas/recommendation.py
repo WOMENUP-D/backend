@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.core.constants import (
     EnrollmentStatus,
+    Language,
     NextStepKind,
     OpportunityType,
     ProficiencyLevel,
@@ -34,6 +35,10 @@ class ProgramSuggestion(BaseModel):
     slug: str
     title_i18n: dict
     category: ProgramCategory
+    # The language it is taught in, for the card's language chip (G-09), and
+    # the partner site it lives on, when it is not ours.
+    language: Language | None = None
+    external_url: str | None = None
     duration_weeks: int | None = None
     has_certificate: bool = False
     skills_taught: list[SkillRef] = []

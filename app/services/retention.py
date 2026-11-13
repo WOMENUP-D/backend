@@ -53,6 +53,37 @@ async def purge(session: AsyncSession, *, now: datetime | None = None) -> Purged
     )
     out.ai_excerpts = result.rowcount or 0
 
+    # Sensitive rows go sooner: health questions after the shorter window,
+    # and any safety-filter row still holding text (written before the filter
+    # stored only a category) at once. Idempotent; the trace stays (I-16).
+    sensitive_cutoff = now - timedelta(days=max(1, settings.ai_sensitive_trace_retention_days))
+    result = await session.execute(
+        update(AiInteraction)
+        .where(
+            AiInteraction.feature == "assistant_health",
+            AiInteraction.created_at < sensitive_cutoff,
+            (AiInteraction.prompt_excerpt.is_not(None))
+            | (AiInteraction.response_excerpt.is_not(None)),
+        )
+        .values(prompt_excerpt=None, response_excerpt=None)
+    )
+    out.ai_excerpts += result.rowcount or 0
+    result = await session.execute(
+        update(AiInteraction)
+        .where(
+            (AiInteraction.prompt_version == "safety-filter")
+            # The Coach once labelled its guardrail rows "coach-fallback".
+            | (
+                (AiInteraction.model_version == "guardrail")
+                & (AiInteraction.prompt_version == "coach-fallback")
+            ),
+            AiInteraction.prompt_excerpt.is_not(None),
+            AiInteraction.prompt_excerpt.not_like("[safety:%"),
+        )
+        .values(prompt_excerpt=None)
+    )
+    out.ai_excerpts += result.rowcount or 0
+
     otp_cutoff = now - timedelta(hours=max(1, settings.otp_retention_hours))
     result = await session.execute(delete(OtpChallenge).where(OtpChallenge.created_at < otp_cutoff))
     out.otp_challenges = result.rowcount or 0

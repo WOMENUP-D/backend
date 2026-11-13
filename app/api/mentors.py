@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUserDep, DbSession, NationalStaffDep
 from app.models.mentor import MentorProfile, MentorSession
 from app.schemas.common import Message
+from app.services.audit_service import record_staff_action
 
 router = APIRouter(prefix="/mentors", tags=["mentors"])
 
@@ -114,7 +115,7 @@ async def leave_feedback(
 ) -> Message:
     if not 1 <= rating <= 5:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Rating must be between 1 and 5",
         )
 
@@ -155,4 +156,7 @@ async def verify_mentor(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mentor not found")
     mentor.is_verified = True
     mentor.verified_at = datetime.now(UTC)
+    await record_staff_action(
+        session, user, action="mentor.verify", entity_type="mentor", entity_id=str(mentor.id)
+    )
     return Message(detail="Mentor verified")

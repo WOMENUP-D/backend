@@ -595,3 +595,45 @@ async def test_a_model_that_keeps_failing_stops_being_waited_for(session):
     assert attempt.recommendation["ai_pending"] is False
     assert attempt.recommendation["mode"] == "rules"
     assert down.calls == cm.MODEL_TRIES
+
+
+# --- QA audit D-01: no interview drills or senior tracks for a beginner -------
+
+
+def _learner_with(levels: dict[str, int]):
+    import uuid as _uuid
+
+    from app.services.course_match import Learner
+
+    return Learner(
+        user_id=_uuid.uuid4(),
+        profile={},
+        language=None,
+        held=set(),
+        skill_levels=levels,
+        weak_dimensions=[],
+        finished=set(),
+        started=set(),
+        age=None,
+        region=None,
+    )
+
+
+def test_a_professional_course_is_offered_only_at_work_level():
+    from app.core.constants import ProgramCategory
+    from app.models.program import Program
+    from app.services.course_match import Need, suits
+
+    drill = Program(
+        slug="x",
+        title_i18n={"ru": "Сборник задач с собеседований программиста"},
+        category=ProgramCategory.DIGITAL_SKILLS,
+    )
+    basics = Program(
+        slug="y", title_i18n={"ru": "Поколение Python"}, category=ProgramCategory.DIGITAL_SKILLS
+    )
+    covers = [Need("programming", 2.0, "interest", "it_programming")]
+    assert not suits(drill, _learner_with({}), covers)
+    assert not suits(drill, _learner_with({"it": 1}), covers)
+    assert suits(drill, _learner_with({"it": 3}), covers)
+    assert suits(basics, _learner_with({}), covers)

@@ -40,6 +40,8 @@ class NavigatorAnswer(BaseModel):
     suggested_actions: list[str] = []
     trace_id: str
     conversation_id: uuid.UUID | None = None
+    # Approved help lines on a safety reply: {id, phone, tel, label}.
+    resources: list[dict] = []
 
 
 class NextStepCard(BaseModel):
