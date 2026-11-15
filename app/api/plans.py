@@ -5,11 +5,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep
-from app.core.constants import PlanItemStatus
+from app.core.constants import PlanItemStatus, normalise_language
 from app.models.plan import DevelopmentPlan, PlanItem
 from app.schemas.common import Message
 from app.schemas.plan import (
@@ -18,8 +18,9 @@ from app.schemas.plan import (
     PlanItemRead,
     PlanItemUpdate,
     PlanRead,
+    PlanTranslateRequest,
 )
-from app.services import ai_limits, plan_service, telemetry
+from app.services import ai_limits, plan_service, plan_translation, telemetry
 from app.services.plan_service import accept_plan, generate_plan
 
 router = APIRouter(prefix="/plans", tags=["plans"])
@@ -54,8 +55,16 @@ async def generate(
     return plan
 
 
+#: `?language=` on the reads: the locale she is reading the site in. A cached
+#: translation of the plan into it is applied; nothing is ever translated or
+#: written on a read (`POST /plans/{id}/translate` does that).
+LanguageQuery = Query(default=None, max_length=8, description="uz | uz-Cyrl | ru | en")
+
+
 @router.get("/active", response_model=PlanRead)
-async def read_active(user: CurrentUserDep, session: DbSession) -> DevelopmentPlan:
+async def read_active(
+    user: CurrentUserDep, session: DbSession, language: str | None = LanguageQuery
+) -> PlanRead:
     plan = await session.scalar(
         select(DevelopmentPlan).where(
             DevelopmentPlan.user_id == uuid.UUID(user.id),
@@ -66,17 +75,56 @@ async def read_active(user: CurrentUserDep, session: DbSession) -> DevelopmentPl
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active plan")
     # Read-only: a "sit the diagnostic" step is settled when the diagnostic
     # is submitted and when a plan is accepted (`plan_service.accept_plan`).
-    return plan
+    return plan_translation.localise(plan, normalise_language(language))
 
 
 @router.get("", response_model=list[PlanRead])
-async def list_plans(user: CurrentUserDep, session: DbSession) -> list[DevelopmentPlan]:
+async def list_plans(
+    user: CurrentUserDep, session: DbSession, language: str | None = LanguageQuery
+) -> list[PlanRead]:
     rows = await session.execute(
         select(DevelopmentPlan)
         .where(DevelopmentPlan.user_id == uuid.UUID(user.id))
         .order_by(DevelopmentPlan.created_at.desc())
     )
-    return list(rows.scalars())
+    lang = normalise_language(language)
+    return [plan_translation.localise(plan, lang) for plan in rows.scalars()]
+
+
+@router.post("/{plan_id}/translate", response_model=PlanRead)
+async def translate(
+    plan_id: uuid.UUID,
+    payload: PlanTranslateRequest,
+    user: CurrentUserDep,
+    session: DbSession,
+    request: Request,
+) -> PlanRead:
+    """Her plan in the language she is now reading the site in.
+
+    The plan is translated, never regenerated: her steps, dates and progress
+    stay as they are. Translated once per language and cached; a plan already
+    in that language, or already translated, costs nothing. A new translation
+    spends one answer of the hourly AI quota; when the quota is spent or the
+    model is unavailable the original comes back with
+    `translation_unavailable` instead of an error.
+    """
+    plan = await session.get(DevelopmentPlan, plan_id)
+    if plan is None or plan.user_id != uuid.UUID(user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    language = normalise_language(payload.language)
+    if language is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unsupported_language"
+        )
+    if language == plan.content_language or language in (plan.translations or {}):
+        return plan_translation.localise(plan, language)
+    try:
+        await ai_limits.take(session, request, uuid.UUID(user.id))
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_429_TOO_MANY_REQUESTS:
+            raise
+        return plan_translation.localise(plan, language, unavailable=True)
+    return await plan_translation.translate(session, plan, language, user_id=uuid.UUID(user.id))
 
 
 @router.post("/{plan_id}/accept", response_model=PlanRead)

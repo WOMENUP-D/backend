@@ -60,7 +60,7 @@ from app.schemas.recommendation import (
     TaskSuggestion,
 )
 from app.schemas.skill import SkillGapRead, SkillRef
-from app.services import eligibility
+from app.services import eligibility, plan_translation
 from app.services import learning_path as path_service
 from app.services import practice as practice_service
 from app.services import skills as skill_service
@@ -1093,7 +1093,9 @@ def next_steps(ctx: LearnerContext, limit: int = MAX_NEXT_STEPS) -> list[NextSte
                 reason=RecommendationReason.IN_YOUR_PLAN,
                 dimension=item.dimension,
                 plan_item_id=item.id,
-                text=item.action,
+                text=plan_translation.item_action(
+                    ctx.active_plan, item, ctx.language.value if ctx.language else None
+                ),
                 due_date=item.due_date,
                 program=(
                     _program_suggestion(
