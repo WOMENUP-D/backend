@@ -39,6 +39,13 @@ async def generate(
     Each draft is a long model call, so it spends the same hourly AI quota as
     the assistant (I-05) — taken first, because the counter commits.
     """
+    # No diagnostic, no plan — checked before the quota, so the refusal is free.
+    try:
+        await plan_service.require_diagnostic(session, uuid.UUID(user.id))
+    except plan_service.DiagnosticRequiredError as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="diagnostic_required"
+        ) from err
     await ai_limits.take(session, request, uuid.UUID(user.id))
     plan = await generate_plan(
         session,

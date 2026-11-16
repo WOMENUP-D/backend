@@ -204,6 +204,23 @@ async def discard_drafts(session: AsyncSession, user_id: uuid.UUID) -> int:
     return count
 
 
+class DiagnosticRequiredError(Exception):
+    """She has not sat the diagnostic, so there is nothing to build a plan on."""
+
+
+async def require_diagnostic(session: AsyncSession, user_id: uuid.UUID) -> None:
+    """A plan is built from her diagnostic; without one there is no plan.
+
+    Starter plans drafted before any assessment read as the platform having
+    judged her already, and the product decision is that the roadmap comes
+    after the diagnostic, not before it.
+    """
+    from app.services.scoring import is_baseline_assessment
+
+    if await is_baseline_assessment(session, user_id):
+        raise DiagnosticRequiredError
+
+
 async def generate_plan(
     session: AsyncSession,
     *,
@@ -218,6 +235,7 @@ async def generate_plan(
     Earlier drafts she never accepted are discarded first: one draft at a time.
     """
     gateway = gateway or llm_gateway
+    await require_diagnostic(session, user_id)
     await discard_drafts(session, user_id)
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
