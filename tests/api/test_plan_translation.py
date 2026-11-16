@@ -183,3 +183,49 @@ async def test_an_old_plan_is_recognised_by_its_script(session):
     assert plan.content_language == "ru"
     plan.title, plan.summary = "Reja", "Qisqa"
     assert plan.content_language == "uz"
+
+
+async def test_a_long_plan_is_translated_in_parallel_pieces(
+    client, session, auth_headers, user_id, monkeypatch
+):
+    session.add(User(id=user_id, phone=_phone()))
+    await session.flush()
+    plan = await _russian_plan(session, user_id)
+    for index in range(2, 12):
+        session.add(PlanItem(plan_id=plan.id, order_index=index, action=f"Шаг {index}"))
+    await session.flush()
+    await session.refresh(plan, ["items"])
+    calls = _fake_model(monkeypatch)
+
+    response = await client.post(
+        f"{API}/{plan.id}/translate", json={"language": "uz"}, headers=auth_headers
+    )
+    body = response.json()
+    assert body["translation_unavailable"] is False
+    assert len(body["items"]) == 12
+    assert all(item["action"].startswith("Qadam") for item in body["items"])
+    assert len(calls) == 3  # 12 steps, five per call
+    assert body["title"] == "6 oylik boşlanğiç yöl"
+
+
+async def test_a_reply_missing_a_step_is_not_cached(
+    client, session, auth_headers, user_id, monkeypatch
+):
+    session.add(User(id=user_id, phone=_phone()))
+    await session.flush()
+    plan = await _russian_plan(session, user_id)
+
+    async def complete(**kwargs):
+        parsed = {"title": "Reja", "summary": "", "items": []}
+        return LlmResponse(
+            text="{}", trace_id="t", model="m", prompt_version="p", latency_ms=1, parsed=parsed
+        )
+
+    monkeypatch.setattr(llm_gateway, "_api_key", "test-key", raising=False)
+    monkeypatch.setattr(llm_gateway, "complete", complete)
+    response = await client.post(
+        f"{API}/{plan.id}/translate", json={"language": "uz"}, headers=auth_headers
+    )
+    assert response.json()["translation_unavailable"] is True
+    await session.refresh(plan)
+    assert plan.translations == {}
