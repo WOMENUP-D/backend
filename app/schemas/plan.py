@@ -49,6 +49,13 @@ class PlanRead(ORMModel):
     items: list[PlanItemRead]
     progress_percent: int
     created_at: datetime
+    # The language the plan was written in, and the language of the text in
+    # this response — the same unless a cached translation was applied.
+    content_language: str = "uz"
+    language: str | None = None
+    # Set when a translation was asked for but could not be made (model
+    # unavailable or quota spent): the text is the original.
+    translation_unavailable: bool = False
 
 
 class PlanGenerateRequest(BaseModel):
@@ -62,6 +69,10 @@ class PlanGenerateRequest(BaseModel):
     # through to the stored language rather than being rejected: a roadmap is
     # worth more than a 422 over a locale tag.
     language: str | None = Field(default=None, max_length=8, description="uz | uz-Cyrl | ru | en")
+
+
+class PlanTranslateRequest(BaseModel):
+    language: str = Field(max_length=8, description="uz | uz-Cyrl | ru | en")
 
 
 class PlanAccept(BaseModel):

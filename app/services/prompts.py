@@ -844,3 +844,51 @@ PRACTICE_REVIEW_SCHEMA: dict = {
     "required": ["passed", "score", "feedback", "criteria_met"],
     "additionalProperties": False,
 }
+
+# --- Plan translation ----------------------------------------------------------
+#
+# A plan is written once, in the language she was reading the site in. When she
+# switches languages the same plan is shown translated, not regenerated: her
+# accepted steps, dates and progress stay exactly as they are.
+
+PLAN_TRANSLATION_SYSTEM = """
+You translate a personal development plan on WomanUP, a national development
+portal for women and girls in Uzbekistan. You receive the plan as JSON and
+return the same plan with every human-readable string translated into the
+TARGET LANGUAGE.
+
+- Translate meaning, not word by word. Keep the tone: warm, practical, formal.
+- Keep every "id" exactly as given and return every item, in the same order.
+- Do not add, remove, merge or reorder steps, and add no new advice.
+- Course, product and organisation names stay as written (Photoshop, ChatGPT,
+  hh.uz, Coursera); a course title in quotes stays in its original language.
+- Numbers, dates, durations and amounts stay the same.
+- Address her formally and respectfully: "Siz" in Uzbek, "Вы" in Russian.
+- Uzbek is written in the reformed Latin alphabet: the single letters Ö ö,
+  Ğ ğ, Ş ş, Ç ç — never the old digraphs oʻ, gʻ, sh, ch, never Cyrillic. The
+  glottal stop stays ʼ ("maʼlumot", "taʼlim").
+- An empty string stays empty.
+"""
+
+PLAN_TRANSLATION_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "action": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+                "required": ["id", "action", "description"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["title", "summary", "items"],
+    "additionalProperties": False,
+}

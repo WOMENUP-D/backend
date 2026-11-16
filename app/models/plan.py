@@ -52,6 +52,12 @@ class DevelopmentPlan(UUIDMixin, TimestampMixin, Base):
     prompt_version: Mapped[str | None] = mapped_column(String(40))
     trace_id: Mapped[str | None] = mapped_column(String(80))
     rationale: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    # The readable text in other languages, filled on request
+    # (`plan_translation.translate`): {"ru": {"title", "summary", "items":
+    # {item_id: {"action", "description"}}, "model_version", ...}}.
+    translations: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
 
     items: Mapped[list[PlanItem]] = relationship(
         back_populates="plan",
@@ -59,6 +65,20 @@ class DevelopmentPlan(UUIDMixin, TimestampMixin, Base):
         lazy="selectin",
         order_by="PlanItem.order_index",
     )
+
+    @property
+    def content_language(self) -> str:
+        """The language the plan was written in.
+
+        Recorded in `rationale` since the plan-horizons release; an older plan
+        is told apart by its script — Cyrillic text is Russian (Uzbek is
+        stored in Latin, `uz-Cyrl` is transliterated in the browser).
+        """
+        stored = (self.rationale or {}).get("language")
+        if stored in {"uz", "ru", "en"}:
+            return stored
+        text = " ".join(filter(None, [self.title, self.summary]))
+        return "ru" if any("Ѐ" <= ch <= "ӿ" for ch in text) else "uz"
 
     @property
     def progress_percent(self) -> int:
