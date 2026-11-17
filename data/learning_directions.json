@@ -75,9 +75,9 @@
         "en": "Software engineering"
       },
       "summary": {
-        "uz": "Dasturlaş tillari, algoritmlar va dastur yozişning asosiy usullari.",
-        "ru": "Языки программирования, алгоритмы и основные приёмы разработки.",
-        "en": "Programming languages, algorithms and the core practices of building software."
+        "uz": "Dasturlaş tillari, algoritmlar, dastur yozişning asosiy usullari va mobil ilovalar.",
+        "ru": "Языки программирования, алгоритмы, основные приёмы разработки и мобильные приложения.",
+        "en": "Programming languages, algorithms, the core practices of building software, and mobile apps."
       },
       "topics": [
         "programming",
@@ -88,7 +88,13 @@
       ],
       "title_keywords": [
         "c#",
-        "алгоритм"
+        "алгоритм",
+        "swift",
+        "kotlin",
+        "android",
+        "flutter",
+        "мобильных прилож",
+        "mobile app"
       ]
     },
     {
@@ -197,39 +203,6 @@
       "topics": [
         "testing",
         "тестирование"
-      ]
-    },
-    {
-      "slug": "mobile-development",
-      "interests": [
-        "it_programming"
-      ],
-      "dimensions": [
-        "digital_skills"
-      ],
-      "title": {
-        "uz": "Mobil ilovalar",
-        "ru": "Мобильная разработка",
-        "en": "Mobile apps"
-      },
-      "summary": {
-        "uz": "Telefon va planşetlar uçun ilovalar yaratiş.",
-        "ru": "Создание приложений для телефонов и планшетов.",
-        "en": "Building apps for phones and tablets."
-      },
-      "topics": [],
-      "title_keywords": [
-        "swift",
-        "kotlin",
-        "android",
-        "flutter",
-        "мобильных прилож",
-        "mobile app"
-      ],
-      "exclude_title": [
-        "тестир",
-        "test",
-        "маркетинг"
       ]
     },
     {
