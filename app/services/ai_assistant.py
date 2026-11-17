@@ -96,6 +96,8 @@ class Persona:
     name: str | None = None
     language: str = "uz"
     interests: list[str] = field(default_factory=list)
+    #: What she told her latest diagnostic: situation, goals, fields of interest.
+    diagnostic: list[str] = field(default_factory=list)
     #: What the platform records that she can do, from the canonical skill
     #: layer — not the free text she once typed into her profile. Each note
     #: carries how well the skill is known, because "learned" and "verified"
@@ -173,6 +175,11 @@ class Persona:
             )
         if self.goals:
             lines.append(f"- her stated goals: {'; '.join(self.goals)}")
+        if self.diagnostic:
+            lines.append(
+                "- what she told her diagnostic (remember it; answer with it in mind): "
+                + "; ".join(self.diagnostic)
+            )
         if self.level and self.composite is not None:
             label = _LEVEL_LABEL.get(self.level, {}).get(self.language) or self.level
             lines.append(
@@ -224,6 +231,19 @@ class AssistantAnswer:
     resources: list[dict] = field(default_factory=list)
     #: Composed by rules or quoted because the model was unavailable.
     degraded: bool = False
+
+
+async def _diagnostic_lines(session: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """Her latest diagnostic answers about herself, as plain lines.
+
+    The profile form's interests are often empty; the diagnostic is where she
+    actually said what she wants and what draws her. Read only after the
+    personalisation consent check, like everything else in the persona.
+    """
+    from app.services import diagnostic
+
+    attempt = await diagnostic.latest_attempt(session, user_id)
+    return diagnostic.profile_lines(attempt.profile if attempt else None)
 
 
 async def build_persona(
@@ -302,6 +322,7 @@ async def build_persona(
         name=(profile.full_name.split()[0] if profile and profile.full_name else None),
         language=language,
         interests=list(profile.interests) if profile else [],
+        diagnostic=await _diagnostic_lines(session, user_id),
         skills=await skill_service.notes_for(session, user_id, language=language),
         education_level=profile.education_level if profile else None,
         profession=profile.profession if profile else None,
