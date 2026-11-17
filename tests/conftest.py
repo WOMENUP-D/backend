@@ -203,3 +203,28 @@ def assume_diagnostic_taken(monkeypatch):
         return None
 
     monkeypatch.setattr(plan_service, "require_diagnostic", _taken)
+
+
+@pytest.fixture(autouse=True)
+def _steady_rate_limit_clock(monkeypatch):
+    """Hold the database rate limiter's clock still for the length of a test.
+
+    The limiter counts in fixed windows (a minute, an hour). A test that sent
+    its requests across :00 got a fresh window halfway through and counted one
+    request too many, so CI went red at random (a password-reset mail test
+    did at 17:00 UTC). Inside one test the clock now stands at a fixed moment
+    in the middle of the current window; nothing a test checks depends on the
+    limiter's clock moving.
+    """
+    from datetime import UTC, datetime
+
+    from app.services import rate_limit
+
+    frozen = datetime.now(UTC).replace(minute=30, second=30, microsecond=0)
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen if tz is not None else frozen.replace(tzinfo=None)
+
+    monkeypatch.setattr(rate_limit, "datetime", _Clock)
