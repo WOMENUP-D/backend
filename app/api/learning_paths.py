@@ -17,13 +17,21 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbSession, OptionalUserDep
 from app.core.constants import ProficiencyLevel, ScoreDimension
 from app.models.learning_path import LearningPath
-from app.schemas.learning_path import LearningPathDetail, LearningPathRead
-from app.schemas.program import EnrollmentRead
-from app.services import learning, learning_path, skills
+from app.models.user import User
+from app.schemas.learning_path import (
+    InterestRef,
+    LearningDirectionRead,
+    LearningDirectionsForMe,
+    LearningPathDetail,
+    LearningPathRead,
+)
+from app.schemas.program import EnrollmentRead, ProgramRead
+from app.services import learning, learning_directions, learning_path, skills
 
 router = APIRouter(prefix="/learning-paths", tags=["learning-paths"])
 
@@ -90,6 +98,51 @@ async def my_paths(user: CurrentUserDep, session: DbSession) -> list[LearningPat
         learning_path.detail(path, index=index, states=states, record=record, held=held)
         for path, states, record in rows
     ]
+
+
+@router.get("/for-me", response_model=LearningDirectionsForMe)
+async def directions_for_me(user: CurrentUserDep, session: DbSession) -> LearningDirectionsForMe:
+    """The directions her latest completed diagnostic points to, each with the
+    published catalogue courses that lead into it, first steps first.
+
+    Lives with the learning paths because it answers the same screen's
+    question — "which route through the catalogue is mine" — for a woman no
+    administrator has authored a route for. It reads and never writes: no path
+    is started and nothing is enrolled. No completed diagnostic is an answer
+    (`needs_diagnostic`), not an error. Declared before `/{slug}`.
+    """
+    user_id = uuid.UUID(user.id)
+    language = await session.scalar(select(User.language).where(User.id == user_id))
+    found = await learning_directions.for_user(
+        session, user_id, language=getattr(language, "value", language)
+    )
+    catalogue = learning_directions.load()
+    labels = catalogue.interests if catalogue else {}
+
+    def interest(value: str | None) -> InterestRef | None:
+        return None if value is None else InterestRef(id=value, label_i18n=labels.get(value, {}))
+
+    return LearningDirectionsForMe(
+        needs_diagnostic=found.needs_diagnostic,
+        basis=found.basis,
+        interests=[interest(i) for i in found.interests],
+        unmatched_interests=[interest(i) for i in found.unmatched_interests],
+        assessment_id=found.assessment_id,
+        directions=[
+            LearningDirectionRead(
+                slug=item.direction.slug,
+                title_i18n=item.direction.title_i18n,
+                summary_i18n=item.direction.summary_i18n,
+                reason=item.reason,
+                interest=interest(item.interest),
+                dimension=item.dimension,
+                topic=item.direction.topic,
+                course_total=item.total,
+                courses=[ProgramRead.model_validate(p) for p in item.courses],
+            )
+            for item in found.picked
+        ],
+    )
 
 
 @router.get("/{slug}", response_model=LearningPathDetail)
