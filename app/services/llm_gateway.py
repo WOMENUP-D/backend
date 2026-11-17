@@ -14,10 +14,13 @@ shapes those tools return are provider knowledge, so the two readers below
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
 import time
 import uuid
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -135,14 +138,15 @@ class LlmGateway:
             )
         return self._client
 
-    async def _send(self, request: dict[str, Any], trace_id: str) -> Any:
-        """One HTTP round trip, with the provider's failures translated.
+    @contextlib.contextmanager
+    def _provider_errors(self, trace_id: str) -> Iterator[None]:
+        """The provider's failures, translated to `LlmUnavailableError`.
 
-        Factored out of `complete` so the resume loop can make several of them
-        under a single trace id without duplicating the error mapping.
+        Shared by the plain and the streamed round trip so that both degrade
+        on exactly the same conditions.
         """
         try:
-            return await self.client.messages.create(**request)
+            yield
         except anthropic.RateLimitError as exc:
             logger.warning("llm rate limited", extra={"extra_fields": {"trace_id": trace_id}})
             raise LlmUnavailableError("model rate limit reached") from exc
@@ -154,6 +158,48 @@ class LlmGateway:
             raise LlmUnavailableError(f"model returned {exc.status_code}") from exc
         except anthropic.APIConnectionError as exc:
             raise LlmUnavailableError("could not reach the model provider") from exc
+
+    async def _send(self, request: dict[str, Any], trace_id: str) -> Any:
+        """One HTTP round trip, with the provider's failures translated.
+
+        Factored out of `complete` so the resume loop can make several of them
+        under a single trace id without duplicating the error mapping.
+        """
+        with self._provider_errors(trace_id):
+            return await self.client.messages.create(**request)
+
+    async def _stream(
+        self,
+        request: dict[str, Any],
+        trace_id: str,
+        on_text: Callable[[str], Awaitable[None]],
+    ) -> Any:
+        """The same round trip, streamed: text deltas go to `on_text` as they
+        arrive, and the accumulated message is returned exactly as `_send`
+        would have returned it.
+
+        The SDK's `timeout` bounds each read, and a stream that keeps sending
+        never trips a read timeout, so the caller's `timeout` is applied here
+        as a bound on the whole call as well — past it the caller degrades,
+        as it does when a plain request times out.
+        """
+        bound = request.get("timeout")
+        with self._provider_errors(trace_id):
+            try:
+                async with asyncio.timeout(bound):
+                    async with self.client.messages.stream(**request) as stream:
+                        async for event in stream:
+                            if (
+                                event.type == "content_block_delta"
+                                and event.delta.type == "text_delta"
+                            ):
+                                await on_text(event.delta.text)
+                        return await stream.get_final_message()
+            except TimeoutError as exc:
+                logger.warning(
+                    "llm stream timed out", extra={"extra_fields": {"trace_id": trace_id}}
+                )
+                raise LlmUnavailableError("model timed out") from exc
 
     async def complete(
         self,
@@ -167,6 +213,7 @@ class LlmGateway:
         tools: list[dict[str, Any]] | None = None,
         max_resumes: int = 0,
         timeout: float | None = None,
+        on_text: Callable[[str], Awaitable[None]] | None = None,
     ) -> LlmResponse:
         """One request/response round-trip.
 
@@ -187,6 +234,11 @@ class LlmGateway:
         `timeout` (seconds) bounds this one call below the client-wide
         `ai_timeout_seconds`; a timeout surfaces as `LlmUnavailableError`, so
         every caller's degraded path covers it.
+
+        `on_text`, when given, streams the call: each text delta is passed to
+        it as the model writes it (for a `json_schema` call that is raw JSON —
+        see `answer_stream`). Everything returned is the same as without it,
+        so the trace a streamed answer leaves is the trace a plain one leaves.
         """
         if json_schema is not None and _tools_emit_citations(tools):
             raise ValueError(
@@ -229,7 +281,10 @@ class LlmGateway:
 
         while True:
             request["messages"] = turns
-            response = await self._send(request, trace_id)
+            if on_text is None:
+                response = await self._send(request, trace_id)
+            else:
+                response = await self._stream(request, trace_id, on_text)
             blocks.extend(response.content)
             input_tokens += response.usage.input_tokens or 0
             output_tokens += response.usage.output_tokens or 0
