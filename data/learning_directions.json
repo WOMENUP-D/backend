@@ -1,0 +1,1074 @@
+{
+  "version": 1,
+  "min_courses": 3,
+  "max_courses": 8,
+  "interests": {
+    "it_programming": {
+      "uz": "IT va dasturlaş",
+      "ru": "IT и программирование",
+      "en": "IT and programming"
+    },
+    "ai": {
+      "uz": "Sunʼiy intellekt",
+      "ru": "Искусственный интеллект",
+      "en": "Artificial intelligence"
+    },
+    "data": {
+      "uz": "Maʼlumotlar tahlili",
+      "ru": "Аналитика данных",
+      "en": "Data analytics"
+    },
+    "business": {
+      "uz": "Biznes va tadbirkorlik",
+      "ru": "Бизнес и предпринимательство",
+      "en": "Business and entrepreneurship"
+    },
+    "marketing_smm": {
+      "uz": "Marketing va SMM",
+      "ru": "Маркетинг и SMM",
+      "en": "Marketing and SMM"
+    },
+    "design": {
+      "uz": "Dizayn va ijod",
+      "ru": "Дизайн и творчество",
+      "en": "Design and creativity"
+    },
+    "finance_economics": {
+      "uz": "Moliya va iqtisodiyot",
+      "ru": "Финансы и экономика",
+      "en": "Finance and economics"
+    },
+    "management": {
+      "uz": "Boşqaruv va liderlik",
+      "ru": "Менеджмент и лидерство",
+      "en": "Management and leadership"
+    },
+    "languages": {
+      "uz": "Tillar va muloqot",
+      "ru": "Языки и коммуникация",
+      "en": "Languages and communication"
+    },
+    "education": {
+      "uz": "Taʼlim",
+      "ru": "Образование",
+      "en": "Education"
+    },
+    "science": {
+      "uz": "Fan va tadqiqot",
+      "ru": "Наука и исследования",
+      "en": "Science and research"
+    }
+  },
+  "directions": [
+    {
+      "slug": "software-engineering",
+      "interests": [
+        "it_programming"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Dasturiy taʼminot işlab çiqiş",
+        "ru": "Разработка программного обеспечения",
+        "en": "Software engineering"
+      },
+      "summary": {
+        "uz": "Dasturlaş tillari, algoritmlar, dastur yozişning asosiy usullari va mobil ilovalar.",
+        "ru": "Языки программирования, алгоритмы, основные приёмы разработки и мобильные приложения.",
+        "en": "Programming languages, algorithms, the core practices of building software, and mobile apps."
+      },
+      "topics": [
+        "programming",
+        "java",
+        "c++",
+        "c#",
+        "algorithms"
+      ],
+      "title_keywords": [
+        "c#",
+        "алгоритм",
+        "swift",
+        "kotlin",
+        "android",
+        "flutter",
+        "мобильных прилож",
+        "mobile app"
+      ]
+    },
+    {
+      "slug": "python",
+      "interests": [
+        "it_programming",
+        "ai",
+        "data"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Python dasturlaş",
+        "ru": "Программирование на Python",
+        "en": "Python programming"
+      },
+      "summary": {
+        "uz": "Eng keng tarqalgan tillardan biri: avtomatlaştiriş, veb, maʼlumotlar va AI uçun.",
+        "ru": "Один из самых распространённых языков: автоматизация, веб, данные и ИИ.",
+        "en": "One of the most widely used languages: automation, the web, data and AI."
+      },
+      "topics": [
+        "python",
+        "django"
+      ]
+    },
+    {
+      "slug": "web-development",
+      "interests": [
+        "it_programming",
+        "design"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Veb-dasturlaş",
+        "ru": "Веб-разработка",
+        "en": "Web development"
+      },
+      "summary": {
+        "uz": "Saytlar va veb-ilovalar: HTML, CSS, JavaScript va server tomoni.",
+        "ru": "Сайты и веб-приложения: HTML, CSS, JavaScript и серверная часть.",
+        "en": "Websites and web apps: HTML, CSS, JavaScript and the server side."
+      },
+      "topics": [
+        "javascript",
+        "html-css",
+        "html",
+        "css",
+        "django"
+      ],
+      "title_keywords": [
+        "веб-",
+        "web-",
+        "web "
+      ]
+    },
+    {
+      "slug": "cybersecurity",
+      "interests": [
+        "it_programming"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "Kiberxavfsizlik",
+        "ru": "Кибербезопасность",
+        "en": "Cybersecurity"
+      },
+      "summary": {
+        "uz": "Maʼlumotlar, akkauntlar va tarmoqlarni himoya qiliş.",
+        "ru": "Защита данных, аккаунтов и сетей.",
+        "en": "Protecting data, accounts and networks."
+      },
+      "topics": [
+        "cybersecurity"
+      ],
+      "categories": [
+        "digital_safety"
+      ]
+    },
+    {
+      "slug": "software-testing",
+      "interests": [
+        "it_programming"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Dasturiy taʼminotni testlaş",
+        "ru": "Тестирование ПО",
+        "en": "Software testing"
+      },
+      "summary": {
+        "uz": "Dasturlardagi xatolarni topiş: qöl va avtomatik testlaş.",
+        "ru": "Поиск ошибок в программах: ручное и автоматизированное тестирование.",
+        "en": "Finding faults in software: manual and automated testing."
+      },
+      "topics": [
+        "testing",
+        "тестирование"
+      ]
+    },
+    {
+      "slug": "devops",
+      "interests": [
+        "it_programming"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "Linux, Git va DevOps",
+        "ru": "Linux, Git и DevOps",
+        "en": "Linux, Git and DevOps"
+      },
+      "summary": {
+        "uz": "Serverlar, buyruqlar qatori va dasturlarni yetkazib beriş vositalari.",
+        "ru": "Серверы, командная строка и инструменты доставки программ.",
+        "en": "Servers, the command line and the tools that ship software."
+      },
+      "topics": [
+        "linux",
+        "git",
+        "docker"
+      ],
+      "title_keywords": [
+        "devops"
+      ]
+    },
+    {
+      "slug": "machine-learning",
+      "interests": [
+        "ai",
+        "data"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "Maşinali örganiş va sunʼiy intellekt",
+        "ru": "Машинное обучение и ИИ",
+        "en": "Machine learning and AI"
+      },
+      "summary": {
+        "uz": "Maʼlumotlardan örganadigan modellar, neyron tarmoqlar va AI vositalari.",
+        "ru": "Модели, обучающиеся на данных, нейросети и инструменты ИИ.",
+        "en": "Models that learn from data, neural networks and AI tools."
+      },
+      "topics": [
+        "machine-learning",
+        "ai-tools"
+      ],
+      "title_keywords": [
+        "нейросет",
+        "искусственн",
+        "ии-",
+        "llm",
+        "ai ",
+        "ai-",
+        "data science"
+      ],
+      "require_title": [
+        "машин",
+        "machine",
+        "ml ",
+        "ии",
+        "ai",
+        "нейро",
+        "искусствен",
+        "data science",
+        "data mining",
+        "llm",
+        "pandas",
+        "numpy",
+        "данных"
+      ],
+      "exclude_title": [
+        "english",
+        "английск",
+        "презентац",
+        "собеседован"
+      ]
+    },
+    {
+      "slug": "data-analysis",
+      "interests": [
+        "data"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Maʼlumotlar tahlili",
+        "ru": "Анализ данных",
+        "en": "Data analysis"
+      },
+      "summary": {
+        "uz": "Raqamlardan xulosa çiqariş: statistika, jadvallar, vizualizatsiya.",
+        "ru": "Выводы из чисел: статистика, таблицы, визуализация.",
+        "en": "Drawing conclusions from numbers: statistics, spreadsheets, visualisation."
+      },
+      "topics": [
+        "data-analysis",
+        "statistics"
+      ],
+      "title_keywords": [
+        "data science",
+        "big data",
+        "больших данных",
+        "bi-аналит",
+        "pandas",
+        "аналитик",
+        "визуализац"
+      ]
+    },
+    {
+      "slug": "databases",
+      "interests": [
+        "data",
+        "it_programming"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "SQL va maʼlumotlar bazalari",
+        "ru": "SQL и базы данных",
+        "en": "SQL and databases"
+      },
+      "summary": {
+        "uz": "Maʼlumotlarni saqlaş va ularga sörovlar yoziş.",
+        "ru": "Хранение данных и запросы к ним.",
+        "en": "Storing data and querying it."
+      },
+      "topics": [
+        "sql"
+      ],
+      "title_keywords": [
+        "баз данных",
+        "базы данных",
+        "clickhouse"
+      ]
+    },
+    {
+      "slug": "excel",
+      "interests": [
+        "data",
+        "finance_economics"
+      ],
+      "dimensions": [
+        "digital_skills",
+        "employment"
+      ],
+      "title": {
+        "uz": "Excel va elektron jadvallar",
+        "ru": "Excel и электронные таблицы",
+        "en": "Excel and spreadsheets"
+      },
+      "summary": {
+        "uz": "Jadvallar, formulalar va hisobotlar bilan işlaş.",
+        "ru": "Работа с таблицами, формулами и отчётами.",
+        "en": "Working with tables, formulas and reports."
+      },
+      "topics": [
+        "excel"
+      ]
+    },
+    {
+      "slug": "entrepreneurship",
+      "interests": [
+        "business"
+      ],
+      "dimensions": [
+        "entrepreneurship"
+      ],
+      "title": {
+        "uz": "Tadbirkorlik asoslari",
+        "ru": "Основы предпринимательства",
+        "en": "Starting a business"
+      },
+      "summary": {
+        "uz": "Biznes ğoyasidan birinçi mijozgaça: reja, xarajatlar, boşqaruv.",
+        "ru": "От бизнес-идеи до первого клиента: план, расходы, управление.",
+        "en": "From a business idea to the first customer: planning, costs, running it."
+      },
+      "topics": [
+        "entrepreneurship",
+        "business-plan"
+      ]
+    },
+    {
+      "slug": "sales",
+      "interests": [
+        "business",
+        "marketing_smm"
+      ],
+      "dimensions": [
+        "entrepreneurship",
+        "employment"
+      ],
+      "title": {
+        "uz": "Sotuv va mijozlar bilan işlaş",
+        "ru": "Продажи и работа с клиентами",
+        "en": "Sales and customers"
+      },
+      "summary": {
+        "uz": "Mahsulotni taklif qiliş, muzokara va mijoz tajribasi.",
+        "ru": "Как предлагать продукт, вести переговоры и работать с клиентом.",
+        "en": "Offering a product, negotiating and looking after customers."
+      },
+      "topics": [
+        "sales",
+        "customer-service",
+        "marketplaces",
+        "ecommerce"
+      ],
+      "title_keywords": [
+        "crm",
+        "клиентск",
+        "продаж"
+      ],
+      "exclude_title": [
+        "психотерап",
+        "уфк"
+      ]
+    },
+    {
+      "slug": "marketing",
+      "interests": [
+        "marketing_smm",
+        "business"
+      ],
+      "dimensions": [
+        "entrepreneurship"
+      ],
+      "title": {
+        "uz": "Marketing va SMM",
+        "ru": "Маркетинг и SMM",
+        "en": "Marketing and SMM"
+      },
+      "summary": {
+        "uz": "Mahsulotni bozorga çiqariş: reklama, ijtimoiy tarmoqlar, kontent.",
+        "ru": "Продвижение продукта: реклама, соцсети, контент.",
+        "en": "Bringing a product to market: advertising, social media, content."
+      },
+      "topics": [
+        "marketing",
+        "smm",
+        "content-marketing",
+        "branding"
+      ],
+      "title_keywords": [
+        "smm",
+        "реклам",
+        "таргет",
+        "личный бренд",
+        "контент-маркет"
+      ],
+      "exclude_title": [
+        "собеседован",
+        "общественного питания"
+      ]
+    },
+    {
+      "slug": "ui-ux-design",
+      "interests": [
+        "design"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "UI/UX dizayn",
+        "ru": "UI/UX-дизайн",
+        "en": "UI/UX design"
+      },
+      "summary": {
+        "uz": "Sayt va ilovalar interfeysi: Figma, prototiplar, foydalanuvçi tajribasi.",
+        "ru": "Интерфейсы сайтов и приложений: Figma, прототипы, пользовательский опыт.",
+        "en": "Interfaces for sites and apps: Figma, prototypes, user experience."
+      },
+      "topics": [
+        "design"
+      ],
+      "require_title": [
+        "ui",
+        "ux",
+        "интерфейс",
+        "figma",
+        "веб-дизайн",
+        "web-дизайн"
+      ],
+      "exclude_title": [
+        "тестир"
+      ]
+    },
+    {
+      "slug": "graphic-design",
+      "interests": [
+        "design"
+      ],
+      "dimensions": [
+        "digital_skills"
+      ],
+      "title": {
+        "uz": "Grafik dizayn",
+        "ru": "Графический дизайн",
+        "en": "Graphic design"
+      },
+      "summary": {
+        "uz": "Kompozitsiya, rang, infografika va vizual materiallar.",
+        "ru": "Композиция, цвет, инфографика и визуальные материалы.",
+        "en": "Composition, colour, infographics and visual materials."
+      },
+      "topics": [
+        "design",
+        "photoshop",
+        "canva"
+      ],
+      "require_title": [
+        "граф",
+        "photoshop",
+        "canva",
+        "инфограф",
+        "digital-дизайн",
+        "3d",
+        "введение в дизайн",
+        "дизайн презентац",
+        "illustrator"
+      ]
+    },
+    {
+      "slug": "financial-literacy",
+      "interests": [
+        "finance_economics"
+      ],
+      "dimensions": [
+        "financial_literacy"
+      ],
+      "title": {
+        "uz": "Moliyaviy savodxonlik",
+        "ru": "Финансовая грамотность",
+        "en": "Financial literacy"
+      },
+      "summary": {
+        "uz": "Byudjet, jamğarma, kredit va şaxsiy moliyani reja qiliş.",
+        "ru": "Бюджет, сбережения, кредиты и планирование личных финансов.",
+        "en": "Budgets, savings, credit and planning personal finances."
+      },
+      "topics": [
+        "financial-literacy",
+        "budgeting",
+        "savings",
+        "credit",
+        "banking",
+        "financial-planning"
+      ],
+      "title_keywords": [
+        "бюджет"
+      ],
+      "exclude_title": [
+        "менеджмент"
+      ]
+    },
+    {
+      "slug": "investing",
+      "interests": [
+        "finance_economics"
+      ],
+      "dimensions": [
+        "financial_literacy"
+      ],
+      "title": {
+        "uz": "Investitsiyalar",
+        "ru": "Инвестиции",
+        "en": "Investing"
+      },
+      "summary": {
+        "uz": "Pulni qanday işlatiş mumkin: aksiyalar, dividendlar, xatarlar.",
+        "ru": "Как работают вложения: акции, дивиденды, риски.",
+        "en": "How investing works: shares, dividends, risk."
+      },
+      "topics": [
+        "investing"
+      ]
+    },
+    {
+      "slug": "accounting",
+      "interests": [
+        "finance_economics",
+        "business"
+      ],
+      "dimensions": [
+        "financial_literacy",
+        "employment"
+      ],
+      "title": {
+        "uz": "Buxgalteriya va soliqlar",
+        "ru": "Бухгалтерия и налоги",
+        "en": "Accounting and tax"
+      },
+      "summary": {
+        "uz": "Hisob yuritiş, hisobotlar va soliq majburiyatlari.",
+        "ru": "Учёт, отчётность и налоговые обязательства.",
+        "en": "Bookkeeping, reporting and tax obligations."
+      },
+      "topics": [
+        "accounting",
+        "tax",
+        "1c"
+      ]
+    },
+    {
+      "slug": "economics",
+      "interests": [
+        "finance_economics",
+        "science"
+      ],
+      "dimensions": [
+        "financial_literacy"
+      ],
+      "title": {
+        "uz": "Iqtisodiyot",
+        "ru": "Экономика",
+        "en": "Economics"
+      },
+      "summary": {
+        "uz": "Bozor, talab va taklif, iqtisodiy qarorlar qanday qabul qilinadi.",
+        "ru": "Рынок, спрос и предложение, как принимаются экономические решения.",
+        "en": "Markets, supply and demand, and how economic decisions are made."
+      },
+      "topics": [
+        "economics"
+      ],
+      "title_keywords": [
+        "экономик",
+        "economics"
+      ]
+    },
+    {
+      "slug": "leadership",
+      "interests": [
+        "management"
+      ],
+      "dimensions": [
+        "leadership",
+        "employment"
+      ],
+      "title": {
+        "uz": "Liderlik va jamoa boşqaruvi",
+        "ru": "Лидерство и управление командой",
+        "en": "Leadership and teams"
+      },
+      "summary": {
+        "uz": "Jamoani boşqariş, qaror qabul qiliş va taʼsir qiliş.",
+        "ru": "Управление командой, принятие решений и влияние.",
+        "en": "Leading a team, making decisions and influence."
+      },
+      "topics": [
+        "leadership",
+        "teamwork",
+        "mentoring",
+        "hr"
+      ],
+      "title_keywords": [
+        "лидер",
+        "руковод",
+        "командообраз",
+        "стратегический менеджмент",
+        "современный менеджмент"
+      ],
+      "exclude_title": [
+        "продаж"
+      ]
+    },
+    {
+      "slug": "project-management",
+      "interests": [
+        "management"
+      ],
+      "dimensions": [
+        "leadership",
+        "employment"
+      ],
+      "title": {
+        "uz": "Loyiha va mahsulot boşqaruvi",
+        "ru": "Управление проектами и продуктом",
+        "en": "Project and product management"
+      },
+      "summary": {
+        "uz": "Loyihani rejalaştiriş, muddatlar, vaqtni boşqariş va mahsulot yaratiş.",
+        "ru": "Планирование проекта, сроки, тайм-менеджмент и создание продукта.",
+        "en": "Planning projects, deadlines, time management and building products."
+      },
+      "topics": [
+        "project-management",
+        "time-management"
+      ],
+      "title_keywords": [
+        "product manager",
+        "управление проект",
+        "agile",
+        "scrum",
+        "bpmn"
+      ]
+    },
+    {
+      "slug": "communication",
+      "interests": [
+        "management",
+        "languages"
+      ],
+      "dimensions": [
+        "leadership",
+        "employment"
+      ],
+      "title": {
+        "uz": "Muloqot va notiqlik",
+        "ru": "Коммуникация и публичные выступления",
+        "en": "Communication and public speaking"
+      },
+      "summary": {
+        "uz": "Iş muloqoti, muzokaralar, taqdimotlar va omma oldida çiqiş.",
+        "ru": "Деловое общение, переговоры, презентации и выступления.",
+        "en": "Workplace communication, negotiation, presentations and speaking."
+      },
+      "topics": [
+        "communication",
+        "public-speaking",
+        "negotiation",
+        "business-writing",
+        "presentation"
+      ],
+      "title_keywords": [
+        "этикет",
+        "коммуникац"
+      ],
+      "exclude_title": [
+        "сети",
+        "информационно",
+        "компьютерн"
+      ]
+    },
+    {
+      "slug": "english",
+      "interests": [
+        "languages"
+      ],
+      "dimensions": [
+        "education_skills",
+        "leadership"
+      ],
+      "title": {
+        "uz": "Ingliz tili",
+        "ru": "Английский язык",
+        "en": "English"
+      },
+      "summary": {
+        "uz": "Ingliz tilini noldan va keyingi darajalarda örganiş, IELTSga tayyorlaniş.",
+        "ru": "Английский с нуля и на следующих уровнях, подготовка к IELTS.",
+        "en": "English from scratch and beyond, and preparing for IELTS."
+      },
+      "topics": [
+        "english",
+        "ielts"
+      ]
+    },
+    {
+      "slug": "chinese",
+      "interests": [
+        "languages"
+      ],
+      "dimensions": [
+        "education_skills",
+        "leadership"
+      ],
+      "title": {
+        "uz": "Xitoy tili",
+        "ru": "Китайский язык",
+        "en": "Chinese"
+      },
+      "summary": {
+        "uz": "Xitoy tili: talaffuz, ierogliflar va kundalik muloqot.",
+        "ru": "Китайский язык: произношение, иероглифы и повседневное общение.",
+        "en": "Chinese: pronunciation, characters and everyday conversation."
+      },
+      "topics": [
+        "chinese"
+      ]
+    },
+    {
+      "slug": "other-languages",
+      "interests": [
+        "languages"
+      ],
+      "dimensions": [
+        "education_skills",
+        "leadership"
+      ],
+      "title": {
+        "uz": "Nemis, koreys va boşqa tillar",
+        "ru": "Немецкий, корейский и другие языки",
+        "en": "German, Korean and other languages"
+      },
+      "summary": {
+        "uz": "Yana bir xorijiy til: nemis, koreys, ispan, fransuz, rus.",
+        "ru": "Ещё один иностранный язык: немецкий, корейский, испанский, французский, русский.",
+        "en": "Another foreign language: German, Korean, Spanish, French, Russian."
+      },
+      "topics": [
+        "german",
+        "korean",
+        "spanish",
+        "french",
+        "russian"
+      ]
+    },
+    {
+      "slug": "teaching",
+      "interests": [
+        "education"
+      ],
+      "dimensions": [
+        "education_skills"
+      ],
+      "title": {
+        "uz": "Pedagogika va öqitiş",
+        "ru": "Педагогика и преподавание",
+        "en": "Teaching"
+      },
+      "summary": {
+        "uz": "Dars tayyorlaş, öqitiş usullari va onlayn kurslar yaratiş.",
+        "ru": "Подготовка уроков, методики обучения и создание онлайн-курсов.",
+        "en": "Preparing lessons, teaching methods and building online courses."
+      },
+      "topics": [
+        "teaching"
+      ],
+      "title_keywords": [
+        "педагог",
+        "преподава",
+        "учител",
+        "электронных курсов",
+        "цифровизация образовани"
+      ],
+      "require_title": [
+        "педагог",
+        "обучени",
+        "образовани",
+        "урок",
+        "преподав",
+        "учител",
+        "курсов"
+      ]
+    },
+    {
+      "slug": "psychology",
+      "interests": [
+        "education",
+        "science"
+      ],
+      "dimensions": [
+        "healthy_lifestyle",
+        "family_parenting"
+      ],
+      "title": {
+        "uz": "Psixologiya",
+        "ru": "Психология",
+        "en": "Psychology"
+      },
+      "summary": {
+        "uz": "Inson xulq-atvori, his-tuyğular va munosabatlar.",
+        "ru": "Поведение человека, эмоции и отношения.",
+        "en": "Human behaviour, emotions and relationships."
+      },
+      "topics": [
+        "psychology",
+        "stress-management"
+      ]
+    },
+    {
+      "slug": "mathematics",
+      "interests": [
+        "science",
+        "education",
+        "data"
+      ],
+      "dimensions": [
+        "education_skills"
+      ],
+      "title": {
+        "uz": "Matematika",
+        "ru": "Математика",
+        "en": "Mathematics"
+      },
+      "summary": {
+        "uz": "Matematik fikrlaş: algebra, ehtimollar, mantiq.",
+        "ru": "Математическое мышление: алгебра, вероятности, логика.",
+        "en": "Mathematical thinking: algebra, probability, logic."
+      },
+      "topics": [
+        "mathematics"
+      ],
+      "title_keywords": [
+        "математ",
+        "логик"
+      ]
+    },
+    {
+      "slug": "medicine-biology",
+      "interests": [
+        "science"
+      ],
+      "dimensions": [
+        "healthy_lifestyle"
+      ],
+      "title": {
+        "uz": "Tibbiyot va biologiya",
+        "ru": "Медицина и биология",
+        "en": "Medicine and biology"
+      },
+      "summary": {
+        "uz": "Inson organizmi, biologiya va zamonaviy tibbiyot asoslari.",
+        "ru": "Организм человека, биология и основы современной медицины.",
+        "en": "The human body, biology and the basics of modern medicine."
+      },
+      "topics": [],
+      "title_keywords": [
+        "медицин",
+        "биолог",
+        "биомед",
+        "химия"
+      ],
+      "exclude_title": [
+        "английск",
+        "english"
+      ]
+    },
+    {
+      "slug": "job-search",
+      "interests": [
+        "management"
+      ],
+      "dimensions": [
+        "employment"
+      ],
+      "title": {
+        "uz": "Iş qidiriş va karyera",
+        "ru": "Поиск работы и карьера",
+        "en": "Job search and career"
+      },
+      "summary": {
+        "uz": "Rezyume, iş suhbati va birinçi işga joylaşiş.",
+        "ru": "Резюме, собеседование и выход на первую работу.",
+        "en": "CVs, interviews and landing a first job."
+      },
+      "topics": [
+        "job-search",
+        "cv-writing",
+        "job-interviews"
+      ],
+      "require_title": [
+        "карьер",
+        "резюме",
+        "собеседован",
+        "career",
+        "interview",
+        "трудоустр",
+        "поиск работы"
+      ]
+    },
+    {
+      "slug": "health",
+      "interests": [],
+      "dimensions": [
+        "healthy_lifestyle"
+      ],
+      "title": {
+        "uz": "Salomatlik va sağlom ovqatlaniş",
+        "ru": "Здоровье и питание",
+        "en": "Health and nutrition"
+      },
+      "summary": {
+        "uz": "Sağlom turmuş tarzi, ovqatlaniş va profilaktika.",
+        "ru": "Здоровый образ жизни, питание и профилактика.",
+        "en": "Healthy living, nutrition and prevention."
+      },
+      "topics": [
+        "health",
+        "nutrition",
+        "prevention"
+      ],
+      "exclude_title": [
+        "веб",
+        "web"
+      ]
+    },
+    {
+      "slug": "parenting",
+      "interests": [
+        "education"
+      ],
+      "dimensions": [
+        "family_parenting"
+      ],
+      "title": {
+        "uz": "Farzand tarbiyasi",
+        "ru": "Воспитание детей",
+        "en": "Parenting"
+      },
+      "summary": {
+        "uz": "Bola rivojlaniş, tarbiya va oilaviy munosabatlar.",
+        "ru": "Развитие ребёнка, воспитание и отношения в семье.",
+        "en": "Child development, upbringing and family relationships."
+      },
+      "topics": [
+        "parenting",
+        "school-readiness"
+      ],
+      "title_keywords": [
+        "родител",
+        "ребен",
+        "ребён",
+        "детей",
+        "подрост",
+        "parenting",
+        "мама"
+      ],
+      "exclude_title": [
+        "педагог",
+        "программирован",
+        "java",
+        "python",
+        "scratch",
+        "roblox"
+      ]
+    },
+    {
+      "slug": "legal-literacy",
+      "interests": [
+        "business"
+      ],
+      "dimensions": [
+        "leadership",
+        "entrepreneurship"
+      ],
+      "title": {
+        "uz": "Huquqiy savodxonlik",
+        "ru": "Правовая грамотность",
+        "en": "Legal literacy"
+      },
+      "summary": {
+        "uz": "Şartnomalar, mehnat va oila huquqi asoslari.",
+        "ru": "Договоры, основы трудового и семейного права.",
+        "en": "Contracts and the basics of labour and family law."
+      },
+      "topics": [
+        "legal-literacy",
+        "labour-law",
+        "contracts",
+        "family-law"
+      ],
+      "categories": [
+        "legal_literacy"
+      ]
+    }
+  ]
+}

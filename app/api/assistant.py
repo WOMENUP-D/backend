@@ -9,22 +9,29 @@ does sign up.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import json
+import logging
 import time
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
 from typing import Annotated
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUserDep, DbSession, TrackerDep, client_ip
 from app.api.deps import _verified as deps_verified
 from app.core.constants import ConsentScope, GoalHorizon, Region, ScoreDimension
 from app.core.security import decode_token
 from app.core.text import tidy_name
+from app.db import get_session
 from app.models.consent import ConsentLog
 from app.models.profile import Goal, Profile
 from app.models.user import User
@@ -48,6 +55,8 @@ from app.services.age_gate import age_from_profile
 from app.services.ai_assistant import AssistantAnswer, Persona
 from app.services.news_age import group_for_age
 from app.services.uzbek import convert_if_uzbek, question_language
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -164,13 +173,18 @@ def _uz(value, language: str | None):
 _VERBATIM_KEYS = frozenset({"id", "slug", "category", "program_ids", "chunk_id"})
 
 
+def _reply_language(text: str, language: str | None) -> str | None:
+    """The language a reply's text is converted as. The answer may be in the
+    question's language rather than the page's; an undeclared language is
+    converted only when the text is evidently Uzbek."""
+    return None if language and _declared_other(text, language) else language
+
+
 def _reply(
     answer: AssistantAnswer, guest_left: int | None, language: str | None = None
 ) -> AssistantReply:
     # Uzbek leaves in the reformed alphabet, whichever one the model wrote.
-    # The answer may be in the question's language rather than the page's;
-    # an undeclared language is converted only when the text is evidently Uzbek.
-    language = None if language and _declared_other(answer.answer, language) else language
+    language = _reply_language(answer.answer, language)
     return AssistantReply(
         answer=_uz(answer.answer, language),
         section=answer.section,
@@ -227,6 +241,150 @@ async def ask(
     )
     await session.commit()
     return _reply(answer, guest_left, payload.language)
+
+
+# --- the same door, streamed ----------------------------------------------
+#
+# The answer is shown while it is written instead of after eight to thirteen
+# seconds of a typing indicator. Nothing else changes: the same checks run in
+# the same order — the safety gate before the allowance, the allowance before
+# the model, routing and retrieval exactly as `ask` does them — and the last
+# event is the very reply `/ask` would have returned.
+#
+# Server-Sent Events, one JSON object per `data:` line:
+#
+#   event: delta   data: {"text": "..."}       append to the bubble
+#   event: reply   data: <AssistantReply>      the whole reply; replaces it
+#   event: error   data: {"detail": "..."}     the answer failed mid-way
+#
+# Lines starting with ":" are keep-alive comments. Failures before the stream
+# opens (401, 422, 429 with the usual `detail` codes) stay plain HTTP errors.
+
+#: Proxies must pass each event on at once: nginx-style buffering is turned
+#: off, and `no-transform` keeps an edge (Cloudflare) from compressing — and
+#: so holding back — the stream.
+STREAM_HEADERS = {
+    "Cache-Control": "no-cache, no-store, no-transform",
+    "X-Accel-Buffering": "no",
+}
+#: A comment line while the model is still thinking, so no proxy on the way
+#: mistakes a long pause before the first word for a dead connection.
+STREAM_KEEPALIVE_SECONDS = 10.0
+#: The answers still being written, held so a task is not collected mid-way.
+_streaming: set[asyncio.Task] = set()
+
+
+def _sse(event: str, data: dict) -> bytes:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+
+class _LiveText:
+    """The streamed text, in the alphabet the final reply will use.
+
+    Conversion to the reformed alphabet is word by word, so text is released
+    only up to the last whitespace: a word is never shown half-converted. The
+    language decision (`_reply_language`) is re-taken on all the text so far;
+    if it changes what was already shown, nothing more is sent and the final
+    reply settles it — the deltas only ever append.
+    """
+
+    def __init__(self, language: str | None) -> None:
+        self.language = language
+        self.raw = ""
+        self.sent = ""
+
+    def push(self, chunk: str) -> str:
+        self.raw += chunk
+        cut = max(self.raw.rfind(" "), self.raw.rfind("\n"), self.raw.rfind("\t"))
+        if cut < 0:
+            return ""
+        shown = _uz(self.raw[: cut + 1], _reply_language(self.raw, self.language))
+        if len(shown) <= len(self.sent) or not shown.startswith(self.sent):
+            return ""
+        delta, self.sent = shown[len(self.sent) :], shown
+        return delta
+
+
+@contextlib.asynccontextmanager
+async def _own_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """A session for work that outlives the endpoint function.
+
+    The request's `DbSession` is closed when the endpoint returns — before a
+    streamed body is written — so the answer is written through a session of
+    its own, from the same dependency (and the same override under test).
+    """
+    factory = request.app.dependency_overrides.get(get_session, get_session)
+    async with contextlib.asynccontextmanager(factory)() as session:
+        yield session
+
+
+@router.post(
+    "/ask/stream",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {}}, "description": "SSE"}},
+)
+async def ask_stream(
+    payload: AssistantAsk,
+    request: Request,
+    session: DbSession,
+    user_id: OptionalUserDep,
+    actor: TrackerDep,
+    x_guest_id: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
+    """`/ask`, with the answer streamed as it is written."""
+    # Before the stream opens, so a refusal is the same 429 `/ask` returns.
+    guest_left = await _spend(session, request, user_id, x_guest_id, payload.message)
+
+    queue: asyncio.Queue[tuple[str, dict]] = asyncio.Queue()
+    live = _LiveText(payload.language)
+
+    async def on_answer(chunk: str) -> None:
+        delta = live.push(chunk)
+        if delta:
+            queue.put_nowait(("delta", {"text": delta}))
+
+    async def write() -> None:
+        # Runs to the end even if she closes the page: the model call is
+        # already paid for, and its trace must be stored like any other.
+        try:
+            async with _own_session(request) as own:
+                answer = await ai_assistant.ask(
+                    own,
+                    user_id=user_id,
+                    question=payload.message,
+                    language=payload.language,
+                    route=payload.route,
+                    history=payload.history,
+                    on_answer=on_answer,
+                )
+                await telemetry.record_event(
+                    own, name="ai_assistant_used", actor=actor, properties={"section": "ask"}
+                )
+                await own.commit()
+            reply = _reply(answer, guest_left, payload.language)
+            queue.put_nowait(("reply", reply.model_dump(mode="json")))
+        except Exception:
+            logger.exception("streamed assistant answer failed")
+            queue.put_nowait(("error", {"detail": "assistant_failed"}))
+
+    task = asyncio.create_task(write())
+    _streaming.add(task)
+    task.add_done_callback(_streaming.discard)
+
+    async def events() -> AsyncIterator[bytes]:
+        # The first bytes go out at once, so the headers do too.
+        yield b": open\n\n"
+        while True:
+            try:
+                event, data = await asyncio.wait_for(queue.get(), STREAM_KEEPALIVE_SECONDS)
+            except TimeoutError:
+                yield b": keep-alive\n\n"
+                continue
+            yield _sse(event, data)
+            if event != "delta":
+                return
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers=STREAM_HEADERS)
 
 
 # --- the coach -------------------------------------------------------------

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, timedelta
 
+import pytest
 from sqlalchemy import select
 
 from app.core.constants import GoalHorizon, ProgramCategory, ScoreDimension
@@ -97,6 +98,7 @@ async def test_a_step_without_a_course_is_marked_by_her_and_can_be_unmarked(
     assert undone.json()["completed_at"] is None
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_a_new_draft_replaces_the_old_unaccepted_one(session):
     """D-17: "another option" used to leave every earlier draft behind."""
     user = User(phone=_phone())
@@ -113,6 +115,7 @@ async def test_a_new_draft_replaces_the_old_unaccepted_one(session):
     assert accepted.id in ids and second.id in ids and first.id not in ids
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_the_fallback_plan_names_areas_in_words_and_grows_with_the_horizon(session):
     """D-09: no raw enum values, the reformed alphabet, more steps for longer horizons."""
     user = User(phone=_phone())

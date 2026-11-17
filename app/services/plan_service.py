@@ -96,6 +96,40 @@ async def diagnostic_focus(
     return ranked[: diagnostic.TOP_PRIORITIES], list(attempt.goals or [])
 
 
+#: Courses taken from each of her interest directions, and how many directions.
+_PER_INTEREST_DIRECTION = 3
+_INTEREST_DIRECTIONS = 4
+
+
+async def diagnostic_profile(session: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """What she told the latest check-in about herself, as lines for the model."""
+    from app.services import diagnostic
+
+    attempt = await diagnostic.latest_attempt(session, user_id)
+    return diagnostic.profile_lines(attempt.profile if attempt else None)
+
+
+async def interest_courses(session: AsyncSession, user_id: uuid.UUID, lang: str) -> list[Program]:
+    """The first courses of the directions her chosen fields lead to.
+
+    The same directions «Yönalişlar» shows her, so a woman who said she is
+    interested in IT finds IT courses in her plan, not only courses for her
+    lowest-scoring dimension. Empty when she chose no field, or none is stocked.
+    """
+    from app.services import learning_directions
+
+    her = await learning_directions.for_user(session, user_id, language=lang)
+    out: list[Program] = []
+    seen: set[uuid.UUID] = set()
+    chosen = [p for p in her.picked if p.reason == "interest"][:_INTEREST_DIRECTIONS]
+    for picked in chosen:
+        for program in picked.courses[:_PER_INTEREST_DIRECTION]:
+            if program.id not in seen:
+                seen.add(program.id)
+                out.append(program)
+    return out
+
+
 # Static text for the rule-based plan. Localised because this path runs exactly
 # when the model is unavailable — the user should not be handed Uzbek because
 # the AI happened to be down.
@@ -204,6 +238,23 @@ async def discard_drafts(session: AsyncSession, user_id: uuid.UUID) -> int:
     return count
 
 
+class DiagnosticRequiredError(Exception):
+    """She has not sat the diagnostic, so there is nothing to build a plan on."""
+
+
+async def require_diagnostic(session: AsyncSession, user_id: uuid.UUID) -> None:
+    """A plan is built from her diagnostic; without one there is no plan.
+
+    Starter plans drafted before any assessment read as the platform having
+    judged her already, and the product decision is that the roadmap comes
+    after the diagnostic, not before it.
+    """
+    from app.services.scoring import is_baseline_assessment
+
+    if await is_baseline_assessment(session, user_id):
+        raise DiagnosticRequiredError
+
+
 async def generate_plan(
     session: AsyncSession,
     *,
@@ -218,6 +269,7 @@ async def generate_plan(
     Earlier drafts she never accepted are discarded first: one draft at a time.
     """
     gateway = gateway or llm_gateway
+    await require_diagnostic(session, user_id)
     await discard_drafts(session, user_id)
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
@@ -254,7 +306,8 @@ async def generate_plan(
     # out of a catalogue of eight hundred — so the plan named courses at random
     # and the same one could fill two steps.
     picks = await _ranked_for_focus(session, user_id, focus, lang)
-    programs = _shortlist(picks)
+    programs = _with_interests(await interest_courses(session, user_id, lang), _shortlist(picks))
+    about_her = await diagnostic_profile(session, user_id)
 
     if not gateway.enabled:
         logger.info("AI disabled — generating rule-based plan for %s", user_id)
@@ -275,6 +328,7 @@ async def generate_plan(
         notes,
         priorities=priorities,
         diagnostic_goals=diagnostic_goals,
+        about_her=about_her,
     )
 
     try:
@@ -457,6 +511,17 @@ def _shortlist(picks: list[tuple[ScoreDimension, list[Program]]]) -> list[Progra
     return out[:_SHORTLIST]
 
 
+def _with_interests(interest: list[Program], shortlist: list[Program]) -> list[Program]:
+    """Her interest courses first, then the dimension shortlist, no repeats."""
+    seen: set[uuid.UUID] = set()
+    out: list[Program] = []
+    for program in [*interest, *shortlist]:
+        if program.id not in seen:
+            seen.add(program.id)
+            out.append(program)
+    return out[: _SHORTLIST + len(interest)]
+
+
 def _program_title(program: Program, lang: str = "uz") -> str:
     """Uzbek title, falling back to whichever translation exists."""
     return (
@@ -478,6 +543,7 @@ def _build_prompt(
     *,
     priorities: list[ScoreDimension] | None = None,
     diagnostic_goals: list[str] | None = None,
+    about_her: list[str] | None = None,
 ) -> str:
     """Assemble the user-turn payload. No direct identifiers are included."""
     weeks = HORIZON_DAYS[horizon] // 7
@@ -499,6 +565,9 @@ def _build_prompt(
         ]
     if diagnostic_goals:
         lines += ["GOALS CHOSEN IN THE DIAGNOSTIC: " + ", ".join(diagnostic_goals)]
+    if about_her:
+        lines += ["", "WHAT SHE TOLD THE DIAGNOSTIC:"]
+        lines += [f"- {line}" for line in about_her]
 
     lines += ["", "USER GOALS:"]
     lines += [f"- [{g.horizon.value}] {g.title}" for g in goals] or ["- (none stated)"]

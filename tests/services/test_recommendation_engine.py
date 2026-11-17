@@ -383,6 +383,7 @@ async def test_insights_explain_a_dimension_with_her_own_answers(session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_rule_based_plan_finds_a_course_for_education_and_skills(session):
     """The fallback looked for the dimension's name inside the category's.
 

@@ -25,6 +25,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -54,6 +55,7 @@ from app.services.age_gate import (
     blocks_adult_health,
     is_minor,
 )
+from app.services.answer_stream import AnswerFieldStream
 from app.services.audit_service import has_consent
 from app.services.diagnostic import level_for
 from app.services.llm_gateway import LlmResponse, LlmUnavailableError, llm_gateway
@@ -73,6 +75,10 @@ from app.services.scoring import composite_score, distinctly_weakest
 from app.services.uzbek import fold, question_language, to_new_alphabet
 
 logger = logging.getLogger(__name__)
+
+#: Receives the reply's `answer` text as the model writes it, a few characters
+#: at a time. Display only: the returned `AssistantAnswer` is what counts.
+OnAnswer = Callable[[str], Awaitable[None]]
 
 # How many questions someone gets before signing up. Deliberately enough to see
 # what the assistant is, and not enough to use it as a free service.
@@ -96,6 +102,8 @@ class Persona:
     name: str | None = None
     language: str = "uz"
     interests: list[str] = field(default_factory=list)
+    #: What she told her latest diagnostic: situation, goals, fields of interest.
+    diagnostic: list[str] = field(default_factory=list)
     #: What the platform records that she can do, from the canonical skill
     #: layer — not the free text she once typed into her profile. Each note
     #: carries how well the skill is known, because "learned" and "verified"
@@ -173,6 +181,11 @@ class Persona:
             )
         if self.goals:
             lines.append(f"- her stated goals: {'; '.join(self.goals)}")
+        if self.diagnostic:
+            lines.append(
+                "- what she told her diagnostic (remember it; answer with it in mind): "
+                + "; ".join(self.diagnostic)
+            )
         if self.level and self.composite is not None:
             label = _LEVEL_LABEL.get(self.level, {}).get(self.language) or self.level
             lines.append(
@@ -224,6 +237,19 @@ class AssistantAnswer:
     resources: list[dict] = field(default_factory=list)
     #: Composed by rules or quoted because the model was unavailable.
     degraded: bool = False
+
+
+async def _diagnostic_lines(session: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """Her latest diagnostic answers about herself, as plain lines.
+
+    The profile form's interests are often empty; the diagnostic is where she
+    actually said what she wants and what draws her. Read only after the
+    personalisation consent check, like everything else in the persona.
+    """
+    from app.services import diagnostic
+
+    attempt = await diagnostic.latest_attempt(session, user_id)
+    return diagnostic.profile_lines(attempt.profile if attempt else None)
 
 
 async def build_persona(
@@ -302,6 +328,7 @@ async def build_persona(
         name=(profile.full_name.split()[0] if profile and profile.full_name else None),
         language=language,
         interests=list(profile.interests) if profile else [],
+        diagnostic=await _diagnostic_lines(session, user_id),
         skills=await skill_service.notes_for(session, user_id, language=language),
         education_level=profile.education_level if profile else None,
         profession=profile.profession if profile else None,
@@ -471,6 +498,7 @@ async def ask_education(
     persona: Persona | None = None,
     gateway=None,
     history: list | None = None,
+    on_answer: OnAnswer | None = None,
 ) -> AssistantAnswer:
     """The conversational half of the education answer.
 
@@ -510,6 +538,7 @@ async def ask_education(
         schema=ASSISTANT_EDUCATION_SCHEMA,
         max_tokens=8000,
         effort="low",
+        on_answer=on_answer,
     )
     if payload is None:
         # Degrade, don't fail: the catalogue search needs no model.
@@ -658,6 +687,7 @@ async def ask_health(
     persona: Persona | None = None,
     gateway=None,
     history: list | None = None,
+    on_answer: OnAnswer | None = None,
 ) -> AssistantAnswer:
     """Age-appropriate health information. Never a diagnosis."""
     gateway = gateway or llm_gateway
@@ -708,6 +738,7 @@ async def ask_health(
         schema=ASSISTANT_HEALTH_SCHEMA,
         max_tokens=8000,
         effort="low",
+        on_answer=on_answer,
     )
     if payload is None:
         answer = _unavailable(AssistantSection.HEALTH, persona, response)
@@ -963,6 +994,7 @@ async def ask(
     route: str = "auto",
     gateway=None,
     history: list | None = None,
+    on_answer: OnAnswer | None = None,
 ) -> AssistantAnswer:
     """One entry point for every question.
 
@@ -971,6 +1003,11 @@ async def ask(
     not. The router picks the capability — portal documentation, career advice,
     or age-appropriate health — and the answer comes back in one shape
     whichever route it took.
+
+    `on_answer` receives the education and health answers as they are
+    written. A portal answer is not streamed: the navigator decides *after*
+    writing it whether it is grounded enough to show (the confidence floor,
+    the hand-off), and text that may be withdrawn is not put in front of her.
     """
     gateway = gateway or llm_gateway
     persona = await build_persona(session, user_id, language=_answer_language(question, language))
@@ -1047,6 +1084,7 @@ async def ask(
             persona=persona,
             gateway=gateway,
             history=history,
+            on_answer=on_answer,
         )
         answer.route = "health"
         return answer
@@ -1059,6 +1097,7 @@ async def ask(
         persona=persona,
         gateway=gateway,
         history=history,
+        on_answer=on_answer,
     )
     answer.route = "education"
     return answer
@@ -1072,7 +1111,14 @@ def _feature(section: AssistantSection) -> str:
 
 
 async def _complete(
-    gateway, *, system, content, schema, max_tokens: int = 16000, effort: str = "medium"
+    gateway,
+    *,
+    system,
+    content,
+    schema,
+    max_tokens: int = 16000,
+    effort: str = "medium",
+    on_answer: OnAnswer | None = None,
 ):
     """One structured round-trip.
 
@@ -1084,7 +1130,21 @@ async def _complete(
 
     Bounded by the interactive timeout: past it the caller degrades instead of
     holding the page open.
+
+    With `on_answer` the call is streamed and the schema's `answer` string is
+    read out of the JSON as it arrives. The request, the parse and the trace
+    are the same either way; only the delivery differs.
     """
+    streaming: dict = {}
+    if on_answer is not None:
+        reader = AnswerFieldStream("answer")
+
+        async def on_text(chunk: str) -> None:
+            text = reader.feed(chunk)
+            if text:
+                await on_answer(text)
+
+        streaming["on_text"] = on_text
     try:
         response: LlmResponse = await gateway.complete(
             system=system,
@@ -1093,6 +1153,7 @@ async def _complete(
             max_tokens=max_tokens,
             effort=effort,
             timeout=settings.ai_interactive_timeout_seconds,
+            **streaming,
         )
     except LlmUnavailableError as exc:
         logger.warning("assistant unavailable: %s", exc)

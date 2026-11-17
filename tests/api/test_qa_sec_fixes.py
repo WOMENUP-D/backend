@@ -655,16 +655,17 @@ async def test_i23_a_partner_names_her_by_its_pseudonym(client, session, monkeyp
     assert payload["womanup_id"] != str(user.id)
 
     body = json.dumps({"source": "edu_job", "outcome_type": "employment"}).encode()
+    # One clock reading, two distinct stamps: "now - 1" read later could land
+    # on the first stamp and be refused as a replay of the first signature.
+    now = int(time.time())
     url = f"{API}/integrations/edu_job/outcomes?user_id={payload['womanup_id']}"
     assert (
-        await client.post(url, content=body, headers=_signed("edu-secret", body))
+        await client.post(url, content=body, headers=_signed("edu-secret", body, now))
     ).status_code == 201
     other = integration_gateway.partner_pseudonym(IntegrationSystem.INVEST_HUB, user.id)
     url = f"{API}/integrations/edu_job/outcomes?user_id={other}"
     assert (
-        await client.post(
-            url, content=body, headers=_signed("edu-secret", body, int(time.time()) - 1)
-        )
+        await client.post(url, content=body, headers=_signed("edu-secret", body, now - 1))
     ).status_code == 404
     count = await session.scalar(select(func.count()).select_from(IntegrationEvent))
     assert count == 1

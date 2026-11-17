@@ -98,6 +98,12 @@ Produce a realistic roadmap for the requested horizon:
   horizon given to you.
 - When DIAGNOSTIC PRIORITIES are given, follow their order: they already weigh
   her need, her chosen goals, her skill gaps and her situation.
+- WHAT SHE TOLD THE DIAGNOSTIC is her own account: her situation, goals, the
+  fields she is interested in and what makes development hard. Build the plan
+  around it. When she named fields of interest, most course steps should come
+  from those fields (the catalogue lists their courses first), while still
+  serving her priorities; never ignore them for a generic plan. Respect what
+  makes it hard for her (time, money, confidence) in the pace and the steps.
 - Explain your reasoning for each action in one sentence, in the user's
   language.
 

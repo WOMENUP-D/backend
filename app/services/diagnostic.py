@@ -32,6 +32,7 @@ import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -460,6 +461,67 @@ def profile_from(submission: Submission) -> dict | None:
         levels[skill] = int(option.get("level", 0))
     profile["skill_levels"] = levels
     return profile
+
+
+#: How each profile answer is named when it is told to a model, in order.
+PROFILE_LINES: tuple[tuple[str, str], ...] = (
+    ("situation", "situation"),
+    ("goal_primary", "main goal"),
+    ("goals_other", "other goals"),
+    ("interests", "fields she is interested in"),
+    ("study_field", "field of study"),
+    ("position", "current position"),
+    ("career_wish", "the work she wants"),
+    ("first_job_when", "when she wants a first job"),
+    ("job_search_duration", "how long she has been looking for work"),
+    ("business_stage", "business stage"),
+    ("business_challenges", "business challenges"),
+    ("difficulties", "what makes development hard for her"),
+)
+GOAL_TEXT_LIMIT = 300
+
+
+@lru_cache(maxsize=1)
+def _option_words() -> dict[str, dict[str, dict]]:
+    """Question code → option id → the option's words, from the active bank."""
+    bank = load_bank()
+    return {
+        question["code"]: {
+            option["id"]: option_label(option) for option in question.get("options") or []
+        }
+        for question in bank.get("questions", [])
+        if question.get("code")
+    }
+
+
+def profile_lines(profile: dict | None) -> list[str]:
+    """What she told the diagnostic about herself, as plain lines for a model.
+
+    The attempt keeps option ids; a model given "it_programming" or a blank
+    label cannot tell what she meant, so each id is turned back into its words
+    (English, the language the prompts are written in — the model answers in
+    hers). Her own sentence about her goal is passed as written, cut short.
+    """
+    if not profile:
+        return []
+    words = _option_words()
+    code_for = {key: code for code, key in PROFILE_FIELDS.items()}
+    lines: list[str] = []
+    for key, name in PROFILE_LINES:
+        value = profile.get(key)
+        if not value:
+            continue
+        ids = value if isinstance(value, list) else [value]
+        options = words.get(code_for.get(key, ""), {})
+        labels = [
+            (options.get(str(i)) or {}).get("en") or (options.get(str(i)) or {}).get("ru") or str(i)
+            for i in ids
+        ]
+        lines.append(f"{name}: {', '.join(labels)}")
+    text = profile.get("goal_text")
+    if isinstance(text, str) and text.strip():
+        lines.append(f"her goal in her own words: {text.strip()[:GOAL_TEXT_LIMIT]}")
+    return lines
 
 
 def legacy_goals(profile: dict | None) -> list[str]:

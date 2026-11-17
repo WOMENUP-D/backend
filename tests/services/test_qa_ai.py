@@ -531,6 +531,7 @@ async def test_the_persona_does_not_invent_a_weakness(session, user_id):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_plan_generation_spends_the_ai_quota(
     client, session, auth_headers, user_id, monkeypatch
 ):

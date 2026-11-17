@@ -188,3 +188,18 @@ async def admin_headers(session: AsyncSession) -> dict[str, str]:
     await session.flush()
     token = create_token(admin_id, Role.ADMIN, "access", {"roles": [Role.ADMIN.value]})
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def assume_diagnostic_taken(monkeypatch):
+    """For tests about what a plan contains, not about when one may exist.
+
+    Plans need a sat diagnostic (`plan_service.require_diagnostic`); the gate
+    itself is covered in tests/api/test_plan_needs_diagnostic.py.
+    """
+    from app.services import plan_service
+
+    async def _taken(session, user_id):
+        return None
+
+    monkeypatch.setattr(plan_service, "require_diagnostic", _taken)

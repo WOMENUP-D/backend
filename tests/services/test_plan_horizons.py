@@ -4,6 +4,7 @@ month holds a month's worth, and the focus follows the latest check-in."""
 import uuid
 from datetime import date, timedelta
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import GoalHorizon, ScoreDimension
@@ -92,6 +93,7 @@ def test_rule_based_steps_are_spread_across_the_horizon():
 # --- generation -------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_a_one_month_plan_holds_a_months_worth(session: AsyncSession):
     user = _user(session)
     await session.flush()
@@ -108,6 +110,7 @@ async def test_a_one_month_plan_holds_a_months_worth(session: AsyncSession):
     assert "HORIZON: 1 months (4 weeks; week_offset 0-3)" in model.prompt
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_a_three_month_plan_keeps_its_weeks(session: AsyncSession):
     user = _user(session)
     await session.flush()
@@ -121,6 +124,7 @@ async def test_a_three_month_plan_keeps_its_weeks(session: AsyncSession):
     assert dues == [timedelta(days=7), timedelta(days=42), timedelta(days=84)]
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_without_the_model_a_month_still_fits_in_a_month(session: AsyncSession):
     user = _user(session)
     await session.flush()
@@ -169,6 +173,7 @@ async def test_the_plan_starts_from_the_check_in_priorities(session: AsyncSessio
     assert "GOALS CHOSEN IN THE DIAGNOSTIC: business" in model.prompt
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_the_api_accepts_a_one_month_horizon(client, session, auth_headers, user_id):
     session.add(User(id=user_id, phone=f"+9989{uuid.uuid4().int % 10**8:08d}"))
     await session.flush()
@@ -182,6 +187,7 @@ async def test_the_api_accepts_a_one_month_horizon(client, session, auth_headers
 # --- Uzbek alphabet ---------------------------------------------------------
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_an_uzbek_plan_keeps_every_dimension_value(session: AsyncSession):
     """Only prose is converted to the reformed alphabet: ``leadership`` must not
     become ``leaderşip`` on its way into the enum column."""
@@ -200,6 +206,7 @@ async def test_an_uzbek_plan_keeps_every_dimension_value(session: AsyncSession):
     assert plan.items[0].action == "Şaxsiy maqsadlarni yoziş"
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_an_unknown_dimension_drops_the_step_not_the_plan(session: AsyncSession):
     user = _user(session)
     await session.flush()

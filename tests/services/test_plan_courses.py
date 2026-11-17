@@ -10,6 +10,7 @@ steps, and a step bound to someone else's course carries the link to it.
 
 import uuid
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import Language, ProgramCategory, ProgramFormat, ScoreDimension
@@ -56,6 +57,7 @@ def test_nothing_said_means_nothing_is_lifted():
     assert _relevance(_course("Dizayn"), []) == 0
 
 
+@pytest.mark.usefixtures("assume_diagnostic_taken")
 async def test_the_course_she_asked_for_comes_first_and_none_repeats(
     session: AsyncSession,
 ) -> None:
