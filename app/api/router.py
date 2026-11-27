@@ -10,6 +10,7 @@ from app.api import (
     assistant,
     auth,
     career_paths,
+    conversations,
     diagnostic,
     events,
     insights,
@@ -51,6 +52,7 @@ api_router.include_router(organizations.admin_router)
 api_router.include_router(mentors.router)
 api_router.include_router(news.router)
 api_router.include_router(ai.router)
+api_router.include_router(conversations.router)
 api_router.include_router(assistant.router)
 api_router.include_router(notifications.router)
 api_router.include_router(integrations.router)
