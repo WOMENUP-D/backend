@@ -14,6 +14,7 @@ from app.models.base import Base
 from app.models.career import EducationEntry, WorkExperience
 from app.models.career_path import CareerPath, UserCareerPath
 from app.models.consent import ConsentLog
+from app.models.conversation import AssistantConversation
 from app.models.integration import IntegrationEvent
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.models.learning_path import LearningPath, LearningPathItem, UserLearningPath
@@ -41,6 +42,7 @@ from app.models.vacancy import VacancyCourseSuggestion
 __all__ = [
     "AiInteraction",
     "AnalyticsEvent",
+    "AssistantConversation",
     "Application",
     "Assessment",
     "AssessmentAnswer",

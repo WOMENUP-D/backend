@@ -374,6 +374,9 @@ class Settings(BaseSettings):
     # Health questions are sensitive data: their excerpts go sooner (I-16).
     # Safety rows never hold her words at all — only a category code.
     ai_sensitive_trace_retention_days: int = 30
+    # Her saved assistant conversations (models/conversation.py): one she has
+    # not opened or added to for this many days is removed by the sweep.
+    assistant_chat_retention_days: int = 365
     otp_retention_hours: int = 24
     # The largest request body the API accepts. Nothing here uploads files;
     # the biggest legitimate body is a partner's listing batch.

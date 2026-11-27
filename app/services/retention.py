@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.audit import AiInteraction
 from app.models.auth_token import RevokedToken
+from app.models.conversation import AssistantConversation
 from app.models.rate_limit import AuthThrottle
 from app.models.user import OtpChallenge
 
@@ -34,6 +35,7 @@ class Purged:
     otp_challenges: int = 0
     revoked_tokens: int = 0
     throttle_rows: int = 0
+    conversations: int = 0
 
 
 async def purge(session: AsyncSession, *, now: datetime | None = None) -> Purged:
@@ -93,6 +95,14 @@ async def purge(session: AsyncSession, *, now: datetime | None = None) -> Purged
 
     result = await session.execute(delete(AuthThrottle).where(AuthThrottle.expires_at < now))
     out.throttle_rows = result.rowcount or 0
+
+    # Saved conversations she has not opened or added to for a year (by
+    # default) go entirely: the list is for coming back to, not an archive.
+    chat_cutoff = now - timedelta(days=max(1, settings.assistant_chat_retention_days))
+    result = await session.execute(
+        delete(AssistantConversation).where(AssistantConversation.updated_at < chat_cutoff)
+    )
+    out.conversations = result.rowcount or 0
     return out
 
 
@@ -100,8 +110,14 @@ async def erase_user(
     session: AsyncSession, user_id: uuid.UUID, identifiers: list[str] | None = None
 ) -> None:
     """What erasure removes beyond the account row: the text of her
-    conversations with the assistant, and any one-time codes addressed to
-    her. The traces stay, blank; the aggregate figures stay, anonymous."""
+    conversations with the assistant — the trace excerpts and the saved
+    conversation list — and any one-time codes addressed to her. The traces
+    stay, blank; the aggregate figures stay, anonymous."""
+    # The list would go with the account row (ON DELETE CASCADE); removed here
+    # as well so erasure does not depend on how the row itself is retired.
+    await session.execute(
+        delete(AssistantConversation).where(AssistantConversation.user_id == user_id)
+    )
     await session.execute(
         update(AiInteraction)
         .where(AiInteraction.user_id == user_id)
